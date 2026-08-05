@@ -1,0 +1,169 @@
+import { useEffect, useState, useCallback } from 'react';
+import { products as productsApi, manufacturers as mfgApi } from '../api/endpoints';
+import { apiErrorMessage } from '../api/client';
+import { useToast } from '../context/ToastContext';
+import Modal from '../components/Modal';
+import { TableSkeleton } from '../components/Skeleton';
+
+const EMPTY_FORM = { manufacturer_id: '', name: '', size_packaging: '', price: '' };
+
+function money(n) {
+  return Number(n || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+}
+
+export default function ProductsPage() {
+  const toast = useToast();
+  const [rows, setRows] = useState([]);
+  const [mfgs, setMfgs] = useState([]);
+  const [search, setSearch] = useState('');
+  const [mfgFilter, setMfgFilter] = useState('');
+  const [loading, setLoading] = useState(true);
+  const [editing, setEditing] = useState(null);
+  const [form, setForm] = useState(EMPTY_FORM);
+  const [saving, setSaving] = useState(false);
+
+  const load = useCallback(async () => {
+    try {
+      const res = await productsApi.list({ search: search || undefined, manufacturer_id: mfgFilter || undefined });
+      setRows(res.data);
+    } catch (err) {
+      toast.error(apiErrorMessage(err));
+    } finally {
+      setLoading(false);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [search, mfgFilter]);
+
+  useEffect(() => { load(); }, [load]);
+  useEffect(() => { mfgApi.list().then((res) => setMfgs(res.data)).catch(() => {}); }, []);
+
+  const openNew = () => { setForm(EMPTY_FORM); setEditing({}); };
+  const openEdit = (p) => { setForm({ ...EMPTY_FORM, ...p }); setEditing(p); };
+
+  const handleSave = async (e) => {
+    e.preventDefault();
+    setSaving(true);
+    try {
+      const payload = { ...form, manufacturer_id: Number(form.manufacturer_id), price: Number(form.price) };
+      if (editing?.id) {
+        await productsApi.update(editing.id, payload);
+        toast.success('Product updated.');
+      } else {
+        await productsApi.create(payload);
+        toast.success('Product added.');
+      }
+      setEditing(null);
+      load();
+    } catch (err) {
+      toast.error(apiErrorMessage(err));
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const handleDelete = async (p) => {
+    if (!window.confirm(`Delete product "${p.name}"? This cannot be undone.`)) return;
+    try {
+      await productsApi.remove(p.id);
+      toast.success('Product deleted.');
+      load();
+    } catch (err) {
+      toast.error(apiErrorMessage(err));
+    }
+  };
+
+  return (
+    <div className="content">
+      <div className="page-header">
+        <div>
+          <h1>Products</h1>
+          <p>{rows.length} total</p>
+        </div>
+        <button className="btn" onClick={openNew} disabled={mfgs.length === 0}>+ Add Product</button>
+      </div>
+
+      {mfgs.length === 0 && !loading && (
+        <div className="error-banner" style={{ background: 'var(--amber-light)', color: 'var(--amber)' }}>
+          Add a manufacturer first — products must be linked to one.
+        </div>
+      )}
+
+      <div className="card">
+        <div className="toolbar">
+          <input type="text" placeholder="Search products…" value={search} onChange={(e) => setSearch(e.target.value)} />
+          <select value={mfgFilter} onChange={(e) => setMfgFilter(e.target.value)}>
+            <option value="">All manufacturers</option>
+            {mfgs.map((m) => <option key={m.id} value={m.id}>{m.name}</option>)}
+          </select>
+        </div>
+        {loading ? (
+          <TableSkeleton columns={6} rows={5} />
+        ) : (
+          <div className="table-wrap">
+            <table className="data-table">
+              <thead>
+                <tr>
+                  <th>Product</th>
+                  <th>Manufacturer</th>
+                  <th>Size / Packaging</th>
+                  <th className="num">Price</th>
+                  <th>Status</th>
+                  <th></th>
+                </tr>
+              </thead>
+              <tbody>
+                {rows.map((p) => (
+                  <tr key={p.id}>
+                    <td><strong>{p.name}</strong></td>
+                    <td>{p.manufacturer_name}</td>
+                    <td>{p.size_packaging || '—'}</td>
+                    <td className="num">{money(p.price)}</td>
+                    <td>{p.is_active ? <span className="badge badge-green">active</span> : <span className="badge badge-neutral">inactive</span>}</td>
+                    <td style={{ display: 'flex', gap: 6, justifyContent: 'flex-end' }}>
+                      <button className="btn btn-secondary btn-sm" onClick={() => openEdit(p)}>Edit</button>
+                      <button className="btn btn-danger btn-sm" onClick={() => handleDelete(p)}>Delete</button>
+                    </td>
+                  </tr>
+                ))}
+                {rows.length === 0 && (
+                  <tr><td colSpan={6}><div className="empty-state">No products found.</div></td></tr>
+                )}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </div>
+
+      {editing !== null && (
+        <Modal title={editing.id ? 'Edit Product' : 'Add Product'} onClose={() => setEditing(null)}>
+          <form onSubmit={handleSave}>
+            <div className="field">
+              <label>Manufacturer</label>
+              <select value={form.manufacturer_id} onChange={(e) => setForm({ ...form, manufacturer_id: e.target.value })} required>
+                <option value="" disabled>Select a manufacturer</option>
+                {mfgs.map((m) => <option key={m.id} value={m.id}>{m.name}</option>)}
+              </select>
+            </div>
+            <div className="field">
+              <label>Product Name</label>
+              <input value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} required />
+            </div>
+            <div className="field-row">
+              <div className="field">
+                <label>Size / Packaging</label>
+                <input value={form.size_packaging} onChange={(e) => setForm({ ...form, size_packaging: e.target.value })} placeholder="e.g. 500ml x 24" />
+              </div>
+              <div className="field">
+                <label>Price</label>
+                <input type="number" step="0.01" min="0" value={form.price} onChange={(e) => setForm({ ...form, price: e.target.value })} required />
+              </div>
+            </div>
+            <button className="btn" type="submit" disabled={saving} style={{ width: '100%', justifyContent: 'center' }}>
+              {saving ? 'Saving…' : 'Save Product'}
+            </button>
+          </form>
+        </Modal>
+      )}
+    </div>
+  );
+}

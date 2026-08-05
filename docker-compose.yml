@@ -1,0 +1,56 @@
+services:
+  postgres:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD in your .env file}
+      POSTGRES_DB: dsl_system
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+    # Not published to the host by default — only the backend container needs
+    # to reach it, via Docker's internal network. Uncomment to allow direct
+    # access from your host machine (e.g. to inspect with a local DB client).
+    # ports:
+    #   - "5432:5432"
+
+  backend:
+    build: ./backend
+    restart: unless-stopped
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      NODE_ENV: production
+      PORT: 4000
+      DATABASE_URL: postgresql://postgres:${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD in your .env file}@postgres:5432/dsl_system
+      CLIENT_ORIGIN: ${CLIENT_ORIGIN:?Set CLIENT_ORIGIN in your .env file (your real frontend URL)}
+      JWT_SECRET: ${JWT_SECRET:?Set JWT_SECRET in your .env file (32+ random characters)}
+      JWT_EXPIRES_IN: 8h
+      SEED_ADMIN_NAME: ${SEED_ADMIN_NAME:-Admin}
+      SEED_ADMIN_EMAIL: ${SEED_ADMIN_EMAIL:?Set SEED_ADMIN_EMAIL in your .env file}
+      SEED_ADMIN_PASSWORD: ${SEED_ADMIN_PASSWORD:?Set SEED_ADMIN_PASSWORD in your .env file}
+    # Not published directly — the frontend's nginx container proxies /api and
+    # /socket.io to it over the internal Docker network. Uncomment only for
+    # direct debugging.
+    # ports:
+    #   - "4000:4000"
+
+  frontend:
+    build:
+      context: ./frontend
+      args:
+        VITE_GOOGLE_CLIENT_ID: ${VITE_GOOGLE_CLIENT_ID:-}
+    restart: unless-stopped
+    depends_on:
+      - backend
+    ports:
+      - "${FRONTEND_PORT:-80}:80"
+
+volumes:
+  postgres_data:
