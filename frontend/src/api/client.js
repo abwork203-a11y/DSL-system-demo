@@ -1,6 +1,8 @@
 import axios from 'axios';
 
-const client = axios.create({ baseURL: '/api', withCredentials: true });
+const API_BASE_URL = import.meta.env.VITE_API_URL || '';
+
+const client = axios.create({ baseURL: `${API_BASE_URL}/api`, withCredentials: true });
 
 function readCookie(name) {
   const match = document.cookie.match(new RegExp(`(?:^|; )${name}=([^;]*)`));
@@ -38,7 +40,15 @@ client.interceptors.response.use(
 export default client;
 
 export function apiErrorMessage(err) {
-  return err.response?.data?.error || err.message || 'Something went wrong.';
+  const raw = err.response?.data?.error;
+  // Our own backend always sends `error` as a plain string. If it's ever
+  // anything else — e.g. a platform-level error page (Vercel/Render) whose
+  // JSON body happens to also use an `error` key, but nests an object like
+  // {code, message} under it — treat that as "no usable message" rather
+  // than risk handing an object to a component that renders it directly.
+  if (typeof raw === 'string' && raw.trim()) return raw;
+  if (typeof err.message === 'string' && err.message.trim()) return err.message;
+  return 'Something went wrong.';
 }
 
 // Export/invoice routes now rely on the session cookie (sent automatically
