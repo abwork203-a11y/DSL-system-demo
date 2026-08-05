@@ -15,15 +15,14 @@ function ensureCsrfCookie(req, res, next) {
     const token = crypto.randomBytes(32).toString('hex');
     res.cookie(CSRF_COOKIE, token, {
       httpOnly: false,
-      sameSite: 'lax',
+      sameSite: process.env.NODE_ENV === 'production' ? 'none' : 'lax',
       secure: process.env.NODE_ENV === 'production',
       path: '/',
     });
-    req.cookies[CSRF_COOKIE] = token; // so the same request can already rely on it
+    req.cookies[CSRF_COOKIE] = token;
   }
   next();
 }
-
 // For any state-changing request, the header the frontend sent must match the
 // cookie the browser sent. A malicious site making the browser fire a
 // cross-site POST can't read our cookie (browsers block that), so it can't
