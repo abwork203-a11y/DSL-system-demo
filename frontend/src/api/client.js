@@ -4,17 +4,12 @@ const API_BASE_URL = import.meta.env.VITE_API_URL || '';
 
 const client = axios.create({ baseURL: `${API_BASE_URL}/api`, withCredentials: true });
 
-function readCookie(name) {
-  const match = document.cookie.match(new RegExp(`(?:^|; )${name}=([^;]*)`));
-  return match ? decodeURIComponent(match[1]) : null;
-}
-
-// Cross-origin note: now that the frontend (Vercel) and backend (Render) are
-// on different domains, client-side JS can no longer read the csrf_token
-// cookie directly via document.cookie — that only exposes cookies belonging
-// to the page's own origin. So instead of reading the cookie, we fetch the
-// token once from a dedicated endpoint (which reads it server-side, where
-// it's not cross-origin) and cache it in memory for the life of the page.
+// CSRF tokens are now purely body-delivered, not cookie-based — the backend
+// signs a self-contained token and hands it back in the JSON response, since
+// a cross-site cookie set by Render in response to a Vercel-origin request
+// isn't reliably stored by modern browsers (third-party cookie blocking,
+// especially in incognito). Fetched lazily on the first mutating request and
+// cached in memory for the life of the page.
 let csrfTokenPromise = null;
 function getCsrfToken() {
   if (!csrfTokenPromise) {
@@ -32,9 +27,7 @@ function getCsrfToken() {
 client.interceptors.request.use(async (config) => {
   const method = (config.method || 'get').toUpperCase();
   if (!['GET', 'HEAD', 'OPTIONS'].includes(method)) {
-    // Fall back to the cookie read too (harmless, and keeps this working
-    // unchanged for same-origin setups like local dev through the Vite proxy).
-    const token = (await getCsrfToken()) || readCookie('csrf_token');
+    const token = await getCsrfToken();
     if (token) config.headers['X-CSRF-Token'] = token;
   }
   return config;

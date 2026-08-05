@@ -11,7 +11,13 @@ const LOCK_DURATION_MINUTES = 15;
 function cookieOptions() {
   return {
     httpOnly: true,
-    sameSite: 'lax',
+    // 'none' is required in production because the frontend (Vercel) and
+    // backend (Render) are on different domains — every request between
+    // them is cross-site, and SameSite=Lax blocks cookies on cross-site
+    // XHR/fetch (it only allows them on top-level navigations). 'lax' stays
+    // the default for local dev, where frontend+backend are same-site
+    // through the Vite proxy and 'none' would require https:// locally too.
+    sameSite: process.env.NODE_ENV === 'production' ? 'none' : 'lax',
     secure: process.env.NODE_ENV === 'production',
     path: '/',
     maxAge: 8 * 60 * 60 * 1000, // 8h, matches JWT_EXPIRES_IN default — keep these in sync

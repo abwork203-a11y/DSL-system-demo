@@ -5,7 +5,7 @@ const morgan = require('morgan');
 const cookieParser = require('cookie-parser');
 
 const { errorHandler, notFound } = require('./middleware/errorHandler');
-const { ensureCsrfCookie, verifyCsrf } = require('./middleware/csrf');
+const { verifyCsrf } = require('./middleware/csrf');
 const { generalLimiter } = require('./middleware/rateLimit');
 
 const authRoutes = require('./routes/authRoutes');
@@ -61,7 +61,6 @@ function createApp() {
   app.use(express.json({ limit: '150kb' })); // generous for a JSON order payload, small enough to blunt body-flooding
   app.use(morgan(process.env.NODE_ENV === 'production' ? 'combined' : 'dev'));
   app.use(generalLimiter);
-  app.use(ensureCsrfCookie);
   app.use(verifyCsrf);
 
   app.get('/health', (req, res) => res.json({ status: 'ok' }));
