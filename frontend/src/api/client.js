@@ -9,17 +9,33 @@ function readCookie(name) {
   return match ? decodeURIComponent(match[1]) : null;
 }
 
-// The session itself now lives in an httpOnly cookie the browser sends
-// automatically — no token to attach here. What we *do* need to attach is the
-// CSRF token: it's a separate, JS-readable cookie set by the backend, and the
-// backend checks this header against that cookie on every state-changing
-// request (double-submit CSRF pattern) since a cross-site attacker can make
-// the browser send cookies, but can't read them to produce a matching header.
-client.interceptors.request.use((config) => {
+// Cross-origin note: now that the frontend (Vercel) and backend (Render) are
+// on different domains, client-side JS can no longer read the csrf_token
+// cookie directly via document.cookie — that only exposes cookies belonging
+// to the page's own origin. So instead of reading the cookie, we fetch the
+// token once from a dedicated endpoint (which reads it server-side, where
+// it's not cross-origin) and cache it in memory for the life of the page.
+let csrfTokenPromise = null;
+function getCsrfToken() {
+  if (!csrfTokenPromise) {
+    csrfTokenPromise = client
+      .get('/auth/csrf-token')
+      .then((res) => res.data.csrfToken)
+      .catch(() => {
+        csrfTokenPromise = null; // allow a retry on the next mutating request
+        return null;
+      });
+  }
+  return csrfTokenPromise;
+}
+
+client.interceptors.request.use(async (config) => {
   const method = (config.method || 'get').toUpperCase();
   if (!['GET', 'HEAD', 'OPTIONS'].includes(method)) {
-    const csrfToken = readCookie('csrf_token');
-    if (csrfToken) config.headers['X-CSRF-Token'] = csrfToken;
+    // Fall back to the cookie read too (harmless, and keeps this working
+    // unchanged for same-origin setups like local dev through the Vite proxy).
+    const token = (await getCsrfToken()) || readCookie('csrf_token');
+    if (token) config.headers['X-CSRF-Token'] = token;
   }
   return config;
 });
