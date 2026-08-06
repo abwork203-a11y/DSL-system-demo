@@ -50,7 +50,7 @@ body {
   padding: 4px 10px 22px;
   letter-spacing: 0.01em;
 }
-.sidebar-brand span { color: var(--gold); }
+.sidebar-brand span { color: var(--brass); }
 
 .sidebar-nav { display: flex; flex-direction: column; gap: 2px; flex: 1; }
 
@@ -69,9 +69,9 @@ body {
 }
 .sidebar-link:hover { background: rgba(255, 255, 255, 0.06); color: var(--sidebar-ink); }
 .sidebar-link.active {
-  background: rgba(192, 138, 46, 0.14);
+  background: rgba(150, 116, 42, 0.14);
   color: #fff;
-  border-left-color: var(--gold);
+  border-left-color: var(--brass);
 }
 
 .sidebar-footer {
@@ -128,7 +128,7 @@ body {
   border-top: 1px solid var(--rule);
 }
 .site-footer a { color: var(--ink-muted); text-decoration: underline; margin: 0 8px; }
-.site-footer a:hover { color: var(--indigo); }
+.site-footer a:hover { color: var(--green); }
 
 /* ── Hamburger menu (mobile) ────────────────────────────────
    Hidden by default; only shown + wired up below 768px. */
@@ -142,7 +142,7 @@ body {
   padding: 8px;
   cursor: pointer;
 }
-.hamburger-btn:focus-visible { outline: 2px solid var(--gold); outline-offset: 2px; }
+.hamburger-btn:focus-visible { outline: 2px solid var(--brass); outline-offset: 2px; }
 
 @media (max-width: 768px) {
   .hamburger-btn { display: block; }
@@ -161,7 +161,7 @@ body {
   .sidebar-scrim {
     position: fixed;
     inset: 0;
-    background: rgba(20, 25, 40, 0.4);
+    background: rgba(27, 33, 28, 0.4);
     z-index: 30;
   }
 
@@ -174,7 +174,7 @@ body {
   border: 1px solid var(--rule);
   border-radius: var(--radius);
   padding: 20px;
-  border-top: 2px solid var(--gold);
+  border-top: 2px solid var(--brass);
   box-shadow: var(--shadow-sm);
 }
 .card + .card { margin-top: 16px; }
@@ -217,23 +217,23 @@ body {
   padding: 8px 14px;
   font-size: 13.5px;
   font-weight: 500;
-  background: var(--indigo);
+  background: var(--green);
   color: #fff;
   cursor: pointer;
   transition: background 0.12s;
 }
-.btn:hover { background: var(--indigo-hover); }
-.btn:focus-visible { outline: 2px solid var(--gold); outline-offset: 2px; }
+.btn:hover { background: var(--green-hover); }
+.btn:focus-visible { outline: 2px solid var(--brass); outline-offset: 2px; }
 .btn:disabled { opacity: 0.5; cursor: not-allowed; }
 
 .btn-secondary { background: var(--surface); color: var(--ink); border-color: var(--rule); }
 .btn-secondary:hover { background: var(--surface-sunken); }
 
-.btn-brass { background: var(--gold); color: #fff; }
-.btn-brass:hover { background: var(--gold-hover); }
+.btn-brass { background: var(--brass); color: #fff; }
+.btn-brass:hover { background: var(--brass-hover); }
 
 .btn-danger { background: var(--status-negative); }
-.btn-danger:hover { background: #7E2C2C; }
+.btn-danger:hover { background: #6E251C; }
 
 .btn-sm { padding: 5px 10px; font-size: 12.5px; }
 .btn-ghost { background: transparent; color: var(--ink-muted); border: none; }
@@ -256,8 +256,8 @@ body {
 .field input:focus,
 .field select:focus,
 .field textarea:focus {
-  border-color: var(--gold);
-  outline: 2px solid rgba(192, 138, 46, 0.25);
+  border-color: var(--brass);
+  outline: 2px solid rgba(150, 116, 42, 0.25);
   outline-offset: 0;
 }
 .field-row { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
@@ -360,7 +360,7 @@ table.data-table { width: 100%; border-collapse: collapse; font-size: 13.5px; ba
   font-size: 13px;
   margin-bottom: 16px;
 }
-.link-btn { background: none; border: none; color: var(--indigo); font-size: 13px; font-weight: 600; padding: 0; cursor: pointer; }
+.link-btn { background: none; border: none; color: var(--green); font-size: 13px; font-weight: 600; padding: 0; cursor: pointer; }
 .link-btn:hover { text-decoration: underline; }
 
 /* ── Toasts ─────────────────────────────────────────────── */
@@ -394,7 +394,7 @@ table.data-table { width: 100%; border-collapse: collapse; font-size: 13.5px; ba
 
 /* ── Skeleton loading ───────────────────────────────────── */
 .skeleton {
-  background: linear-gradient(90deg, var(--surface-sunken) 25%, #DEDCD3 37%, var(--surface-sunken) 63%);
+  background: linear-gradient(90deg, var(--surface-sunken) 25%, #E4DFCC 37%, var(--surface-sunken) 63%);
   background-size: 400% 100%;
   animation: skeleton-shine 1.4s ease infinite;
   border-radius: var(--radius-sm);
@@ -412,14 +412,14 @@ table.data-table { width: 100%; border-collapse: collapse; font-size: 13.5px; ba
 
 /* ── Modal ──────────────────────────────────────────────── */
 .modal-overlay {
-  position: fixed; inset: 0; background: rgba(20, 25, 40, 0.5);
+  position: fixed; inset: 0; background: rgba(27, 33, 28, 0.5);
   display: flex; align-items: center; justify-content: center; z-index: 50;
   padding: 20px;
 }
 .modal {
   background: var(--surface);
   border-radius: 10px;
-  border-top: 3px solid var(--gold);
+  border-top: 3px solid var(--brass);
   padding: 24px;
   width: 100%;
   max-width: 560px;
@@ -443,7 +443,7 @@ table.data-table { width: 100%; border-collapse: collapse; font-size: 13.5px; ba
   text-align: center;
   transition: border-color 0.15s, color 0.15s;
 }
-.stepper-item.active { border-color: var(--gold); color: var(--ink); }
+.stepper-item.active { border-color: var(--brass); color: var(--ink); }
 .stepper-item.done { border-color: var(--status-positive); color: var(--ink); }
 
 /* ── Accessibility floor ────────────────────────────────── */
@@ -452,6 +452,6 @@ button:focus-visible,
 input:focus-visible,
 select:focus-visible,
 textarea:focus-visible {
-  outline: 2px solid var(--gold);
+  outline: 2px solid var(--brass);
   outline-offset: 2px;
 }

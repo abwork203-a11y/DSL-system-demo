@@ -1,49 +1,48 @@
 /* ═══════════════════════════════════════════════════════════════
    DESIGN TOKENS — LedgerOne
-   Scheme B: Indigo Ledger — cooler, more modern-fintech than the
-   original forest green. Deep navy-indigo as primary, warm gold
-   as the accent, oxblood/forest/ochre for status ink.
+   Scheme A: Ledger green + brass — deep forest ink as primary,
+   warm brass as the accent, oxblood/forest/ochre for status ink.
    ═══════════════════════════════════════════════════════════════ */
 
 :root {
   /* ── Surfaces — the "paper" the app sits on ─────────────── */
-  --paper: #F5F4F0;
+  --paper: #F7F5EE;
   --surface: #FFFFFF;
-  --surface-sunken: #EAE8E1;
-  --rule: #DAD7CE;
-  --rule-strong: #C5C1B5;
+  --surface-sunken: #EFEBDE;
+  --rule: #DDD6C4;
+  --rule-strong: #C9C0A8;
 
   /* ── Ink — text and structural color ────────────────────── */
-  --ink: #22262E;
-  --ink-muted: #5E6472;
-  --ink-faint: #9AA0AC;
+  --ink: #1B211C;
+  --ink-muted: #5C6B60;
+  --ink-faint: #8B9689;
 
-  /* ── Indigo — the brand/primary color ───────────────────── */
-  --indigo: #1E2A4A;
-  --indigo-hover: #141D35;
-  --indigo-light: #E4E7EF;
+  /* ── Ledger green — the brand/primary color ─────────────── */
+  --green: #223F35;
+  --green-hover: #182D25;
+  --green-light: #E4EAE3;
 
-  /* ── Gold — the accent, used sparingly ──────────────────── */
-  --gold: #C08A2E;
-  --gold-hover: #A5741F;
-  --gold-light: #F5EAD4;
+  /* ── Brass — the accent, used sparingly ─────────────────── */
+  --brass: #96742A;
+  --brass-hover: #7C5F21;
+  --brass-light: #F1E7CE;
 
   /* ── Status ink ──────────────────────────────────────────── */
   --status-positive: #2B6B45;
-  --status-positive-bg: #E3EFE6;
-  --status-negative: #A13A3A;
-  --status-negative-bg: #F5E3E3;
-  --status-pending: #B8791E;
-  --status-pending-bg: #F4E8D0;
-  --status-neutral: #5E6472;
-  --status-neutral-bg: #ECEAE4;
+  --status-positive-bg: #E4EFE6;
+  --status-negative: #8C3226;
+  --status-negative-bg: #F4E6E2;
+  --status-pending: #A1741E;
+  --status-pending-bg: #F3EAD6;
+  --status-neutral: #5C6B60;
+  --status-neutral-bg: #EBE8DC;
 
   /* ── Sidebar ─────────────────────────────────────────────── */
-  --sidebar-bg: #141B2E;
-  --sidebar-ink: #EDEFF4;
-  --sidebar-muted: #8D95AC;
-  --sidebar-active: #1E2A4A;
-  --sidebar-accent: var(--gold);
+  --sidebar-bg: #182620;
+  --sidebar-ink: #F2F0E6;
+  --sidebar-muted: #9AAA9E;
+  --sidebar-active: #223F35;
+  --sidebar-accent: var(--brass);
 
   /* ── Typography ──────────────────────────────────────────── */
   --font-display: 'Fraunces', Georgia, serif;
@@ -53,18 +52,12 @@
   /* ── Shape & shadow ──────────────────────────────────────── */
   --radius: 8px;
   --radius-sm: 5px;
-  --shadow-sm: 0 1px 2px rgba(20, 25, 40, 0.07);
-  --shadow-md: 0 4px 16px rgba(20, 25, 40, 0.12);
+  --shadow-sm: 0 1px 2px rgba(27, 33, 28, 0.06);
+  --shadow-md: 0 4px 16px rgba(27, 33, 28, 0.10);
 
   /* ── Legacy aliases (old class names still work) ─────────── */
-  --accent: var(--indigo);
-  --accent-hover: var(--indigo-hover);
-  --brass: var(--gold);
-  --brass-hover: var(--gold-hover);
-  --brass-light: var(--gold-light);
-  --green: var(--indigo);
-  --green-hover: var(--indigo-hover);
-  --green-light: var(--indigo-light);
+  --accent: var(--green);
+  --accent-hover: var(--green-hover);
   --border: var(--rule);
   --red: var(--status-negative);
   --red-light: var(--status-negative-bg);
