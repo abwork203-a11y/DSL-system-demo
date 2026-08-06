@@ -1,93 +1,76 @@
+/* ═══════════════════════════════════════════════════════════════
+   DESIGN TOKENS — LedgerOne
+   ───────────────────────────────────────────────────────────────
+   Every color, font, and spacing value the app uses lives HERE.
+   Change a value in this one file and it updates everywhere —
+   that's the whole point of tokens instead of hardcoding colors
+   directly inside component CSS.
+
+   Concept: an actual ledger book, not a generic SaaS dashboard.
+   Warm paper background, deep ink-green for structure, a brass/
+   gold accent standing in for an official stamp or seal, and
+   status colors modeled on real accounting ink (not neon alerts).
+   ═══════════════════════════════════════════════════════════════ */
+
 :root {
-  /* Color — a ledger/accounting palette: deep forest ink, warm paper background.
-     Deliberately not the cream+terracotta / near-black+neon / broadsheet defaults. */
-  --bg: #F6F6F2;
-  --surface: #FFFFFF;
-  --surface-sunken: #F0F0EA;
-  --ink: #1B211D;
-  --ink-muted: #656F63;
-  --border: #E2E1D6;
+  /* ── Surfaces — the "paper" the app sits on ─────────────── */
+  --paper: #F7F5EE;              /* page background — warm, not stark white, not cream-latte */
+  --surface: #FFFFFF;            /* cards, inputs, table rows */
+  --surface-sunken: #EFEBDE;     /* hover states, skeleton base, subtle recessed areas */
+  --rule: #DDD6C4;               /* hairline borders — warm, paper-toned, not cold gray */
+  --rule-strong: #C9C0A8;        /* slightly stronger rule, e.g. table header underline */
 
-  --accent: #2F5D50;       /* deep forest green — primary actions */
-  --accent-hover: #244A40;
-  --accent-light: #E7EFEB;
+  /* ── Ink — text and structural color ────────────────────── */
+  --ink: #1B211C;                /* primary text — near-black with a green undertone */
+  --ink-muted: #5C6B60;          /* secondary text, labels */
+  --ink-faint: #8B9689;          /* placeholder text, disabled states */
 
-  --amber: #B4670A;        /* partial payment / pending */
-  --amber-light: #FBEEE0;
-  --red: #B3261E;          /* unpaid / danger */
-  --red-light: #FBEAE9;
-  --green: #1E7A4C;        /* paid / active / success */
-  --green-light: #E8F5EE;
+  /* ── Ledger green — the brand/primary color ─────────────── */
+  --green: #223F35;              /* deep, serious ledger-book green — primary actions, brand */
+  --green-hover: #182D25;
+  --green-light: #E4EAE3;        /* tinted background for green badges/highlights */
 
-  --sidebar-bg: #1C2620;
-  --sidebar-ink: #E9ECE9;
-  --sidebar-muted: #8FA096;
-  --sidebar-active: #2F5D50;
+  /* ── Brass — the accent, used sparingly (this is the "one bold choice") */
+  --brass: #96742A;              /* focus rings, active nav indicator, signature stamp color */
+  --brass-hover: #7C5F21;
+  --brass-light: #F1E7CE;
 
-  --font-display: 'Fraunces', Georgia, serif;
-  --font-body: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
-  --font-mono: 'IBM Plex Mono', ui-monospace, monospace;
+  /* ── Status ink — modeled on real accounting colors, not alert colors */
+  --status-positive: #2B6B45;    /* paid / good — forest ink */
+  --status-positive-bg: #E4EFE6;
+  --status-negative: #8C3226;    /* overdue / bad — oxblood ink, not fire-engine red */
+  --status-negative-bg: #F4E6E2;
+  --status-pending: #A1741E;     /* pending / warning — ochre ink */
+  --status-pending-bg: #F3EAD6;
+  --status-neutral: #5C6B60;
+  --status-neutral-bg: #EBE8DC;
 
+  /* ── Sidebar — deliberately darker/denser than the main canvas */
+  --sidebar-bg: #182620;
+  --sidebar-ink: #F2F0E6;
+  --sidebar-muted: #9AAA9E;
+  --sidebar-active: #223F35;
+  --sidebar-accent: var(--brass);
+
+  /* ── Typography ──────────────────────────────────────────── */
+  --font-display: 'Fraunces', Georgia, serif;         /* page titles, brand — used sparingly */
+  --font-body: 'Inter', -apple-system, sans-serif;     /* everything else */
+  --font-mono: 'IBM Plex Mono', 'Courier New', monospace; /* every number, no exceptions */
+
+  /* ── Shape & shadow — restrained, paper-like, not glossy ── */
   --radius: 8px;
-  --shadow-sm: 0 1px 2px rgba(27, 33, 29, 0.06);
-  --shadow-md: 0 4px 16px rgba(27, 33, 29, 0.08);
-}
+  --radius-sm: 5px;
+  --shadow-sm: 0 1px 2px rgba(27, 33, 28, 0.06);
+  --shadow-md: 0 4px 16px rgba(27, 33, 28, 0.10);
 
-* { box-sizing: border-box; }
-
-html, body, #root { height: 100%; }
-
-body {
-  margin: 0;
-  background: var(--bg);
-  color: var(--ink);
-  font-family: var(--font-body);
-  font-size: 14px;
-  -webkit-font-smoothing: antialiased;
-}
-
-h1, h2, h3 {
-  font-family: var(--font-display);
-  font-weight: 600;
-  margin: 0 0 4px;
-  letter-spacing: -0.01em;
-}
-
-h1 { font-size: 26px; }
-h2 { font-size: 19px; }
-h3 { font-size: 15px; }
-
-p { margin: 0; }
-
-a { color: inherit; }
-
-button {
-  font-family: var(--font-body);
-  cursor: pointer;
-}
-
-input, select, textarea {
-  font-family: var(--font-body);
-  font-size: 14px;
-}
-
-/* Currency/numeric alignment — the signature detail: every money figure in the
-   app renders in tabular-figure monospace so digits line up like a real ledger. */
-.num {
-  font-family: var(--font-mono);
-  font-variant-numeric: tabular-nums;
-  font-feature-settings: 'tnum' 1;
-}
-
-:focus-visible {
-  outline: 2px solid var(--accent);
-  outline-offset: 2px;
-}
-
-::-webkit-scrollbar { width: 10px; height: 10px; }
-::-webkit-scrollbar-thumb { background: var(--border); border-radius: 8px; }
-::-webkit-scrollbar-track { background: transparent; }
-
-@media (prefers-reduced-motion: reduce) {
-  * { animation: none !important; transition: none !important; }
+  /* ── Legacy aliases (kept so existing component CSS referencing
+     the old token names doesn't break — safe to remove once every
+     component file is confirmed migrated to the names above) ── */
+  --accent: var(--green);
+  --accent-hover: var(--green-hover);
+  --border: var(--rule);
+  --red: var(--status-negative);
+  --red-light: var(--status-negative-bg);
+  --amber: var(--status-pending);
+  --amber-light: var(--status-pending-bg);
 }
