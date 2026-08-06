@@ -1,7 +1,8 @@
+import { useState } from 'react';
 import { NavLink, Outlet, useNavigate } from 'react-router-dom';
 import {
   LayoutDashboard, FileText, Factory, Package, Building2,
-  BookOpen, BarChart3, Users, LogOut, CloudUpload,
+  BookOpen, BarChart3, Users, LogOut, CloudUpload, Menu,
 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import Footer from './Footer';
@@ -22,15 +23,32 @@ const NAV_ITEMS = [
 export default function Layout() {
   const { user, logout, isAdmin } = useAuth();
   const navigate = useNavigate();
+  const [sidebarOpen, setSidebarOpen] = useState(false);
 
   const handleLogout = async () => {
     await logout();
     navigate('/login');
   };
 
+  // Close the mobile sidebar automatically whenever a nav link is clicked,
+  // so it doesn't stay open covering the page after navigating.
+  const closeSidebar = () => setSidebarOpen(false);
+
   return (
     <div className="app-shell">
-      <aside className="sidebar">
+      <button
+        className="hamburger-btn"
+        onClick={() => setSidebarOpen(!sidebarOpen)}
+        aria-label="Toggle menu"
+      >
+        <Menu size={22} strokeWidth={2} />
+      </button>
+
+      {sidebarOpen && (
+        <div className="sidebar-scrim" onClick={closeSidebar} />
+      )}
+
+      <aside className={`sidebar${sidebarOpen ? ' sidebar-open' : ''}`}>
         <div className="sidebar-brand">{APP_NAME}<span>.</span></div>
         <nav className="sidebar-nav">
           {NAV_ITEMS.filter((item) => !item.adminOnly || isAdmin).map(({ to, label, icon: Icon, end }) => (
@@ -38,6 +56,7 @@ export default function Layout() {
               key={to}
               to={to}
               end={end}
+              onClick={closeSidebar}
               className={({ isActive }) => `sidebar-link${isActive ? ' active' : ''}`}
             >
               <Icon size={16} strokeWidth={2} />

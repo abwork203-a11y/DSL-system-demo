@@ -1,8 +1,16 @@
 /* ═══════════════════════════════════════════════════════════════
    COMPONENT STYLES — LedgerOne
-   Import tokens.css BEFORE this file — every color/font here
-   references a variable defined there, nothing is hardcoded.
+   Import tokens.css BEFORE this file.
    ═══════════════════════════════════════════════════════════════ */
+
+/* ── Global reset — fixes the white edge-frame around the page ──
+   Browsers apply an 8px default margin to <body>. Without this,
+   your background color never reaches the true edge of the screen. */
+html, body, #root {
+  margin: 0;
+  padding: 0;
+  height: 100%;
+}
 
 body {
   font-family: var(--font-body);
@@ -25,8 +33,13 @@ body {
   display: flex;
   flex-direction: column;
   padding: 20px 14px;
-  /* subtle inner edge — reads as a bound cover, not a flat panel */
   box-shadow: inset -1px 0 0 rgba(255, 255, 255, 0.05);
+
+  /* Sticky sidebar — stays in view while .content scrolls beside it */
+  position: sticky;
+  top: 0;
+  height: 100vh;
+  overflow-y: auto;
 }
 
 .sidebar-brand {
@@ -37,7 +50,7 @@ body {
   padding: 4px 10px 22px;
   letter-spacing: 0.01em;
 }
-.sidebar-brand span { color: var(--brass); }
+.sidebar-brand span { color: var(--gold); }
 
 .sidebar-nav { display: flex; flex-direction: column; gap: 2px; flex: 1; }
 
@@ -56,9 +69,9 @@ body {
 }
 .sidebar-link:hover { background: rgba(255, 255, 255, 0.06); color: var(--sidebar-ink); }
 .sidebar-link.active {
-  background: rgba(150, 116, 42, 0.14);   /* brass tint, not a solid fill — quieter */
+  background: rgba(192, 138, 46, 0.14);
   color: #fff;
-  border-left-color: var(--brass);        /* the active indicator IS the brass accent */
+  border-left-color: var(--gold);
 }
 
 .sidebar-footer {
@@ -69,7 +82,15 @@ body {
 .sidebar-user { padding: 6px 12px; font-size: 12.5px; color: var(--sidebar-muted); }
 .sidebar-user strong { color: var(--sidebar-ink); display: block; font-size: 13.5px; }
 
-.main-area { flex: 1; min-width: 0; display: flex; flex-direction: column; }
+/* main-area is a flex column so the site footer can be pushed to
+   the bottom of the viewport with margin-top: auto (see .site-footer) */
+.main-area {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  min-height: 100vh;
+}
 
 .topbar {
   height: 60px;
@@ -95,15 +116,65 @@ body {
 .page-header h1 { font-family: var(--font-display); font-weight: 600; }
 .page-header p { color: var(--ink-muted); margin-top: 4px; font-size: 13.5px; }
 
+/* ── Site footer — sits at the true bottom of the screen ───
+   margin-top: auto pushes it down when content is short (e.g. the
+   login page); it flows naturally below content when a page is long. */
+.site-footer {
+  margin-top: auto;
+  padding: 16px 28px;
+  text-align: center;
+  font-size: 12.5px;
+  color: var(--ink-muted);
+  border-top: 1px solid var(--rule);
+}
+.site-footer a { color: var(--ink-muted); text-decoration: underline; margin: 0 8px; }
+.site-footer a:hover { color: var(--indigo); }
+
+/* ── Hamburger menu (mobile) ────────────────────────────────
+   Hidden by default; only shown + wired up below 768px. */
+.hamburger-btn {
+  display: none;
+  border: none;
+  background: transparent;
+  color: var(--ink);
+  font-size: 22px;
+  line-height: 1;
+  padding: 8px;
+  cursor: pointer;
+}
+.hamburger-btn:focus-visible { outline: 2px solid var(--gold); outline-offset: 2px; }
+
+@media (max-width: 768px) {
+  .hamburger-btn { display: block; }
+
+  .sidebar {
+    position: fixed;
+    left: -240px;
+    top: 0;
+    z-index: 40;
+    transition: left 0.2s ease;
+  }
+  .sidebar.sidebar-open { left: 0; }
+
+  /* Dims the page behind the sidebar when it's open on mobile —
+     add this element in JSX only when sidebarOpen is true */
+  .sidebar-scrim {
+    position: fixed;
+    inset: 0;
+    background: rgba(20, 25, 40, 0.4);
+    z-index: 30;
+  }
+
+  .field-row { grid-template-columns: 1fr; }  /* stack form fields on mobile */
+}
+
 /* ── Card ───────────────────────────────────────────────── */
 .card {
   background: var(--surface);
   border: 1px solid var(--rule);
   border-radius: var(--radius);
   padding: 20px;
-  /* thin brass tab at the top-left, like a ledger page divider tab —
-     the one recurring structural motif tying cards back to the concept */
-  border-top: 2px solid var(--brass);
+  border-top: 2px solid var(--gold);
   box-shadow: var(--shadow-sm);
 }
 .card + .card { margin-top: 16px; }
@@ -146,23 +217,23 @@ body {
   padding: 8px 14px;
   font-size: 13.5px;
   font-weight: 500;
-  background: var(--green);
+  background: var(--indigo);
   color: #fff;
   cursor: pointer;
   transition: background 0.12s;
 }
-.btn:hover { background: var(--green-hover); }
-.btn:focus-visible { outline: 2px solid var(--brass); outline-offset: 2px; }
+.btn:hover { background: var(--indigo-hover); }
+.btn:focus-visible { outline: 2px solid var(--gold); outline-offset: 2px; }
 .btn:disabled { opacity: 0.5; cursor: not-allowed; }
 
 .btn-secondary { background: var(--surface); color: var(--ink); border-color: var(--rule); }
 .btn-secondary:hover { background: var(--surface-sunken); }
 
-.btn-brass { background: var(--brass); color: #fff; }
-.btn-brass:hover { background: var(--brass-hover); }
+.btn-brass { background: var(--gold); color: #fff; }
+.btn-brass:hover { background: var(--gold-hover); }
 
 .btn-danger { background: var(--status-negative); }
-.btn-danger:hover { background: #6E251C; }
+.btn-danger:hover { background: #7E2C2C; }
 
 .btn-sm { padding: 5px 10px; font-size: 12.5px; }
 .btn-ghost { background: transparent; color: var(--ink-muted); border: none; }
@@ -185,14 +256,13 @@ body {
 .field input:focus,
 .field select:focus,
 .field textarea:focus {
-  border-color: var(--brass);
-  outline: 2px solid rgba(150, 116, 42, 0.25);
+  border-color: var(--gold);
+  outline: 2px solid rgba(192, 138, 46, 0.25);
   outline-offset: 0;
 }
 .field-row { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
 .field-error { color: var(--status-negative); font-size: 12.5px; margin-top: -8px; margin-bottom: 12px; }
 
-/* Any input holding a currency value — force mono + tabular numerals */
 input[data-currency],
 .field-currency input {
   font-family: var(--font-mono);
@@ -200,9 +270,7 @@ input[data-currency],
   text-align: right;
 }
 
-/* ── Table — the ledger-ruled look ─────────────────────────
-   A very faint repeating horizontal line pattern sits behind the
-   table, echoing ruled ledger paper. Row content sits on top of it. */
+/* ── Table — ledger-ruled look ──────────────────────────── */
 .table-wrap {
   overflow-x: auto;
   background-image: repeating-linear-gradient(
@@ -256,11 +324,7 @@ table.data-table { width: 100%; border-collapse: collapse; font-size: 13.5px; ba
 }
 .toolbar .spacer { flex: 1; }
 
-/* ── Badges — the signature element ────────────────────────
-   Rendered like an ink stamp on a ledger page: slightly rotated,
-   double-ring border, wide letter-spacing (like a rubber stamp
-   font), and a color that reads as "ink," not "notification dot."
-   This replaces generic rounded pill badges everywhere in the app. */
+/* ── Badges — ink-stamp signature element ─────────────────── */
 .badge {
   display: inline-flex;
   align-items: center;
@@ -296,7 +360,7 @@ table.data-table { width: 100%; border-collapse: collapse; font-size: 13.5px; ba
   font-size: 13px;
   margin-bottom: 16px;
 }
-.link-btn { background: none; border: none; color: var(--green); font-size: 13px; font-weight: 600; padding: 0; cursor: pointer; }
+.link-btn { background: none; border: none; color: var(--indigo); font-size: 13px; font-weight: 600; padding: 0; cursor: pointer; }
 .link-btn:hover { text-decoration: underline; }
 
 /* ── Toasts ─────────────────────────────────────────────── */
@@ -330,7 +394,7 @@ table.data-table { width: 100%; border-collapse: collapse; font-size: 13.5px; ba
 
 /* ── Skeleton loading ───────────────────────────────────── */
 .skeleton {
-  background: linear-gradient(90deg, var(--surface-sunken) 25%, #E4DFCC 37%, var(--surface-sunken) 63%);
+  background: linear-gradient(90deg, var(--surface-sunken) 25%, #DEDCD3 37%, var(--surface-sunken) 63%);
   background-size: 400% 100%;
   animation: skeleton-shine 1.4s ease infinite;
   border-radius: var(--radius-sm);
@@ -348,14 +412,14 @@ table.data-table { width: 100%; border-collapse: collapse; font-size: 13.5px; ba
 
 /* ── Modal ──────────────────────────────────────────────── */
 .modal-overlay {
-  position: fixed; inset: 0; background: rgba(27, 33, 28, 0.5);
+  position: fixed; inset: 0; background: rgba(20, 25, 40, 0.5);
   display: flex; align-items: center; justify-content: center; z-index: 50;
   padding: 20px;
 }
 .modal {
   background: var(--surface);
   border-radius: 10px;
-  border-top: 3px solid var(--brass);
+  border-top: 3px solid var(--gold);
   padding: 24px;
   width: 100%;
   max-width: 560px;
@@ -379,16 +443,15 @@ table.data-table { width: 100%; border-collapse: collapse; font-size: 13.5px; ba
   text-align: center;
   transition: border-color 0.15s, color 0.15s;
 }
-.stepper-item.active { border-color: var(--brass); color: var(--ink); }
+.stepper-item.active { border-color: var(--gold); color: var(--ink); }
 .stepper-item.done { border-color: var(--status-positive); color: var(--ink); }
 
-/* ── Accessibility floor — every interactive element gets a
-   visible focus ring; this is non-negotiable, not decoration ── */
+/* ── Accessibility floor ────────────────────────────────── */
 a:focus-visible,
 button:focus-visible,
 input:focus-visible,
 select:focus-visible,
 textarea:focus-visible {
-  outline: 2px solid var(--brass);
+  outline: 2px solid var(--gold);
   outline-offset: 2px;
 }

@@ -50,12 +50,6 @@ export default function LoginPage() {
             {loading ? 'Signing in…' : 'Sign in'}
           </button>
         </form>
-        <div style={{ display: 'flex', gap: 14, justifyContent: 'center', marginTop: 18, fontSize: 12 }}>
-          <Link to="/terms" className="link-btn" style={{ color: 'var(--ink-muted)' }}>Terms</Link>
-          <Link to="/privacy" className="link-btn" style={{ color: 'var(--ink-muted)' }}>Privacy</Link>
-          <Link to="/cookies" className="link-btn" style={{ color: 'var(--ink-muted)' }}>Cookies</Link>
-          <Link to="/contact" className="link-btn" style={{ color: 'var(--ink-muted)' }}>Contact</Link>
-        </div>
       </div>
     </div>
   );

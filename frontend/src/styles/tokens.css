@@ -1,73 +1,70 @@
 /* ═══════════════════════════════════════════════════════════════
    DESIGN TOKENS — LedgerOne
-   ───────────────────────────────────────────────────────────────
-   Every color, font, and spacing value the app uses lives HERE.
-   Change a value in this one file and it updates everywhere —
-   that's the whole point of tokens instead of hardcoding colors
-   directly inside component CSS.
-
-   Concept: an actual ledger book, not a generic SaaS dashboard.
-   Warm paper background, deep ink-green for structure, a brass/
-   gold accent standing in for an official stamp or seal, and
-   status colors modeled on real accounting ink (not neon alerts).
+   Scheme B: Indigo Ledger — cooler, more modern-fintech than the
+   original forest green. Deep navy-indigo as primary, warm gold
+   as the accent, oxblood/forest/ochre for status ink.
    ═══════════════════════════════════════════════════════════════ */
 
 :root {
   /* ── Surfaces — the "paper" the app sits on ─────────────── */
-  --paper: #F7F5EE;              /* page background — warm, not stark white, not cream-latte */
-  --surface: #FFFFFF;            /* cards, inputs, table rows */
-  --surface-sunken: #EFEBDE;     /* hover states, skeleton base, subtle recessed areas */
-  --rule: #DDD6C4;               /* hairline borders — warm, paper-toned, not cold gray */
-  --rule-strong: #C9C0A8;        /* slightly stronger rule, e.g. table header underline */
+  --paper: #F5F4F0;
+  --surface: #FFFFFF;
+  --surface-sunken: #EAE8E1;
+  --rule: #DAD7CE;
+  --rule-strong: #C5C1B5;
 
   /* ── Ink — text and structural color ────────────────────── */
-  --ink: #1B211C;                /* primary text — near-black with a green undertone */
-  --ink-muted: #5C6B60;          /* secondary text, labels */
-  --ink-faint: #8B9689;          /* placeholder text, disabled states */
+  --ink: #22262E;
+  --ink-muted: #5E6472;
+  --ink-faint: #9AA0AC;
 
-  /* ── Ledger green — the brand/primary color ─────────────── */
-  --green: #223F35;              /* deep, serious ledger-book green — primary actions, brand */
-  --green-hover: #182D25;
-  --green-light: #E4EAE3;        /* tinted background for green badges/highlights */
+  /* ── Indigo — the brand/primary color ───────────────────── */
+  --indigo: #1E2A4A;
+  --indigo-hover: #141D35;
+  --indigo-light: #E4E7EF;
 
-  /* ── Brass — the accent, used sparingly (this is the "one bold choice") */
-  --brass: #96742A;              /* focus rings, active nav indicator, signature stamp color */
-  --brass-hover: #7C5F21;
-  --brass-light: #F1E7CE;
+  /* ── Gold — the accent, used sparingly ──────────────────── */
+  --gold: #C08A2E;
+  --gold-hover: #A5741F;
+  --gold-light: #F5EAD4;
 
-  /* ── Status ink — modeled on real accounting colors, not alert colors */
-  --status-positive: #2B6B45;    /* paid / good — forest ink */
-  --status-positive-bg: #E4EFE6;
-  --status-negative: #8C3226;    /* overdue / bad — oxblood ink, not fire-engine red */
-  --status-negative-bg: #F4E6E2;
-  --status-pending: #A1741E;     /* pending / warning — ochre ink */
-  --status-pending-bg: #F3EAD6;
-  --status-neutral: #5C6B60;
-  --status-neutral-bg: #EBE8DC;
+  /* ── Status ink ──────────────────────────────────────────── */
+  --status-positive: #2B6B45;
+  --status-positive-bg: #E3EFE6;
+  --status-negative: #A13A3A;
+  --status-negative-bg: #F5E3E3;
+  --status-pending: #B8791E;
+  --status-pending-bg: #F4E8D0;
+  --status-neutral: #5E6472;
+  --status-neutral-bg: #ECEAE4;
 
-  /* ── Sidebar — deliberately darker/denser than the main canvas */
-  --sidebar-bg: #182620;
-  --sidebar-ink: #F2F0E6;
-  --sidebar-muted: #9AAA9E;
-  --sidebar-active: #223F35;
-  --sidebar-accent: var(--brass);
+  /* ── Sidebar ─────────────────────────────────────────────── */
+  --sidebar-bg: #141B2E;
+  --sidebar-ink: #EDEFF4;
+  --sidebar-muted: #8D95AC;
+  --sidebar-active: #1E2A4A;
+  --sidebar-accent: var(--gold);
 
   /* ── Typography ──────────────────────────────────────────── */
-  --font-display: 'Fraunces', Georgia, serif;         /* page titles, brand — used sparingly */
-  --font-body: 'Inter', -apple-system, sans-serif;     /* everything else */
-  --font-mono: 'IBM Plex Mono', 'Courier New', monospace; /* every number, no exceptions */
+  --font-display: 'Fraunces', Georgia, serif;
+  --font-body: 'Inter', -apple-system, sans-serif;
+  --font-mono: 'IBM Plex Mono', 'Courier New', monospace;
 
-  /* ── Shape & shadow — restrained, paper-like, not glossy ── */
+  /* ── Shape & shadow ──────────────────────────────────────── */
   --radius: 8px;
   --radius-sm: 5px;
-  --shadow-sm: 0 1px 2px rgba(27, 33, 28, 0.06);
-  --shadow-md: 0 4px 16px rgba(27, 33, 28, 0.10);
+  --shadow-sm: 0 1px 2px rgba(20, 25, 40, 0.07);
+  --shadow-md: 0 4px 16px rgba(20, 25, 40, 0.12);
 
-  /* ── Legacy aliases (kept so existing component CSS referencing
-     the old token names doesn't break — safe to remove once every
-     component file is confirmed migrated to the names above) ── */
-  --accent: var(--green);
-  --accent-hover: var(--green-hover);
+  /* ── Legacy aliases (old class names still work) ─────────── */
+  --accent: var(--indigo);
+  --accent-hover: var(--indigo-hover);
+  --brass: var(--gold);
+  --brass-hover: var(--gold-hover);
+  --brass-light: var(--gold-light);
+  --green: var(--indigo);
+  --green-hover: var(--indigo-hover);
+  --green-light: var(--indigo-light);
   --border: var(--rule);
   --red: var(--status-negative);
   --red-light: var(--status-negative-bg);
