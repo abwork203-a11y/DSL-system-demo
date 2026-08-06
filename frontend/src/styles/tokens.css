@@ -1,48 +1,43 @@
 /* ═══════════════════════════════════════════════════════════════
    DESIGN TOKENS — LedgerOne
-   Scheme A: Ledger green + brass — deep forest ink as primary,
-   warm brass as the accent, oxblood/forest/ochre for status ink.
+   Clean, modern SaaS dashboard palette: deep blue primary, navy
+   sidebar, light gray canvas, semantic success/warning/error.
    ═══════════════════════════════════════════════════════════════ */
 
 :root {
-  /* ── Surfaces — the "paper" the app sits on ─────────────── */
-  --paper: #F7F5EE;
+  /* ── Surfaces ────────────────────────────────────────────── */
+  --paper: #F8FAFC;
   --surface: #FFFFFF;
-  --surface-sunken: #EFEBDE;
-  --rule: #DDD6C4;
-  --rule-strong: #C9C0A8;
+  --surface-sunken: #F1F5F9;
+  --rule: #E2E8F0;
+  --rule-strong: #CBD5E1;
 
   /* ── Ink — text and structural color ────────────────────── */
-  --ink: #1B211C;
-  --ink-muted: #5C6B60;
-  --ink-faint: #8B9689;
+  --ink: #334155;
+  --ink-muted: #64748B;
+  --ink-faint: #94A3B8;
 
-  /* ── Ledger green — the brand/primary color ─────────────── */
-  --green: #223F35;
-  --green-hover: #182D25;
-  --green-light: #E4EAE3;
+  /* ── Primary — deep blue ─────────────────────────────────── */
+  --blue: #2563EB;
+  --blue-hover: #1D4ED8;
+  --blue-light: #EFF6FF;
 
-  /* ── Brass — the accent, used sparingly ─────────────────── */
-  --brass: #96742A;
-  --brass-hover: #7C5F21;
-  --brass-light: #F1E7CE;
+  /* ── Sidebar — navy ──────────────────────────────────────── */
+  --sidebar-bg: #1E293B;
+  --sidebar-ink: #F1F5F9;
+  --sidebar-muted: #94A3B8;
+  --sidebar-active: #2563EB;
+  --sidebar-accent: var(--blue);
 
   /* ── Status ink ──────────────────────────────────────────── */
-  --status-positive: #2B6B45;
-  --status-positive-bg: #E4EFE6;
-  --status-negative: #8C3226;
-  --status-negative-bg: #F4E6E2;
-  --status-pending: #A1741E;
-  --status-pending-bg: #F3EAD6;
-  --status-neutral: #5C6B60;
-  --status-neutral-bg: #EBE8DC;
-
-  /* ── Sidebar ─────────────────────────────────────────────── */
-  --sidebar-bg: #182620;
-  --sidebar-ink: #F2F0E6;
-  --sidebar-muted: #9AAA9E;
-  --sidebar-active: #223F35;
-  --sidebar-accent: var(--brass);
+  --status-positive: #22C55E;
+  --status-positive-bg: #F0FDF4;
+  --status-negative: #EF4444;
+  --status-negative-bg: #FEF2F2;
+  --status-pending: #F59E0B;
+  --status-pending-bg: #FFFBEB;
+  --status-neutral: #64748B;
+  --status-neutral-bg: #F1F5F9;
 
   /* ── Typography ──────────────────────────────────────────── */
   --font-display: 'Fraunces', Georgia, serif;
@@ -52,12 +47,20 @@
   /* ── Shape & shadow ──────────────────────────────────────── */
   --radius: 8px;
   --radius-sm: 5px;
-  --shadow-sm: 0 1px 2px rgba(27, 33, 28, 0.06);
-  --shadow-md: 0 4px 16px rgba(27, 33, 28, 0.10);
+  --shadow-sm: 0 1px 2px rgba(30, 41, 59, 0.06);
+  --shadow-md: 0 4px 16px rgba(30, 41, 59, 0.10);
 
-  /* ── Legacy aliases (old class names still work) ─────────── */
-  --accent: var(--green);
-  --accent-hover: var(--green-hover);
+  /* ── Legacy aliases (old class names still work — the app's
+     component CSS references --green/--brass/--accent by name,
+     this maps them onto the new palette without editing every file) */
+  --green: var(--blue);
+  --green-hover: var(--blue-hover);
+  --green-light: var(--blue-light);
+  --brass: var(--blue);
+  --brass-hover: var(--blue-hover);
+  --brass-light: var(--blue-light);
+  --accent: var(--blue);
+  --accent-hover: var(--blue-hover);
   --border: var(--rule);
   --red: var(--status-negative);
   --red-light: var(--status-negative-bg);

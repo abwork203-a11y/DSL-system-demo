@@ -14,7 +14,6 @@ function Section({ title, children }) {
 export default function CookiePage() {
   return (
     <LegalPageLayout title="Cookie Policy">
-      <PlaceholderNotice />
 
       <Section title="What Cookies Are">
         Cookies are small text files a website stores in your browser, used to remember information

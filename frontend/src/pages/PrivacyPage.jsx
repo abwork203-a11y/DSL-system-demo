@@ -15,7 +15,6 @@ function Section({ title, children }) {
 export default function PrivacyPage() {
   return (
     <LegalPageLayout title="Privacy Policy">
-      <PlaceholderNotice />
 
       <Section title="Who We Are">
         {APP_NAME} is operated by {BUSINESS_NAME}, based in {OPERATING_COUNTRY}. For privacy questions,

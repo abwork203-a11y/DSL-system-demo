@@ -14,7 +14,6 @@ function Section({ title, children }) {
 export default function TermsPage() {
   return (
     <LegalPageLayout title="Terms of Service">
-      <PlaceholderNotice />
 
       <Section title="Agreement to Terms">
         By accessing or using {APP_NAME} (the "Service"), operated by {BUSINESS_NAME} ("we," "us," "our"),

@@ -75,9 +75,9 @@ body {
 }
 .sidebar-link:hover { background: rgba(255, 255, 255, 0.06); color: var(--sidebar-ink); }
 .sidebar-link.active {
-  background: rgba(150, 116, 42, 0.14);
+  background: rgba(37, 99, 235, 0.16);
   color: #fff;
-  border-left-color: var(--brass);
+  border-left-color: var(--blue);
 }
 
 .sidebar-footer {
@@ -306,7 +306,7 @@ body {
 .field select:focus,
 .field textarea:focus {
   border-color: var(--brass);
-  outline: 2px solid rgba(150, 116, 42, 0.25);
+  outline: 2px solid rgba(37, 99, 235, 0.25);
   outline-offset: 0;
 }
 .field-row { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
@@ -322,13 +322,6 @@ input[data-currency],
 /* ── Table — ledger-ruled look ──────────────────────────── */
 .table-wrap {
   overflow-x: auto;
-  background-image: repeating-linear-gradient(
-    to bottom,
-    transparent,
-    transparent 43px,
-    var(--rule) 43px,
-    var(--rule) 44px
-  );
 }
 table.data-table { width: 100%; border-collapse: collapse; font-size: 13.5px; background: var(--surface); }
 .data-table th {
@@ -441,7 +434,7 @@ table.data-table { width: 100%; border-collapse: collapse; font-size: 13.5px; ba
 
 /* ── Skeleton loading ───────────────────────────────────── */
 .skeleton {
-  background: linear-gradient(90deg, var(--surface-sunken) 25%, #E4DFCC 37%, var(--surface-sunken) 63%);
+  background: linear-gradient(90deg, var(--surface-sunken) 25%, #E2E8F0 37%, var(--surface-sunken) 63%);
   background-size: 400% 100%;
   animation: skeleton-shine 1.4s ease infinite;
   border-radius: var(--radius-sm);
