@@ -3,6 +3,7 @@ import { useNavigate, Link } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { apiErrorMessage } from '../api/client';
 import { APP_NAME } from '../config';
+import Footer from '../components/Footer';
 
 export default function LoginPage() {
   const { login } = useAuth();
@@ -27,30 +28,30 @@ export default function LoginPage() {
   };
 
   return (
-    <div style={{
-      minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center',
-      background: 'var(--sidebar-bg)',
-    }}>
-      <div className="card" style={{ width: 380, boxShadow: 'var(--shadow-md)' }}>
-        <div style={{ marginBottom: 22 }}>
-          <h1>{APP_NAME}<span style={{ color: 'var(--accent)' }}>.</span></h1>
-          <p style={{ color: 'var(--ink-muted)', fontSize: 13.5 }}>Distribution Sales &amp; Ledger Management</p>
+    <div className="auth-shell">
+      <div className="auth-center">
+        <div className="auth-card">
+          <div style={{ marginBottom: 22 }}>
+            <h1>{APP_NAME}<span style={{ color: 'var(--accent)' }}>.</span></h1>
+            <p style={{ color: 'var(--ink-muted)', fontSize: 13.5 }}>Distribution Sales &amp; Ledger Management</p>
+          </div>
+          {error && <div className="error-banner">{error}</div>}
+          <form onSubmit={handleSubmit}>
+            <div className="field">
+              <label htmlFor="email">Email</label>
+              <input id="email" type="email" value={email} onChange={(e) => setEmail(e.target.value)} required autoFocus />
+            </div>
+            <div className="field">
+              <label htmlFor="password">Password</label>
+              <input id="password" type="password" value={password} onChange={(e) => setPassword(e.target.value)} required />
+            </div>
+            <button className="btn" type="submit" disabled={loading} style={{ width: '100%', justifyContent: 'center', marginTop: 4 }}>
+              {loading ? 'Signing in…' : 'Sign in'}
+            </button>
+          </form>
         </div>
-        {error && <div className="error-banner">{error}</div>}
-        <form onSubmit={handleSubmit}>
-          <div className="field">
-            <label htmlFor="email">Email</label>
-            <input id="email" type="email" value={email} onChange={(e) => setEmail(e.target.value)} required autoFocus />
-          </div>
-          <div className="field">
-            <label htmlFor="password">Password</label>
-            <input id="password" type="password" value={password} onChange={(e) => setPassword(e.target.value)} required />
-          </div>
-          <button className="btn" type="submit" disabled={loading} style={{ width: '100%', justifyContent: 'center', marginTop: 4 }}>
-            {loading ? 'Signing in…' : 'Sign in'}
-          </button>
-        </form>
       </div>
+      <Footer />
     </div>
   );
 }

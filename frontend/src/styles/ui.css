@@ -6,10 +6,16 @@
 /* ── Global reset — fixes the white edge-frame around the page ──
    Browsers apply an 8px default margin to <body>. Without this,
    your background color never reaches the true edge of the screen. */
+*, *::before, *::after {
+  box-sizing: border-box;
+}
+
 html, body, #root {
   margin: 0;
   padding: 0;
   height: 100%;
+  width: 100%;
+  overflow-x: hidden;   /* stops any stray sideways scroll / edge sliver */
 }
 
 body {
@@ -116,6 +122,40 @@ body {
 .page-header h1 { font-family: var(--font-display); font-weight: 600; }
 .page-header p { color: var(--ink-muted); margin-top: 4px; font-size: 13.5px; }
 
+/* ── Auth / login page layout ───────────────────────────────
+   A flex column filling the full viewport height. The card sits
+   in the middle (flex: 1 centers it), the footer sits at the very
+   bottom via margin-top: auto on .site-footer — see below. */
+.auth-shell {
+  min-height: 100vh;
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  background: var(--sidebar-bg);
+}
+.auth-center {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 24px;
+}
+.auth-card {
+  width: 100%;
+  max-width: 420px;      /* fixed, predictable form width on any screen */
+  background: var(--surface);
+  border-radius: var(--radius);
+  border-top: 3px solid var(--brass);
+  box-shadow: var(--shadow-md);
+  padding: 36px 40px;
+}
+.auth-shell .site-footer {
+  border-top: 1px solid rgba(255, 255, 255, 0.1);
+  color: var(--sidebar-muted);
+}
+.auth-shell .site-footer a { color: var(--sidebar-muted); }
+.auth-shell .site-footer a:hover { color: var(--brass); }
+
 /* ── Site footer — sits at the true bottom of the screen ───
    margin-top: auto pushes it down when content is short (e.g. the
    login page); it flows naturally below content when a page is long. */
@@ -134,27 +174,35 @@ body {
    Hidden by default; only shown + wired up below 768px. */
 .hamburger-btn {
   display: none;
-  border: none;
-  background: transparent;
+  position: fixed;      /* pinned to the viewport corner — stays put on scroll */
+  top: 14px;
+  left: 14px;
+  z-index: 50;
+  border: 1px solid var(--rule);
+  background: var(--surface);
   color: var(--ink);
-  font-size: 22px;
-  line-height: 1;
-  padding: 8px;
+  border-radius: var(--radius-sm);
+  box-shadow: var(--shadow-sm);
+  width: 40px;
+  height: 40px;
+  align-items: center;
+  justify-content: center;
   cursor: pointer;
 }
 .hamburger-btn:focus-visible { outline: 2px solid var(--brass); outline-offset: 2px; }
 
 @media (max-width: 768px) {
-  .hamburger-btn { display: block; }
+  .hamburger-btn { display: flex; }
 
   .sidebar {
     position: fixed;
-    left: -240px;
+    left: 0;
     top: 0;
     z-index: 40;
-    transition: left 0.2s ease;
+    transform: translateX(-100%);   /* fully off-screen, no partial-pixel gap */
+    transition: transform 0.2s ease;
   }
-  .sidebar.sidebar-open { left: 0; }
+  .sidebar.sidebar-open { transform: translateX(0); }
 
   /* Dims the page behind the sidebar when it's open on mobile —
      add this element in JSX only when sidebarOpen is true */
@@ -211,6 +259,7 @@ body {
 .btn {
   display: inline-flex;
   align-items: center;
+  text-decoration: none;   /* removes the underline browsers add if this class is on an <a> */
   gap: 6px;
   border: 1px solid transparent;
   border-radius: var(--radius-sm);
@@ -329,14 +378,12 @@ table.data-table { width: 100%; border-collapse: collapse; font-size: 13.5px; ba
   display: inline-flex;
   align-items: center;
   padding: 3px 11px;
-  border-radius: 3px;
+  border-radius: var(--radius-sm);
   font-size: 10.5px;
   font-weight: 700;
   text-transform: uppercase;
-  letter-spacing: 0.09em;
+  letter-spacing: 0.06em;
   border: 1.5px solid currentColor;
-  box-shadow: 0 0 0 1px var(--surface), 0 0 0 2.5px currentColor;
-  transform: rotate(-1.2deg);
   background: transparent;
 }
 .badge-green  { color: var(--status-positive); background: var(--status-positive-bg); }
