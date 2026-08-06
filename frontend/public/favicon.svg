@@ -1,7 +1,6 @@
-<?xml version="1.0" encoding="UTF-8"?>
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" width="64" height="64">
-  <rect width="64" height="64" rx="14" fill="#2F5D50"/>
-  <text x="32" y="45" font-family="Georgia, 'Fraunces', serif" font-size="34" font-weight="600"
-        fill="#F6F6F2" text-anchor="middle">L</text>
-  <circle cx="47" cy="19" r="4.5" fill="#F6F6F2"/>
+<svg viewBox="0 0 64 64" xmlns="http://www.w3.org/2000/svg">
+  <rect x="4" y="4" width="56" height="56" rx="13" fill="#2563EB"/>
+  <rect x="14" y="32" width="8" height="16" rx="2" fill="#FFFFFF"/>
+  <rect x="28" y="22" width="8" height="26" rx="2" fill="#FFFFFF"/>
+  <rect x="42" y="28" width="8" height="20" rx="2" fill="#FFFFFF"/>
 </svg>
