@@ -110,15 +110,6 @@ export default function LoginPage() {
               </div>
             </form>
           )}
-
-          {!mfaToken && (
-            <div style={{ display: 'flex', gap: 14, justifyContent: 'center', marginTop: 18, fontSize: 12 }}>
-              <Link to="/terms" className="link-btn" style={{ color: 'var(--ink-muted)' }}>Terms</Link>
-              <Link to="/privacy" className="link-btn" style={{ color: 'var(--ink-muted)' }}>Privacy</Link>
-              <Link to="/cookies" className="link-btn" style={{ color: 'var(--ink-muted)' }}>Cookies</Link>
-              <Link to="/contact" className="link-btn" style={{ color: 'var(--ink-muted)' }}>Contact</Link>
-            </div>
-          )}
         </div>
       </div>
       <Footer />
