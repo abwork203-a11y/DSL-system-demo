@@ -5,8 +5,8 @@ export const APP_NAME = 'LedgerOne';
 export const APP_VERSION = '1.0.0';
 export const BUSINESS_NAME = 'LedgerOne';
 export const SUPPORT_EMAIL = 'abdullahhameed166@gmail.com';
-export const OPERATING_COUNTRY = '[Country/State of Operation]';
-export const WEBSITE_DOMAIN = '[yourapp.example.com]';
+export const OPERATING_COUNTRY = '[Pakistan/Punjab]';
+export const WEBSITE_DOMAIN = '[https://ledger-project-one.vercel.app]';
 export const CURRENT_YEAR = new Date().getFullYear();
 
 // Google OAuth Client ID for the Drive backup feature (see

@@ -197,7 +197,7 @@ body {
 .hamburger-btn:focus-visible { outline: 2px solid var(--brass); outline-offset: 2px; }
 
 @media (max-width: 768px) {
-  .hamburger-btn { display: flex; }
+  .hamburger-btn { display: none; }
 
   .sidebar {
     position: fixed;
