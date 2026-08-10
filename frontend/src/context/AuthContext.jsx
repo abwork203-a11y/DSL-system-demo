@@ -15,8 +15,6 @@ export function AuthProvider({ children }) {
       const stored = localStorage.getItem('dsl_user');
       return stored ? JSON.parse(stored) : null;
     } catch {
-      // Corrupted or tampered localStorage shouldn't crash the app on load —
-      // /auth/me (below) is the real source of truth anyway.
       return null;
     }
   });
@@ -36,12 +34,29 @@ export function AuthProvider({ children }) {
       .finally(() => setReady(true));
   }, []);
 
+  const applySession = useCallback((user) => {
+    localStorage.setItem('dsl_user', JSON.stringify(user));
+    setUser(user);
+  }, []);
+
+  // Two possible outcomes now: a normal account logs straight in
+  // ({ done: true }); an MFA-enabled account gets a pending token instead
+  // ({ done: false, mfaToken }) that the caller (LoginPage) uses to prompt
+  // for a code and complete the login via completeMfaLogin below.
   const login = useCallback(async (email, password) => {
     const res = await authApi.login(email, password);
-    localStorage.setItem('dsl_user', JSON.stringify(res.data.user));
-    setUser(res.data.user);
-    return res.data.user;
-  }, []);
+    if (res.data.mfaRequired) {
+      return { done: false, mfaToken: res.data.mfaToken };
+    }
+    applySession(res.data.user);
+    return { done: true, user: res.data.user };
+  }, [applySession]);
+
+  const completeMfaLogin = useCallback(async (mfaToken, code) => {
+    const res = await authApi.mfaVerify(mfaToken, code);
+    applySession(res.data.user);
+    return res.data;
+  }, [applySession]);
 
   const logout = useCallback(async () => {
     try {
@@ -53,7 +68,7 @@ export function AuthProvider({ children }) {
   }, []);
 
   return (
-    <AuthContext.Provider value={{ user, ready, login, logout, isAdmin: user?.role === 'admin' }}>
+    <AuthContext.Provider value={{ user, ready, login, completeMfaLogin, logout, isAdmin: user?.role === 'admin' }}>
       {children}
     </AuthContext.Provider>
   );

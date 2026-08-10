@@ -9,50 +9,68 @@ Every claim below was tested against the live app (curl through the actual Vite 
 ## 1. Authentication
 
 ### Password storage — bcrypt hashing
-Passwords are never stored in a recoverable form. `backend/src/db/seed.js` and `backend/src/controllers/userController.js` hash with `bcrypt` (cost factor 10) before writing to the database; `authController.js` verifies with `bcrypt.compare()`, which never reverses the hash — it re-hashes the login attempt and compares.
+Passwords are never stored in a recoverable form. `backend/src/db/seed.js` and `backend/src/controllers/userController.js` hash with `bcrypt` (cost factor 10) before writing to the database; `authController.js` verifies with `bcrypt.compare()`, which never reverses the hash — it re-hashes the login attempt and compares, and does so in constant time (bcrypt's own design), so response timing doesn't leak whether a password was "close."
 **Why:** if the database were ever leaked, plain-text or weakly-hashed passwords would hand an attacker every user's real password immediately.
 
-### Session cookie (httpOnly, not localStorage)
-The login endpoint (`POST /api/auth/login`) no longer returns a JWT in the JSON response body. Instead it sets an `httpOnly` cookie (`dsl_session`) containing the token. `httpOnly` means client-side JavaScript cannot read this cookie at all — not even a malicious script injected via an XSS bug could steal it.
-**Why:** the previous design (Sessions 1-2) stored the JWT in `localStorage`, which *any* JavaScript running on the page can read. An httpOnly cookie removes that entire theft vector — the browser sends it automatically, but no JS (ours or an attacker's) ever touches it directly.
-**Cookie flags used:** `httpOnly: true`, `sameSite: 'lax'`, `secure: true` in production (requires HTTPS), `path: '/'`, 8-hour expiry matching the JWT's own expiry.
+### Breached-password check (Have I Been Pwned, k-anonymity)
+Every new password — on account creation and on any password change — is checked against HIBP's breached-password database via `backend/src/utils/passwordBreachCheck.js`. Only the first 5 characters of the password's SHA-1 hash are ever sent over the network (HIBP's own k-anonymity design, not something we invented); the full password never leaves this server.
+**Fails open, deliberately:** if HIBP is unreachable, the check is skipped rather than blocking account creation/password changes — a core account-management flow shouldn't become unavailable because of a third-party outage. Verified this fail-open path directly (this sandbox's network egress is restricted and returns a 403 for this domain — confirmed the code correctly treats that as "couldn't check" rather than crashing or wrongly blocking).
+
+### Session cookie (httpOnly)
+The login endpoint sets an `httpOnly` cookie (`dsl_session`) containing the JWT — client-side JavaScript cannot read this cookie at all, not even a malicious script injected via an XSS bug.
+**Cookie flags:** `httpOnly: true`; `sameSite: 'none'` in production / `'lax'` in local dev (see the CORS/cross-origin note in §3 for why this had to change from a flat `'lax'`); `secure: true` in production; `path: '/'`; 8-hour expiry.
 
 ### Fresh per-request authorization check
-`requireAuth` (`backend/src/middleware/auth.js`) verifies the JWT signature, then — new in this pass — does a database lookup on every single request to confirm the user still exists, is still active, and fetches their *current* role, rather than trusting whatever was true when the token was issued.
-**Why:** without this, an admin deactivating a sales rep (or changing their role) would have no effect until that rep's existing token naturally expired — up to 8 hours later. Verified live: deactivating a user via direct DB update immediately caused their still-unexpired token to be rejected on the very next request (`This session is no longer valid.`).
-**Tradeoff accepted:** one extra database query per authenticated request. At this app's scale (a small internal sales team), that cost is negligible next to the correctness gain.
+`requireAuth` verifies the JWT signature, then does a database lookup on every request to confirm the user still exists, is active, and fetches their *current* role — not whatever was true when the token was issued. Verified live: deactivating a user mid-session caused their still-unexpired token to be rejected on the very next request.
 
-### Account lockout after repeated failed logins
-`users.failed_login_attempts` and `users.locked_until` (new columns, added via an idempotent `ALTER TABLE` in `schema.sql` so existing databases upgrade safely) track failures per account. After 5 wrong passwords, the account locks for 15 minutes — checked *before* the password is even verified, so further guesses during the lockout window don't get a bcrypt comparison at all. A successful login resets the counter.
-**Why:** stops an attacker who already knows (or has narrowed down) a specific person's email from brute-forcing that one account, independent of IP-based rate limiting (see below) — someone could otherwise route guesses through many IPs to dodge a pure rate limit.
-**Tradeoff accepted, deliberately:** this makes it possible for someone to lock a *real* user out on purpose by deliberately failing their password 5 times. This is a known, accepted tradeoff of account-based lockout in general — the alternative (no lockout at all) is worse. If this becomes a real annoyance in practice, the usual next step is CAPTCHA after a few failures instead of a hard lock, which we haven't implemented here.
+### Session invalidation via token_version (this pass)
+A `token_version` integer on each user row is embedded in every JWT at login. `requireAuth` rejects any token whose embedded version doesn't match the account's current value. This is the actual mechanism behind three real actions:
+- **Changing your own password** (`PATCH /api/account/password`) bumps your `token_version`, silently invalidating every *other* session on your account while re-issuing a fresh cookie for the request that made the change — so you don't lock yourself out on the device you're using.
+- **An admin resetting someone else's password** (`userController.update`) does the same for the target user.
+- **"Log out all other sessions"** (`POST /api/account/logout-all-sessions`) — an explicit self-service action for "I think I left myself logged in somewhere."
+
+No server-side session store was needed for this — it's a single integer compared against a claim already inside the JWT.
+
+### Sliding session renewal
+`requireAuth` also checks how much of the token's lifetime remains; once a token is more than halfway to expiry, it silently issues a fresh one with a full new window. Net effect: an actively-used session doesn't hit a hard 8-hour wall mid-task, but a genuinely abandoned session (nobody making requests) still expires normally — nothing is polling to keep it alive artificially.
+**Why not a separate refresh-token pair with rotation instead?** Considered and deliberately not built — a distinct short-lived access token + long-lived refresh token (with reuse detection, rotation, etc.) is meaningfully more moving parts for a benefit this app already gets most of via the combination above: short-lived tokens, a DB freshness check every request, and a real kill-switch (`token_version`). Worth revisiting if this app's needs grow (e.g. needing to distinguish "remember me" from a short session).
+
+### Multi-factor authentication (TOTP)
+Users can enable MFA under Account Settings (`/account`, self-service — any role, not just admins). Implementation:
+- `otplib` generates a secret and verifies 6-digit TOTP codes (`backend/src/utils/mfa.js`); `qrcode` renders it as a scannable QR code for authenticator apps (Google Authenticator, Authy, 1Password, etc.).
+- The secret is stored but MFA isn't actually turned on (`mfa_enabled`) until the user proves their authenticator app produces a matching code (`mfaVerifySetup`) — prevents a typo'd setup from locking someone out of their own account.
+- **Login becomes two steps once enabled:** a correct password alone no longer issues a session. Instead, the server returns a short-lived (5 min), purpose-scoped JWT in the response body (`mfaToken`) — deliberately *not* a second cookie, for the same cross-origin reason described in §2 for CSRF — which the frontend holds in memory and exchanges for a real session via `POST /api/auth/mfa/verify` once the user supplies a code. Verified live: a password-only login attempt against an MFA-enabled account returns `{mfaRequired: true}` and does **not** set the session cookie; `/auth/me` correctly returns 401 until the second step completes.
+- **Backup codes:** 8 single-use codes are generated and shown exactly once when MFA is enabled, then stored only as bcrypt hashes (same treatment as passwords). Verified live: using one succeeds and consumes it; reusing the same code afterward is correctly rejected.
+- **Rate limited specifically:** MFA code attempts (both at login and at setup-confirmation) are capped separately and more tightly (10 per 10 minutes — see `middleware/rateLimit.js`) than the general API limit, since a 6-digit code is a small enough space that unrestricted guessing within its 30-second validity window would matter.
+- **Disabling MFA requires the current password** and bumps `token_version` — silently turning off a second factor is exactly the kind of action a compromised session might attempt, so it's gated the same way a password change is.
+
+### Account lockout — now with exponential backoff
+`users.failed_login_attempts`, `locked_until`, and `lockout_count` track failures per account. After 5 wrong passwords, the account locks — checked *before* the password is even verified, so further guesses during a lockout don't reach `bcrypt.compare` at all. Unlike the original flat 15-minute lock, **duration now doubles with each separate lockout episode** (15min → 30min → 60min → ... capped at 24h), making sustained brute-forcing of one specific account increasingly pointless without an unbounded permanent ban a legitimate user would need an admin to lift.
+**Bug caught during this pass's own testing:** the first implementation had an off-by-one — it incremented the lockout counter *before* computing the duration, so the very first lockout was 30 minutes instead of the intended 15. Caught by actually triggering a real lockout during testing (not just code review) and checking the returned minutes; fixed by computing duration from the pre-increment count.
+**Tradeoff accepted, deliberately:** this still allows someone to lock a real user out on purpose by deliberately failing their password 5 times — the accepted tradeoff of account-based lockout in general.
 
 ### Rate limiting on login (IP-based, layer two)
-`express-rate-limit` caps login attempts at 20 per 15 minutes per IP address (`backend/src/middleware/rateLimit.js`), independent of the per-account lockout above. A much looser limit (600 requests/15min) applies to the whole API as a blunt safety net against runaway clients or crude scripted abuse.
-**Why two separate mechanisms?** Account lockout stops "guess one person's password many times." IP rate limiting stops "guess many people's passwords a few times each from one machine." Neither alone covers both attack shapes.
+20 login attempts per 15 minutes per IP, independent of the per-account lockout above — one stops "guess one person's password many times," the other stops "guess many people's passwords a few times each from one machine." Neither alone covers both attack shapes.
 
 ### Generic error messages (no account enumeration)
-Login failure always returns the same message — `"Invalid email or password."` — whether the email doesn't exist or the password is simply wrong.
-**Why:** a distinct "no such account" error would let an attacker silently build a list of every valid email address registered in the system before ever attempting a password.
+Login failure always returns the same message regardless of whether the email exists — telling an attacker "no such account" vs "wrong password" is a free account-enumeration oracle.
 
 ### JWT secret validated at startup
-`backend/src/server.js` now refuses to start the server at all if `JWT_SECRET` is missing, still equal to the placeholder text from `.env.example`, or shorter than 32 characters.
-**Why:** a weak or default secret means anyone can forge a valid-looking login token (including one claiming to be an admin). This is the kind of mistake that's easy to make by copying `.env.example` to `.env` and forgetting the one line that actually matters — better to crash loudly at startup than run silently vulnerable.
+The server refuses to boot if `JWT_SECRET` is missing, still the `.env.example` placeholder, or under 32 characters — a weak/default secret means anyone can forge a valid login token, and this is the kind of mistake that's easy to make silently by copying `.env.example` without editing the one line that matters.
 
 ---
 
 ## 2. Cross-Site Request Forgery (CSRF) protection
 
-Switching the session to a cookie reintroduced a risk that didn't exist with the old `Authorization`-header approach: cookies are sent by the browser *automatically* on any request to the site, including ones triggered by a malicious page the user happens to have open in another tab. Without a defense, that other page could make the user's browser fire a request (e.g. "delete this distributor") that the backend would accept, since the valid session cookie rides along whether the request came from our real frontend or not.
+**This section changed since the original hardening pass.** The original design (documented in earlier versions of this file) used a double-submit *cookie* — a `csrf_token` cookie plus a matching header. That works cleanly when frontend and backend share an origin, but this app's real deployment topology is **three separate origins** (Vercel for the frontend, Render for the backend, Supabase for the database) — and a cookie set by Render in response to a Vercel-origin request isn't reliably stored or sent back by browsers that block third-party cookies (Safari does this by default; Chrome is moving the same direction). That would have made the CSRF cookie itself unreliable exactly where it mattered most.
 
-**Defense implemented — double-submit cookie pattern** (`backend/src/middleware/csrf.js`):
-1. On any request, if the browser doesn't already have a `csrf_token` cookie, the server issues one — a random value, *not* httpOnly (JS needs to read it), set with `sameSite: 'lax'`.
-2. On every state-changing request (`POST`/`PUT`/`PATCH`/`DELETE`), the server requires an `X-CSRF-Token` header whose value matches the `csrf_token` cookie. If they don't match (or either is missing), the request is rejected with `403`.
-3. The frontend (`api/client.js`) reads the `csrf_token` cookie and attaches it as that header automatically on every mutating request — the person using the app never sees this happen.
+**Current defense — signed token, delivered in the response body, not a cookie** (`backend/src/middleware/csrf.js`):
+1. `GET /api/auth/csrf-token` issues an HMAC-signed token (a random nonce + timestamp, signed with `JWT_SECRET` so it can't be forged, with its own 24h expiry) — a plain JSON response, no cookie involved at all.
+2. The frontend fetches this once and holds it in memory, attaching it as an `X-CSRF-Token` header on every mutating (`POST`/`PUT`/`PATCH`/`DELETE`) request.
+3. The server verifies the signature and expiry on every such request; missing or invalid → `403`.
 
-**Why this actually stops CSRF:** a malicious site can make the browser *send* our cookies, but it cannot *read* them (browsers enforce this — cookies are only readable by scripts running on the same origin that set them). So the attacker's page can't produce a matching `X-CSRF-Token` header, even though the `csrf_token` cookie itself rides along. Verified live: an identical order-creation request succeeded with the correct header and was rejected with `"CSRF token missing or invalid."` when the header was omitted.
-
-**Also contributing to CSRF defense, as a second layer:** the session cookie's `sameSite: 'lax'` attribute already blocks it from being sent on most cross-site requests in modern browsers, and CORS (below) rejects cross-origin requests from unrecognized origins before they'd even reach the CSRF check. The double-submit token is defense-in-depth on top of both.
+**Why this still stops CSRF despite not depending on a cookie at all:** a malicious page cannot make the victim's browser produce a validly-signed token — it has no way to read one (the token was fetched via an authenticated, same-origin-to-the-attacker-inaccessible XHR call from the real frontend) and no way to forge one (it doesn't know `JWT_SECRET`). This sidesteps the third-party-cookie-blocking problem entirely rather than working around it.
+**Layered with:** strict CORS (§3, rejects requests from any origin except the configured frontend before they'd even reach the CSRF check) and, for the session cookie specifically, `SameSite=None; Secure` in production (required for the cross-origin cookie to be sent at all — see §1 — which is *not* a CSRF defense by itself at that setting, which is exactly why the signed-token approach above is the real protection now, not a supporting layer).
 
 ---
 
@@ -122,13 +140,26 @@ Ran `npm audit` on both backend and frontend and manually applied the same vulne
 
 ---
 
-## 9. Deliberately not done (and why)
+## 9. Scalability & performance (this pass)
 
-- **No CSP (Content-Security-Policy) header configuration beyond Helmet's defaults.** The backend is a pure JSON API — it serves no HTML — so CSP's main value (restricting which scripts/styles a *page* can load) applies to the frontend's hosting setup, not this Express server. Worth configuring when the frontend is actually deployed to a static host.
-- **No refresh-token rotation.** The session simply expires after 8 hours, requiring a fresh login. A refresh-token scheme (silently renewing sessions) is a legitimate future improvement for user convenience, but adds real complexity (secure storage of a second, longer-lived credential, revocation logic) that wasn't part of what we scoped together — flagged in `PROJECT_LOG.md` as a future item, not silently skipped.
-- **No CAPTCHA.** Considered as a softer alternative to hard account lockout; not implemented since we chose to add real lockout instead. Could be layered in later if lockout proves too disruptive in practice.
-- **Socket.io connections are not authenticated.** Real-time order-update events broadcast to any connected client without checking who they are. This was flagged during this session as a known gap but intentionally left out of this pass since it wasn't part of the specific measures discussed — anyone who can reach the app can currently receive live "an order was created" notifications, though not the actual order *contents* beyond what's in the broadcast payload (currently just an order ID and distributor ID). Worth hardening if this app is ever exposed beyond a trusted internal network.
+Not strictly "security," but done in the same pass and worth documenting together since some of it has security-adjacent motivations (denial-of-service resistance, not just speed):
+
+- **Pagination on Orders and the all-distributors Ledger view** (`backend/src/utils/pagination.js`) — previously both endpoints returned every matching row in one response with no limit. A client (malicious or just a business with years of order history) could force the server to load and serialize an unbounded result set. Page size is clamped server-side (max 200) regardless of what a client requests, so this is also a mild DoS mitigation, not purely a UX nicety. The single-distributor ledger view stays unpaginated deliberately — naturally bounded to one business relationship rather than the whole company's activity — documented as a candidate for the same treatment if that assumption stops holding.
+- **In-memory response caching on the expensive aggregate report endpoints** (`backend/src/utils/cache.js`, 30s TTL) — dashboard/monthly-sales/performance/top-products all run non-trivial aggregate SQL; a plain `Map`-based cache (not Redis — this app runs as a single instance, so cache coherency across instances was never a real requirement here) cuts repeated identical queries during normal navigation. Explicitly invalidated on order creation and payment recording (`invalidatePrefix('route:/api/reports')`) rather than only relying on the TTL, so a just-created order's effect on the dashboard is visible immediately, not up to 30s later.
+- **gzip compression** (`compression` middleware) on all API responses above ~1KB.
+- **Database indexes added**: `ledger(entry_date DESC)` for the now-paginated all-distributors view's sort, and `orders(created_by)` for the sales-rep performance report's join — both query patterns existed before but weren't covered by an index until this pass.
+
+## 10. New dependencies added this pass
+`otplib` (TOTP generation/verification), `qrcode` (MFA setup QR codes), `compression` (gzip). All three are widely-used, actively maintained packages with no known relevant CVEs at time of adding (checked via `npm audit` after installation — clean).
+
+## 11. Deliberately not done (and why)
+
+- **No CSP header on the backend itself** (unchanged reasoning from earlier passes) — it's a pure JSON API. The frontend's CSP lives in `frontend/index.html` as a meta tag; `frame-ancestors`/`X-Frame-Options` (which browsers ignore inside a `<meta>` CSP tag) are set at the real HTTP-header level via `frontend/vercel.json`'s `headers` config, updated this pass to match the actual Vercel deployment path — the original `frontend/nginx.conf` version still exists for the Docker Compose deployment option, but isn't what's actually in use.
+- **No separate refresh-token pair with rotation.** Superseded by this pass's combination of `token_version`-based invalidation + sliding renewal (§1) — considered, and judged to cover the practical need (sessions that don't die mid-task, but that a password change/explicit action can genuinely kill) without the added complexity of a second credential type, rotation-on-use, and reuse-detection logic. Worth revisiting only if a concrete need emerges that this doesn't cover (e.g. a "remember me for 30 days" option distinct from a normal session).
+- **No CAPTCHA.** Exponential lockout backoff (§1) was implemented instead as the practical response to repeated failed logins — CAPTCHA remains a reasonable future layer if lockout alone proves disruptive, but adds a third-party dependency (hCaptcha/reCAPTCHA both require the operator's own site keys) that wasn't worth taking on for this pass.
+- **Socket.io connections are still not authenticated.** Unchanged from the prior pass — anyone who can reach the app can receive live "an order was created" events, though not the order's actual contents (the broadcast payload is just an order ID and distributor ID). Worth hardening if this app is ever exposed beyond a trusted setup.
+- **Account lockout/breach-check/MFA state is not yet reflected in `frontend/src/pages/UsersPage.jsx`'s admin view** — an admin can see whether a user has MFA enabled (`mfa_enabled` is now returned by `GET /api/users`) but there's no UI surfacing *locked-out* accounts or offering an admin a one-click unlock. Currently the only way to clear a lockout is a direct database update. Small, worth adding if lockouts turn out to affect real users in practice.
 
 ---
 
-*Every measure above was tested against the running application, not just reviewed as code — see `PROJECT_LOG.md`, Session 4, for the full test transcript (login/CSRF/lockout/validation/deactivation-takes-effect-immediately, all verified via curl through the real Vite dev proxy).*
+*Every measure in §1-§8 was originally verified in Session 4 (see `PROJECT_LOG.md` for that transcript). Everything in §1's MFA/token_version/exponential-backoff subsections, and §2's signed-token CSRF, was verified fresh in this pass — real TOTP codes generated and checked end-to-end, a genuine two-session password-change-invalidates-the-other-session test, a real single-use backup code consumed and correctly rejected on reuse, and the exponential-backoff off-by-one bug caught by actually triggering a lockout rather than trusting the code on inspection. See `PROJECT_LOG.md`'s latest session for the full transcript.*

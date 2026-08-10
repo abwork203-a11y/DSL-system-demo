@@ -66,6 +66,9 @@ Serve `frontend/dist` from any static host, and point it at your deployed backen
 - **Google Drive backup** (admin-only) — one-click export of every product/distributor/ledger/invoice as Excel files, uploaded directly from the browser to the admin's own Google Drive (fresh Google sign-in required every time; see `GOOGLE_DRIVE_SETUP.md` to configure)
 - Full dashboard (stats) + charts (monthly sales, top distributors, rep performance, top products)
 - JWT auth with two roles (admin / sales_rep), enforced server-side, session via httpOnly cookie
+- Optional TOTP two-factor authentication (self-service, any role) with QR setup and single-use backup codes
+- Self-service Account Settings: password change, MFA setup/disable, "log out all other sessions"
+- Pagination on Orders and the all-distributors Ledger view; short-TTL caching + gzip compression on report endpoints
 - Real-time order/payment events via Socket.io (dashboard and orders list auto-refresh)
 - Audit trail on create/update/delete/payment actions, viewable via `/api/audit` (admin)
 - Footer with Terms of Service / Privacy Policy / Contact pages (structural placeholders — see "Legal pages" below)

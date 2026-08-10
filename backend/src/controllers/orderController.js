@@ -3,9 +3,12 @@ const { asyncHandler } = require('../utils/asyncHandler');
 const { ApiError } = require('../utils/ApiError');
 const { createOrderWithLedger, recordPayment } = require('../services/ledgerService');
 const { recordAudit } = require('../utils/audit');
+const { parsePagination, paginatedResponse } = require('../utils/pagination');
+const { invalidatePrefix } = require('../utils/cache');
 
 const list = asyncHandler(async (req, res) => {
   const { distributor_id, order_status, payment_status, date_from, date_to, search } = req.query;
+  const { page, pageSize, offset } = parsePagination(req.query);
   const clauses = [];
   const params = [];
 
@@ -35,16 +38,27 @@ const list = asyncHandler(async (req, res) => {
   }
 
   const where = clauses.length ? `WHERE ${clauses.join(' AND ')}` : '';
+
+  // Two queries (count + page) rather than a window function — simpler to
+  // read, and at this app's realistic data volumes the extra round-trip
+  // costs nothing worth optimizing away yet.
+  const countResult = await pool.query(
+    `SELECT COUNT(*)::int AS total FROM orders o JOIN distributors d ON d.id = o.distributor_id ${where}`,
+    params
+  );
+
+  const dataParams = [...params, pageSize, offset];
   const result = await pool.query(
     `SELECT o.*, d.name AS distributor_name, u.name AS created_by_name
      FROM orders o
      JOIN distributors d ON d.id = o.distributor_id
      LEFT JOIN users u ON u.id = o.created_by
      ${where}
-     ORDER BY o.order_date DESC`,
-    params
+     ORDER BY o.order_date DESC
+     LIMIT $${dataParams.length - 1} OFFSET $${dataParams.length}`,
+    dataParams
   );
-  res.json(result.rows);
+  res.json(paginatedResponse(result.rows, countResult.rows[0].total, page, pageSize));
 });
 
 const getOne = asyncHandler(async (req, res) => {
@@ -90,6 +104,8 @@ const create = asyncHandler(async (req, res) => {
       notes,
     });
     await client.query('COMMIT');
+
+    invalidatePrefix('route:/api/reports'); // dashboard/report numbers just went stale
 
     const io = req.app.get('io');
     if (io) io.emit('order:created', { orderId: order.id, distributorId: distributor_id });
@@ -141,6 +157,8 @@ const pay = asyncHandler(async (req, res) => {
     await client.query('BEGIN');
     const result = await recordPayment(client, { orderId: id, amount, note, userId: req.user.id });
     await client.query('COMMIT');
+
+    invalidatePrefix('route:/api/reports'); // outstanding-receivables figure just changed
 
     const io = req.app.get('io');
     if (io) io.emit('order:payment', { orderId: Number(id) });

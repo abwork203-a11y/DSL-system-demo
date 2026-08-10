@@ -20,6 +20,25 @@ async function fetchBlob(url) {
   return res.data;
 }
 
+// The orders endpoint is now paginated (see orderController.js) — a backup
+// needs every order regardless of how many pages that is, so we walk pages
+// until there's nothing left rather than assuming one request returns
+// everything (which would silently only back up the first ~50 orders once a
+// business has more than that).
+async function fetchAllOrders() {
+  const all = [];
+  let page = 1;
+  const pageSize = 200; // MAX_PAGE_SIZE server-side — fewest round-trips while staying within what the API allows
+  // eslint-disable-next-line no-constant-condition
+  while (true) {
+    const res = await ordersApi.list({ page, pageSize });
+    all.push(...res.data.data);
+    if (page >= res.data.pagination.totalPages) break;
+    page += 1;
+  }
+  return all;
+}
+
 export default function BackupPage() {
   const toast = useToast();
   const [running, setRunning] = useState(false);
@@ -40,8 +59,7 @@ export default function BackupPage() {
       // Build the full list of files this backup will contain up front so we
       // can show real progress instead of a spinner with no sense of scale.
       setProgress({ current: 0, total: 1, label: 'Fetching order list…' });
-      const ordersRes = await ordersApi.list();
-      const allOrders = ordersRes.data;
+      const allOrders = await fetchAllOrders();
 
       const jobs = [
         { filename: 'products.xlsx', url: exportApi.productsUrl() },

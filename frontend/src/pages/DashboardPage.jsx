@@ -23,10 +23,10 @@ export default function DashboardPage() {
     try {
       const [summaryRes, ordersRes] = await Promise.all([
         reports.dashboard(),
-        ordersApi.list(),
+        ordersApi.list({ pageSize: 8 }),
       ]);
       setSummary(summaryRes.data);
-      setRecentOrders(ordersRes.data.slice(0, 8));
+      setRecentOrders(ordersRes.data.data);
     } catch (err) {
       toast.error(apiErrorMessage(err));
     } finally {

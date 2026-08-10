@@ -5,7 +5,10 @@ import { apiErrorMessage } from '../api/client';
 import { useToast } from '../context/ToastContext';
 import { useLiveOrderEvents } from '../context/SocketContext';
 import StatusBadge from '../components/StatusBadge';
+import Pagination from '../components/Pagination';
 import { TableSkeleton } from '../components/Skeleton';
+
+const PAGE_SIZE = 25;
 
 function money(n) {
   return Number(n || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
@@ -14,6 +17,8 @@ function money(n) {
 export default function OrdersPage() {
   const toast = useToast();
   const [rows, setRows] = useState([]);
+  const [pagination, setPagination] = useState(null);
+  const [page, setPage] = useState(1);
   const [distributorsList, setDistributorsList] = useState([]);
   const [search, setSearch] = useState('');
   const [orderStatus, setOrderStatus] = useState('');
@@ -28,45 +33,52 @@ export default function OrdersPage() {
         order_status: orderStatus || undefined,
         payment_status: paymentStatus || undefined,
         distributor_id: distributorId || undefined,
+        page,
+        pageSize: PAGE_SIZE,
       });
-      setRows(res.data);
+      setRows(res.data.data);
+      setPagination(res.data.pagination);
     } catch (err) {
       toast.error(apiErrorMessage(err));
     } finally {
       setLoading(false);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [search, orderStatus, paymentStatus, distributorId]);
+  }, [search, orderStatus, paymentStatus, distributorId, page]);
 
   useEffect(() => { load(); }, [load]);
   useEffect(() => { distributorsApi.list().then((res) => setDistributorsList(res.data)).catch(() => {}); }, []);
   useLiveOrderEvents(() => load());
+
+  // Any filter change should reset back to page 1 — staying on page 4 of a
+  // now-different, shorter result set would just show an empty page.
+  const updateFilter = (setter) => (value) => { setter(value); setPage(1); };
 
   return (
     <div className="content">
       <div className="page-header">
         <div>
           <h1>Orders</h1>
-          <p>{rows.length} order{rows.length === 1 ? '' : 's'}</p>
+          <p>{pagination?.total ?? '…'} order{pagination?.total === 1 ? '' : 's'}</p>
         </div>
         <Link to="/orders/new" className="btn">+ New Order</Link>
       </div>
 
       <div className="card">
         <div className="toolbar">
-          <input type="text" placeholder="Search order # or distributor…" value={search} onChange={(e) => setSearch(e.target.value)} style={{ minWidth: 220 }} />
-          <select value={distributorId} onChange={(e) => setDistributorId(e.target.value)}>
+          <input type="text" placeholder="Search order # or distributor…" value={search} onChange={(e) => updateFilter(setSearch)(e.target.value)} style={{ minWidth: 220 }} />
+          <select value={distributorId} onChange={(e) => updateFilter(setDistributorId)(e.target.value)}>
             <option value="">All distributors</option>
             {distributorsList.map((d) => <option key={d.id} value={d.id}>{d.name}</option>)}
           </select>
-          <select value={orderStatus} onChange={(e) => setOrderStatus(e.target.value)}>
+          <select value={orderStatus} onChange={(e) => updateFilter(setOrderStatus)(e.target.value)}>
             <option value="">All order statuses</option>
             <option value="pending">Pending</option>
             <option value="current">Current</option>
             <option value="completed">Completed</option>
             <option value="cancelled">Cancelled</option>
           </select>
-          <select value={paymentStatus} onChange={(e) => setPaymentStatus(e.target.value)}>
+          <select value={paymentStatus} onChange={(e) => updateFilter(setPaymentStatus)(e.target.value)}>
             <option value="">All payment statuses</option>
             <option value="unpaid">Unpaid</option>
             <option value="partial">Partial</option>
@@ -109,6 +121,7 @@ export default function OrdersPage() {
             </table>
           </div>
         )}
+        <Pagination pagination={pagination} onPageChange={setPage} />
       </div>
     </div>
   );

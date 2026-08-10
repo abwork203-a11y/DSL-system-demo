@@ -57,11 +57,14 @@ export default function UsersPage() {
   };
 
   const toggleActive = async (u) => {
+    const newActive = !u.is_active;
+    setRows((current) => current.map((row) => (row.id === u.id ? { ...row, is_active: newActive } : row)));
+
     try {
-      await usersApi.update(u.id, { is_active: !u.is_active });
-      toast.success(u.is_active ? 'Account deactivated.' : 'Account reactivated.');
-      load();
+      await usersApi.update(u.id, { is_active: newActive });
+      toast.success(newActive ? 'Account reactivated.' : 'Account deactivated.');
     } catch (err) {
+      setRows((current) => current.map((row) => (row.id === u.id ? { ...row, is_active: u.is_active } : row)));
       toast.error(apiErrorMessage(err));
     }
   };

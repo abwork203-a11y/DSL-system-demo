@@ -52,13 +52,27 @@ export default function OrderDetailPage() {
   const handlePay = async (e) => {
     e.preventDefault();
     setPaying(true);
+    const amount = Number(payAmount);
+    const previousOrder = order; // snapshot for rollback
+
+    // Optimistic update: apply the same amount_paid/payment_status logic the
+    // server uses (see ledgerService.js) so the UI reflects the payment
+    // immediately — the modal closes and the balance updates before the
+    // network round-trip completes, then gets silently reconciled with the
+    // server's authoritative response a moment later.
+    const optimisticAmountPaid = Number(order.amount_paid) + amount;
+    const optimisticStatus = optimisticAmountPaid >= Number(order.total) ? 'paid'
+      : optimisticAmountPaid > 0 ? 'partial' : 'unpaid';
+    setOrder({ ...order, amount_paid: optimisticAmountPaid, payment_status: optimisticStatus });
+    setPayOpen(false);
+    setPayAmount('');
+
     try {
-      await ordersApi.pay(id, Number(payAmount));
+      const res = await ordersApi.pay(id, amount);
+      setOrder((current) => ({ ...current, ...res.data.order })); // reconcile with the server's real numbers
       toast.success('Payment recorded.');
-      setPayOpen(false);
-      setPayAmount('');
-      load();
     } catch (err) {
+      setOrder(previousOrder); // roll back — the payment didn't actually happen
       toast.error(apiErrorMessage(err));
     } finally {
       setPaying(false);
@@ -66,11 +80,14 @@ export default function OrderDetailPage() {
   };
 
   const handleStatusChange = async (order_status) => {
+    const previousStatus = order.order_status;
+    setOrder({ ...order, order_status }); // optimistic — no server-side side effects to wait on for this field
+
     try {
       await ordersApi.updateStatus(id, order_status);
       toast.success(`Order marked ${order_status}.`);
-      load();
     } catch (err) {
+      setOrder((current) => ({ ...current, order_status: previousStatus })); // roll back
       toast.error(apiErrorMessage(err));
     }
   };

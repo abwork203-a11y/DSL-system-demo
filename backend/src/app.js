@@ -1,6 +1,7 @@
 const express = require('express');
 const cors = require('cors');
 const helmet = require('helmet');
+const compression = require('compression');
 const morgan = require('morgan');
 const cookieParser = require('cookie-parser');
 
@@ -9,6 +10,7 @@ const { verifyCsrf } = require('./middleware/csrf');
 const { generalLimiter } = require('./middleware/rateLimit');
 
 const authRoutes = require('./routes/authRoutes');
+const accountRoutes = require('./routes/accountRoutes');
 const userRoutes = require('./routes/userRoutes');
 const manufacturerRoutes = require('./routes/manufacturerRoutes');
 const productRoutes = require('./routes/productRoutes');
@@ -41,21 +43,28 @@ function createApp() {
   const app = express();
 
   // Needed for rate limiting / secure cookies to see the real client IP and
-  // scheme when the app sits behind a reverse proxy (e.g. nginx, a PaaS LB) —
-  // harmless locally, necessary in most production deployments.
+  // scheme when the app sits behind a reverse proxy (Render's own LB in
+  // front of this service) — harmless locally, necessary in production.
   app.set('trust proxy', 1);
 
   app.use(helmet({
     // This backend serves only JSON, never HTML, so a content-security-policy
     // here wouldn't do much — it belongs on the frontend's static hosting
-    // instead (see frontend/index.html and DEPLOYMENT.md). Explicitly
-    // disabling it here (rather than leaving Helmet's HTML-oriented default)
-    // avoids a header that implies protection this server doesn't actually
-    // provide.
+    // instead (see frontend/index.html and DEPLOYMENT.md/vercel.json).
+    // Explicitly disabling it here (rather than leaving Helmet's HTML-oriented
+    // default) avoids a header that implies protection this server doesn't
+    // actually provide.
     contentSecurityPolicy: false,
     referrerPolicy: { policy: 'no-referrer' },
-    crossOriginResourcePolicy: { policy: 'same-site' },
+    crossOriginResourcePolicy: { policy: 'cross-origin' }, // frontend origin (Vercel) differs from this API's origin (Render) — 'same-site' would incorrectly block it
+    // HSTS: tells browsers "never even try plain HTTP for this host again,"
+    // closing the window where a single accidental http:// request could be
+    // intercepted before a redirect to https:// ever happened. Only
+    // meaningful — and only sent — over an HTTPS connection to begin with,
+    // which Render provides by default.
+    hsts: { maxAge: 15552000, includeSubDomains: true }, // 180 days
   }));
+  app.use(compression()); // gzip response bodies — meaningful for the larger JSON payloads (order lists, reports) and free performance
   app.use(cors({ origin: resolveCorsOrigin(), credentials: true }));
   app.use(cookieParser());
   app.use(express.json({ limit: '150kb' })); // generous for a JSON order payload, small enough to blunt body-flooding
@@ -66,6 +75,7 @@ function createApp() {
   app.get('/health', (req, res) => res.json({ status: 'ok' }));
 
   app.use('/api/auth', authRoutes);
+  app.use('/api/account', accountRoutes);
   app.use('/api/users', userRoutes);
   app.use('/api/manufacturers', manufacturerRoutes);
   app.use('/api/products', productRoutes);

@@ -63,11 +63,17 @@ export default function DistributorsPage() {
   };
 
   const toggleStatus = async (d) => {
+    const newStatus = d.status === 'active' ? 'inactive' : 'active';
+    // Optimistic: flip this one row in local state immediately rather than
+    // waiting for a round-trip + full reload — a status toggle has no other
+    // derived fields to reconcile, so a simple rollback on failure is safe.
+    setRows((current) => current.map((row) => (row.id === d.id ? { ...row, status: newStatus } : row)));
+
     try {
-      await distributorsApi.update(d.id, { status: d.status === 'active' ? 'inactive' : 'active' });
-      toast.success(d.status === 'active' ? 'Marked inactive.' : 'Reactivated.');
-      load();
+      await distributorsApi.update(d.id, { status: newStatus });
+      toast.success(newStatus === 'inactive' ? 'Marked inactive.' : 'Reactivated.');
     } catch (err) {
+      setRows((current) => current.map((row) => (row.id === d.id ? { ...row, status: d.status } : row))); // roll back
       toast.error(apiErrorMessage(err));
     }
   };

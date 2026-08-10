@@ -190,3 +190,41 @@ ALTER TABLE users ADD COLUMN IF NOT EXISTS failed_login_attempts INTEGER NOT NUL
 ALTER TABLE users ADD COLUMN IF NOT EXISTS locked_until TIMESTAMPTZ;
 
 COMMIT;
+
+-- ─────────────────────────────────────────────────────────────
+-- Session/token & MFA hardening (this pass) — also idempotent.
+-- ─────────────────────────────────────────────────────────────
+BEGIN;
+
+-- Bumped on password change or an explicit "log out everywhere" action.
+-- Embedded in every JWT at login time; requireAuth rejects any token whose
+-- embedded version doesn't match the current DB value — the mechanism that
+-- makes "invalidate all other sessions" possible without a server-side
+-- session store (see backend/src/middleware/auth.js).
+ALTER TABLE users ADD COLUMN IF NOT EXISTS token_version INTEGER NOT NULL DEFAULT 0;
+
+-- How many times this account has *entered* a lockout state, consecutively.
+-- Drives exponential backoff on repeated lockouts (15min, 30min, 60min, ...)
+-- rather than a flat duration every time — see authController.js.
+ALTER TABLE users ADD COLUMN IF NOT EXISTS lockout_count INTEGER NOT NULL DEFAULT 0;
+
+-- TOTP secret (base32), never sent back to the client after initial setup.
+ALTER TABLE users ADD COLUMN IF NOT EXISTS mfa_secret TEXT;
+ALTER TABLE users ADD COLUMN IF NOT EXISTS mfa_enabled BOOLEAN NOT NULL DEFAULT false;
+-- Bcrypt-hashed one-time backup codes (never stored in plain text, same as
+-- passwords) — each array element is consumed (removed) on use.
+ALTER TABLE users ADD COLUMN IF NOT EXISTS mfa_backup_codes TEXT[] NOT NULL DEFAULT '{}';
+
+COMMIT;
+
+-- ─────────────────────────────────────────────────────────────
+-- Performance indexes (this pass) — covers query patterns that were
+-- previously unindexed: sorting/filtering the full (unfiltered-by-distributor)
+-- ledger view, and the sales-rep performance report's join on orders.created_by.
+-- ─────────────────────────────────────────────────────────────
+BEGIN;
+
+CREATE INDEX IF NOT EXISTS idx_ledger_entry_date ON ledger(entry_date DESC);
+CREATE INDEX IF NOT EXISTS idx_orders_created_by ON orders(created_by);
+
+COMMIT;

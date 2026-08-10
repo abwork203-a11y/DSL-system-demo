@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { NavLink, Outlet, useNavigate } from 'react-router-dom';
 import {
   LayoutDashboard, FileText, Factory, Package, Building2,
-  BookOpen, BarChart3, Users, LogOut, CloudUpload, Menu,
+  BookOpen, BarChart3, Users, LogOut, CloudUpload, Menu, Settings,
 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import Footer from './Footer';
@@ -18,6 +18,7 @@ const NAV_ITEMS = [
   { to: '/reports', label: 'Reports', icon: BarChart3, adminOnly: true },
   { to: '/users', label: 'Sales Reps', icon: Users, adminOnly: true },
   { to: '/backup', label: 'Backup', icon: CloudUpload, adminOnly: true },
+  { to: '/account', label: 'Account Settings', icon: Settings },
 ];
 
 export default function Layout() {

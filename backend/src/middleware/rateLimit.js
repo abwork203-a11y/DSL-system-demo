@@ -22,4 +22,17 @@ const generalLimiter = rateLimit({
   message: { error: 'Too many requests. Please slow down.' },
 });
 
-module.exports = { loginLimiter, generalLimiter };
+// Tighter limit on MFA code attempts specifically — a 6-digit TOTP code has
+// only 1,000,000 possibilities, so without a strict limit here it's
+// meaningfully guessable by brute force within a 30s validity window at high
+// request rates. Shared between login-time MFA verification and the
+// MFA-setup confirmation step.
+const mfaAttemptLimiter = rateLimit({
+  windowMs: 10 * 60 * 1000,
+  limit: 10,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { error: 'Too many verification attempts. Please wait and try again.' },
+});
+
+module.exports = { loginLimiter, generalLimiter, mfaAttemptLimiter };

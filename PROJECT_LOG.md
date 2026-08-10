@@ -301,6 +301,149 @@ Backend and frontend both fully updated for the new auth model and confirmed wor
 
 ---
 
+## Session 8 — Log
+
+### Goal
+Four things requested together: (1) implement every checkpoint from an uploaded "5 Ways to Secure Your Login Endpoint" reference doc, (2) make the app scalable/fast, (3) add optimistic UI, (4) improve the CSS toward a professional/minimal ERP look. User uploaded `backend.zip` + `frontend.zip` as the starting point instead of continuing from this sandbox's prior state.
+
+### Important discovery: the uploaded code already contained undocumented changes
+Diffing the uploaded zips against Session 7's known output revealed real, high-quality changes made **outside this conversation** (likely via Claude Code or another session, prompted by the user actually hitting deployment problems after Session 7): the CSRF mechanism had been reworked from a cookie-based double-submit to a **signed HMAC token delivered in the response body**, and the session cookie's `sameSite` had been made dynamic (`'none'` in production). Both changes exist specifically because the real deployment topology turned out to be **three separate origins** — Vercel (frontend), Render (backend), Supabase (database) — not the single-origin/Docker-Compose setup `DEPLOYMENT.md` had been written for. This is a *better* solution than what this session would have built from scratch (sidesteps third-party-cookie-blocking entirely rather than working around it). Treated this as the new baseline and built on top of it rather than reverting or redoing it — verified it was fully wired (found and confirmed the `GET /auth/csrf-token` route) before proceeding.
+
+**One real gap found in that prior work**: `SocketContext.jsx` had *not* been updated — it still connected to `/` (relative/same-origin), which cannot reach a Render backend from a Vercel frontend. Fixed this session (connects to `VITE_API_URL` directly, cross-origin, with `withCredentials: true` and a `['polling','websocket']` transport fallback).
+
+### What was implemented — security checklist (mapped to the uploaded reference doc's 5 items)
+
+**1. Rate limit & lockout:**
+- Already had per-IP + per-account lockout from Session 4. Added **exponential backoff** this session: lockout duration now doubles per consecutive lockout episode (15min → 30min → 60min → ... capped at 24h) instead of a flat 15 minutes every time.
+- **Bug caught during this session's own testing, not code review**: the first implementation incremented the lockout counter *before* computing the duration, making the very first-ever lockout 30 minutes instead of the intended 15. Found by actually triggering a real lockout and checking the response, not by reading the code — fixed by computing duration from the pre-increment count.
+- CAPTCHA: deliberately not implemented (would require the user's own hCaptcha/reCAPTCHA site keys, a new external dependency) — exponential backoff was judged the more impactful lever without adding a third-party requirement; documented as a considered-and-deferred item in `SECURITY.md`, not silently skipped.
+
+**2. Password & credential handling:**
+- bcrypt hashing and constant-time comparison already existed (Session 1/4).
+- **New**: breached-password check via Have I Been Pwned's k-anonymity API (`backend/src/utils/passwordBreachCheck.js`) — only a 5-character SHA-1 prefix ever leaves the server (HIBP's own documented privacy design), applied on both new-account creation and any password change. **Fails open** if HIBP is unreachable — a core account-management flow shouldn't become unavailable because of a third-party outage. Verified the fail-open path directly: this sandbox's network egress returns 403 for this domain (a sandbox restriction, not a code issue — confirmed the code correctly treats that as "couldn't check" rather than crashing).
+- Generic "invalid email or password" messaging already existed, unchanged.
+
+**3. Multi-factor authentication (the biggest net-new piece):**
+- `otplib` (TOTP generate/verify) + `qrcode` (QR rendering) — `backend/src/utils/mfa.js`.
+- New DB columns (idempotent `ALTER TABLE`, safe on the user's existing Supabase database too): `mfa_secret`, `mfa_enabled`, `mfa_backup_codes` (bcrypt-hashed, single-use).
+- Self-service setup flow: generate secret+QR → user confirms with a real code from their authenticator app before `mfa_enabled` actually flips to true (prevents a typo'd setup from locking someone out) → 8 backup codes generated and shown exactly once.
+- **Login becomes two steps once MFA is enabled.** A correct password alone no longer issues a session — the server returns a short-lived (5min), purpose-scoped JWT in the response body instead (`mfaToken`), which the frontend holds in memory and exchanges for a real session via a second endpoint. Deliberately *not* a second cookie — same cross-origin reasoning as the CSRF token.
+- MFA-specific rate limiting (10 attempts/10min, separate from and stricter than the general API limit) — a 6-digit code is a small enough space that this matters.
+- New self-service `AccountSettingsPage.jsx` (`/account`, any role) — password change, MFA setup/disable (QR display, backup codes shown once, disable requires current password), and a new "log out all other sessions" action.
+
+**4. Session & token management:**
+- **`token_version`-based invalidation** (new column): embedded in every JWT, checked on every request. Bumped by — self-service password change, an admin resetting someone else's password, disabling MFA, or the new explicit "log out all other sessions" action. This is what makes "changing your password logs out every other session" actually true now, without needing a server-side session store.
+- **Sliding session renewal**: `requireAuth` silently re-issues a fresh cookie once a token is past the halfway point of its lifetime, so an actively-used session doesn't hit a hard 8h wall mid-task, while a genuinely abandoned one still expires normally.
+- Full separate refresh-token pair with rotation was considered and deliberately not built — judged that the combination above already covers the practical need without a second credential type's added complexity; documented as such in `SECURITY.md`, not silently skipped.
+- `SameSite=Strict` (as the reference doc suggested) is **not viable** given the actual three-origin deployment — `None` is required for the cross-origin cookie to be sent at all. Documented this explicitly in `SECURITY.md` so it doesn't read as an oversight.
+
+**5. Input validation & transport hardening:**
+- Explicit HSTS header added via Helmet config (was previously relying on Helmet's implicit default).
+- `compression` (gzip) middleware added.
+- `frontend/vercel.json` updated to set `X-Frame-Options`/CSP `frame-ancestors` at the real HTTP-header level (the existing `nginx.conf` version only applies to the Docker Compose deployment path, which isn't what's actually in use) — closes an item that would otherwise have shipped as a documented-but-unfixed gap.
+- Parameterized queries / no injection surface: unchanged, still clean (no new raw SQL introduced this session).
+
+### Scalability
+- **Pagination** added to Orders and the all-distributors Ledger view (`backend/src/utils/pagination.js`, page/pageSize query params, server-clamped to a max of 200 regardless of client request — a mild DoS mitigation as well as a UX one). Single-distributor ledger history stays unpaginated deliberately (naturally bounded to one relationship), documented as a candidate for the same treatment later.
+- **In-memory response caching** (30s TTL, plain `Map` — not Redis, since this runs as a single instance and cache coherency across instances was never a real requirement here) on the five expensive aggregate report endpoints, explicitly invalidated on order creation/payment (not just left to the TTL) so a just-created order's effect on the dashboard shows immediately.
+- **gzip compression** on API responses.
+- **Two new DB indexes**: `ledger(entry_date DESC)` and `orders(created_by)` — query patterns that existed before but weren't covered.
+- Frontend: `BackupPage.jsx` updated to walk every page of the now-paginated orders endpoint (rather than assuming one request returns everything) — a backup silently only covering the first ~50 orders would have been a real, easy-to-miss bug once the pagination change landed.
+
+### Optimistic UI
+Applied to the three actions where it's safe and meaningfully improves perceived speed: order payment recording and order status change (`OrderDetailPage.jsx`, with rollback to a snapshotted previous state on API failure), and the active/inactive toggles on `DistributorsPage.jsx` and `UsersPage.jsx`. Payment recording specifically mirrors the backend's own amount_paid/payment_status derivation logic locally so the UI reflects the payment before the network round-trip completes, then reconciles with the server's authoritative response.
+
+### CSS / design
+Found that the design tokens and much of the component CSS had **also** already been substantially reworked outside this conversation (a clean blue SaaS palette replacing the original green theme, with a backward-compat alias system, sticky sidebar, restrained active-states) — genuinely good, professional work. Rather than a wholesale rewrite, did a targeted refinement pass:
+- **Removed the repeated colored top-border accent from every `.card` and `.modal`** — applied universally, it read as busier/less minimal than intended (real minimal dashboards like Linear/Stripe reserve accent color for a few deliberate moments, not every container). Kept the accent on `.auth-card` (a single, once-per-page hero element) and added a more restrained left-edge accent specifically on `.stat-card` (KPI metrics) to keep those visually distinct from generic content cards without the universal treatment.
+- **Found and fixed a real bug**: `Footer.jsx` had never been updated to use the `.site-footer` CSS class the design system defined (including a dark-theme override specifically for the login page) — it was still using this session's-predecessor's inline styles, making the `.site-footer` CSS rules dead code and the actual footer visually inconsistent (especially likely low-contrast on the dark login page background). Rewrote `Footer.jsx` to use the class properly.
+- Minor polish: smoother table-row hover transitions, subtle `.stat-card` hover elevation.
+
+### Files created/changed this session
+```
+New (backend):
+  backend/src/utils/authToken.js, mfa.js, passwordBreachCheck.js, pagination.js, cache.js
+  backend/src/controllers/accountController.js
+  backend/src/routes/accountRoutes.js
+
+Rewritten (backend):
+  backend/src/middleware/auth.js (token_version check + sliding renewal)
+  backend/src/controllers/authController.js (MFA branch, fixed exponential backoff)
+  backend/src/controllers/userController.js (breach check, token_version bump on admin password reset)
+  backend/src/controllers/orderController.js (pagination, cache invalidation)
+  backend/src/controllers/ledgerController.js (pagination on the all-distributors view)
+  backend/src/routes/authRoutes.js, reportRoutes.js
+  backend/src/app.js (compression, explicit HSTS, mounted accountRoutes)
+  backend/src/middleware/rateLimit.js (+ mfaAttemptLimiter)
+  backend/src/db/schema.sql (+ token_version, lockout_count, mfa_* columns, 2 new indexes — all idempotent)
+  backend/package.json (+ otplib, qrcode, compression)
+
+New (frontend):
+  frontend/src/pages/AccountSettingsPage.jsx
+  frontend/src/components/Pagination.jsx
+
+Rewritten (frontend):
+  frontend/src/context/AuthContext.jsx (two-step MFA login flow)
+  frontend/src/context/SocketContext.jsx (cross-origin fix — the real bug found in the uploaded code)
+  frontend/src/pages/LoginPage.jsx (+ MFA step)
+  frontend/src/pages/OrdersPage.jsx, LedgerPage.jsx (pagination UI)
+  frontend/src/pages/BackupPage.jsx (walks all pages of orders now)
+  frontend/src/pages/OrderDetailPage.jsx (optimistic payment/status updates)
+  frontend/src/pages/DistributorsPage.jsx, UsersPage.jsx (optimistic toggle)
+  frontend/src/components/Footer.jsx (bug fix — now uses .site-footer class)
+  frontend/src/components/Layout.jsx (+ Account Settings nav item)
+  frontend/src/App.jsx (+ /account route)
+  frontend/src/api/endpoints.js (+ account/MFA endpoints)
+  frontend/src/styles/ui.css (removed universal card/modal accent border, .site-footer real layout, minor polish)
+  frontend/vercel.json (+ security headers)
+  frontend/src/pages/DashboardPage.jsx (pagination-aware recent-orders fetch)
+
+Docs:
+  SECURITY.md — sections 1-2 substantially rewritten (MFA, token_version, corrected backoff, new CSRF mechanism description); new §9 (scalability), §10 (new deps); §11 "deliberately not done" updated
+  DEPLOYMENT.md — added real Option A (Vercel+Render+Supabase, the path actually in use), old Docker Compose content demoted to Option B, generic cloud platforms to Option C, fixed a duplicate "Option B" heading collision and stale cross-references
+  README.md — feature list updated (MFA, pagination, caching)
+```
+
+### Errors encountered & resolved
+1. **Exponential-backoff off-by-one** (see above) — caught by live testing, not code review. The single most valuable catch this session, since it's exactly the kind of bug that looks correct on inspection.
+2. **`node_modules` from the uploaded zip had broken permissions** (`vite: Permission denied` on build) — zip extraction doesn't preserve executable bits reliably. Fixed with a clean `rm -rf node_modules && npm install`, not a code issue.
+3. **Confusing, noisy manual test session around session-invalidation-on-password-change** — a mix of real sandbox connection blips (postgres dying mid-test, `HTTP 000` connection-refused errors) and resulting stale/inconsistent test-account state (password and MFA state left in an unknown combination partway through) made several test attempts fail for environmental reasons unrelated to the actual code. Resolved by forcing known state directly via SQL (safe — this is local sandbox test data, not the user's real Supabase) and re-running clean; the underlying logic was already independently confirmed correct in earlier, uninterrupted test passes (MFA setup/login/backup-codes all passed cleanly on the first attempt before the noisy stretch began).
+4. **`otplib` v12 (initially installed per a stale default) is deprecated** — caught immediately via `npm install`'s own deprecation warnings, switched to v13 before writing any code against it, and had to re-derive the correct API shape by testing directly (v13's API differs meaningfully from v12/v11 — flat function exports like `otplib.generate()`/`otplib.verify()` instead of a `authenticator` object) rather than assume it matched documentation-in-training-data.
+5. **`SECURITY.md` section-numbering care** — grepped `^## ` *before* inserting new sections this time (a habit explicitly flagged as needed after this exact mistake happened twice in Sessions 5 and 7) — no numbering collision this session.
+6. Recurring sandbox service death — same pattern as every session, handled the same way (checked `ps aux`/health before deciding whether to restart, never combined a process-kill with a same-string relaunch in one call).
+7. **Missing root `.gitignore` discovered during final packaging** — Session 5's root-level `.gitignore` (the actual safety net protecting `.env` from being committed if this whole folder is one git repo) didn't exist anywhere in the uploaded zips, since this session started from `backend.zip`/`frontend.zip` rather than continuing the sandbox's own file tree, and those zips only ever contained each subfolder's own contents. Also found `frontend/.gitignore` (added by whoever did the earlier cross-origin/CSRF work) only excluded `*.local`, which does **not** match a bare `.env` file — only `.env.local` would have been caught. Recreated the root `.gitignore`, added a new `backend/.gitignore` (there wasn't one at all), and fixed `frontend/.gitignore` to explicitly list `.env`. Directly relevant to the user's explicit "make sure all api keys... are protected" ask — glad this got caught during final packaging rather than after a `git push`.
+
+### Tests run (all passed, all against a local sandbox Postgres instance — the user's real Supabase database was never touched)
+- Full MFA lifecycle: setup → QR/secret returned → real TOTP code generated and verified → `mfa_enabled` flips true → backup codes returned once → password-only login correctly returns `mfaRequired` without granting a session → `/auth/me` correctly 401s at that point → completing with a real TOTP code grants a session → completing with a backup code also works and correctly marks it consumed → reusing that same backup code is correctly rejected.
+- Exponential lockout: triggered a real first-ever lockout, caught it returning 30min (the bug), fixed the code, re-triggered, confirmed 15min.
+- Session invalidation: two concurrent sessions on one account, password changed from session A, confirmed session B is dead (`401`) and session A is still valid (re-issued cookie).
+- Pagination: confirmed the new `{data, pagination}` response shape end-to-end through a real order creation + paginated fetch.
+- Caching: confirmed `X-Cache: MISS` then `HIT` on consecutive dashboard requests.
+- Validation/RBAC: re-confirmed weak-password rejection and role enforcement still work after all the auth-layer changes.
+- Breach-check fail-open path: confirmed directly (sandbox network restriction returns 403 for the HIBP domain; code correctly treats this as "couldn't check," not a crash or wrongful block).
+- Both `npm run build` (frontend) and a full backend `node --check` sweep — clean.
+- `vercel.json` validated as syntactically correct JSON.
+
+### Not verified this session
+- **The actual cross-origin cookie/CSRF behavior in a real browser against real separate Vercel/Render domains** — tested the CSRF/session mechanics thoroughly, but against `localhost` (different ports, which *are* different origins to a browser, giving a reasonable approximation) rather than the user's actual live `onrender.com`/`vercel.app` domains. The user's backend is already live; the first fully real-world test of this exact cross-origin flow will be theirs once the frontend deploys to Vercel.
+- CSS visual appearance — same standing limitation as every prior frontend session (no browser tool available in this sandbox).
+- HIBP's "positive" breach-detection path (returning `breached: true` for a genuinely known-breached password) — only the fail-open path could be verified directly, since the sandbox can't reach the real API at all. The string-matching logic itself is simple enough that this is a low-risk gap, but it's a gap.
+
+### Effort/length signal
+The largest session by a significant margin — full MFA implementation (new DB columns, 6 new backend endpoints, 2 new frontend pages/flows), session-invalidation architecture, exponential backoff (with a real bug caught and fixed), breach checking, pagination across 2 endpoints + 3 frontend pages, caching, compression, optimistic UI on 3 actions, a CSS refinement pass, and 3 documentation files substantially rewritten. Comparable to Sessions 1, 4, and 7 combined in scope.
+
+### State of the repo
+Everything builds clean and was tested as thoroughly as this sandbox allows (see above). Not yet re-zipped/re-presented to the user as of the start of this log entry — check message history for whether that happened by the end of this session.
+
+### Next session should start with
+1. **If starting a new chat**: nothing in `/home/claude` persists — restore from the user's last downloaded zip.
+2. **The user should actually deploy the frontend to Vercel and do a real, live cross-origin test** — login, MFA, an order creation — since that's the one thing this sandbox genuinely cannot verify.
+3. **Run the migration against the user's real Supabase database** (`npm run migrate` with their real `DATABASE_URL`) — all the new MFA/token_version/lockout_count columns and indexes need to land there; this session only ever touched a local sandbox test database, deliberately, to avoid disturbing the user's real data.
+4. Small UI gap noted in `SECURITY.md` §11: no admin-facing way to see or clear a locked-out account's lockout state except a direct database edit — worth adding if it comes up in practice.
+5. Standing items from prior sessions, still unaddressed: Socket.io authentication, the manufacturer-balance auto-derivation question, legal-placeholder fill-in + attorney review, and the pending Google Drive backup real-world test (though the user has since gotten a real Client ID, per the live config found in the uploaded `.env` — worth confirming whether that test has actually happened yet).
+
+---
+
 ## Session 5 — Log
 
 ### Goal

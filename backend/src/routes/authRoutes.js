@@ -1,6 +1,6 @@
 const express = require('express');
 const { requireAuth } = require('../middleware/auth');
-const { loginLimiter } = require('../middleware/rateLimit');
+const { loginLimiter, mfaAttemptLimiter } = require('../middleware/rateLimit');
 const { issueCsrfToken } = require('../middleware/csrf');
 const authController = require('../controllers/authController');
 
@@ -15,6 +15,7 @@ router.get('/csrf-token', (req, res) => {
 });
 
 router.post('/login', loginLimiter, authController.login);
+router.post('/mfa/verify', loginLimiter, mfaAttemptLimiter, authController.mfaLoginVerify);
 router.post('/logout', authController.logout);
 router.get('/me', requireAuth, authController.me);
 

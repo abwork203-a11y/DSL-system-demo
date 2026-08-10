@@ -17,6 +17,7 @@ import LedgerPage from './pages/LedgerPage';
 import ReportsPage from './pages/ReportsPage';
 import UsersPage from './pages/UsersPage';
 import BackupPage from './pages/BackupPage';
+import AccountSettingsPage from './pages/AccountSettingsPage';
 import TermsPage from './pages/TermsPage';
 import PrivacyPage from './pages/PrivacyPage';
 import ContactPage from './pages/ContactPage';
@@ -66,6 +67,7 @@ const router = createBrowserRouter([
           { path: '/reports', element: <ProtectedRoute adminOnly><ReportsPage /></ProtectedRoute> },
           { path: '/users', element: <ProtectedRoute adminOnly><UsersPage /></ProtectedRoute> },
           { path: '/backup', element: <ProtectedRoute adminOnly><BackupPage /></ProtectedRoute> },
+          { path: '/account', element: <AccountSettingsPage /> },
         ],
       },
     ],

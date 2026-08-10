@@ -2,8 +2,18 @@ import client from './client';
 
 export const auth = {
   login: (email, password) => client.post('/auth/login', { email, password }),
+  mfaVerify: (mfaToken, code) => client.post('/auth/mfa/verify', { mfaToken, code }),
   logout: () => client.post('/auth/logout'),
   me: () => client.get('/auth/me'),
+};
+
+export const account = {
+  changePassword: (currentPassword, newPassword) => client.patch('/account/password', { currentPassword, newPassword }),
+  logoutAllSessions: () => client.post('/account/logout-all-sessions'),
+  mfaStatus: () => client.get('/account/mfa/status'),
+  mfaSetup: () => client.post('/account/mfa/setup'),
+  mfaVerifySetup: (code) => client.post('/account/mfa/verify-setup', { code }),
+  mfaDisable: (password) => client.post('/account/mfa/disable', { password }),
 };
 
 export const manufacturers = {
