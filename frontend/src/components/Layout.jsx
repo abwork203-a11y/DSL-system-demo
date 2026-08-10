@@ -47,6 +47,7 @@ export default function Layout() {
 
       {sidebarOpen && (
         <div className="sidebar-scrim" onClick={closeSidebar} />
+        
       )}
 
       <aside className={`sidebar${sidebarOpen ? ' sidebar-open' : ''}`}>

@@ -13,9 +13,6 @@ export default function ContactPage() {
           <a href={`mailto:${SUPPORT_EMAIL}`} className="link-btn">{SUPPORT_EMAIL}</a>
         </p>
       </div>
-      <p style={{ color: 'var(--ink-muted)', fontSize: 12.5, marginTop: 20 }}>
-        Replace the placeholder email in <code>src/config.js</code> with your real support address.
-      </p>
     </LegalPageLayout>
   );
 }
