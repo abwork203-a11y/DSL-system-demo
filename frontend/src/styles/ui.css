@@ -208,7 +208,7 @@ body {
     transition: transform 0.2s ease;
   }
   .sidebar.sidebar-open { transform: translateX(0); }
-  .hamburger-btn { display:hidden; }
+  
   /* Dims the page behind the sidebar when it's open on mobile —
      add this element in JSX only when sidebarOpen is true */
   .sidebar-scrim {
