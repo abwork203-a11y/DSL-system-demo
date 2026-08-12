@@ -76,12 +76,6 @@ const router = createBrowserRouter([
   },
 ]);
 
-createRoot(document.getElementById('root')).render(
-  <StrictMode>
-    <App />
-    <SpeedInsights />
-  </StrictMode>
-);
 
 
 export default function App() {
