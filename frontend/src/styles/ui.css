@@ -198,7 +198,9 @@ body {
 
 @media (max-width: 768px) {
   .hamburger-btn { display: flex; }
-
+  .hamburger-btn.is-hidden {
+    display: none;
+  }
   .sidebar {
     position: fixed;
     left: 0;

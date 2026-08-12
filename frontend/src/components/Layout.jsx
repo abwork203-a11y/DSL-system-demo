@@ -38,9 +38,9 @@ export default function Layout() {
   return (
     <div className="app-shell">
       <button
-         className={`hamburger-btn${sidebarOpen ? ' is-hidden' : ''}`}
-         onClick={() => setSidebarOpen(!sidebarOpen)}
-         aria-label="Toggle menu"
+        className={`hamburger-btn${sidebarOpen ? ' is-hidden' : ''}`}
+        onClick={() => setSidebarOpen(!sidebarOpen)}
+        aria-label="Toggle menu"
       >
         <Menu size={22} strokeWidth={2} />
       </button>
