@@ -4,7 +4,8 @@ import { SocketProvider } from './context/SocketContext';
 import { ToastProvider } from './context/ToastContext';
 import ProtectedRoute from './components/ProtectedRoute';
 import Layout from './components/Layout';
-
+import { SpeedInsights } from "@vercel/speed-insights/react";
+import { Analytics } from "@vercel/analytics/react"
 
 import LoginPage from './pages/LoginPage';
 import DashboardPage from './pages/DashboardPage';
@@ -74,6 +75,14 @@ const router = createBrowserRouter([
     ],
   },
 ]);
+
+createRoot(document.getElementById('root')).render(
+  <StrictMode>
+    <App />
+    <SpeedInsights />
+  </StrictMode>
+);
+
 
 export default function App() {
   return <RouterProvider router={router} />;
