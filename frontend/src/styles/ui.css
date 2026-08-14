@@ -230,6 +230,7 @@ body {
   border-radius: var(--radius);
   padding: 20px;
   box-shadow: var(--shadow-sm);
+  overflow-y: auto;
 }
 .card + .card { margin-top: 16px; }
 
@@ -331,7 +332,7 @@ input[data-currency],
 /* ── Table — ledger-ruled look ──────────────────────────── */
 .table-wrap {
   overflow-x: auto;
-  overflow-y: auto;
+
 }
 table.data-table { width: 100%; border-collapse: collapse; font-size: 13.5px; background: var(--surface); }
 .data-table th {
