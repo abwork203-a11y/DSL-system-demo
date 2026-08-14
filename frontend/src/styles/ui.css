@@ -331,6 +331,7 @@ input[data-currency],
 /* ── Table — ledger-ruled look ──────────────────────────── */
 .table-wrap {
   overflow-x: auto;
+  overflow-y: auto;
 }
 table.data-table { width: 100%; border-collapse: collapse; font-size: 13.5px; background: var(--surface); }
 .data-table th {
@@ -344,6 +345,8 @@ table.data-table { width: 100%; border-collapse: collapse; font-size: 13.5px; ba
   border-bottom: 2px solid var(--rule-strong);
   white-space: nowrap;
   background: var(--surface);
+  
+  
 }
 .data-table td {
   padding: 11px 12px;
@@ -386,7 +389,7 @@ table.data-table { width: 100%; border-collapse: collapse; font-size: 13.5px; ba
   font-weight: 700;
   text-transform: uppercase;
   letter-spacing: 0.06em;
-  border: 1.5px solid currentColor;
+ // border: 1.5px solid currentColor;
   background: transparent;
 }
 .badge-green  { color: var(--status-positive); background: var(--status-positive-bg); }
