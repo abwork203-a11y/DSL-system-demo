@@ -439,14 +439,25 @@ table.data-table { width: 100%; border-collapse: collapse; font-size: 13.5px; ba
   color: #fff;
   box-shadow: var(--shadow-md);
   cursor: pointer;
-  animation: toast-in 0.18s ease-out;
+  animation: toast-in 0.32s cubic-bezier(0.16, 1, 0.3, 1);
+}
+.toast.toast-leaving {
+  animation: toast-out 0.22s ease-in forwards;
 }
 .toast-success { background: var(--status-positive); }
 .toast-error { background: var(--status-negative); }
 .toast-info { background: var(--ink); }
 @keyframes toast-in {
-  from { opacity: 0; transform: translateY(6px); }
-  to { opacity: 1; transform: translateY(0); }
+  from { opacity: 0; transform: translateY(10px) scale(0.94); }
+  to { opacity: 1; transform: translateY(0) scale(1); }
+}
+@keyframes toast-out {
+  from { opacity: 1; transform: translateY(0) scale(1); }
+  to { opacity: 0; transform: translateY(6px) scale(0.94); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .toast { animation: none; }
+  .toast.toast-leaving { animation: none; }
 }
 
 /* ── Skeleton loading ───────────────────────────────────── */

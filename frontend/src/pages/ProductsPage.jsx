@@ -1,11 +1,12 @@
 import { useEffect, useState, useCallback } from 'react';
+import { Plus, Pencil, Trash2 } from 'lucide-react';
 import { products as productsApi, manufacturers as mfgApi } from '../api/endpoints';
 import { apiErrorMessage } from '../api/client';
 import { useToast } from '../context/ToastContext';
 import Modal from '../components/Modal';
 import { TableSkeleton } from '../components/Skeleton';
 
-const EMPTY_FORM = { manufacturer_id: '', name: '', size_packaging: '', price: '' };
+const EMPTY_FORM = { manufacturer_id: '', name: '', size_packaging: '', price: '', retail_price: '' };
 
 function money(n) {
   return Number(n || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
@@ -44,7 +45,7 @@ export default function ProductsPage() {
     e.preventDefault();
     setSaving(true);
     try {
-      const payload = { ...form, manufacturer_id: Number(form.manufacturer_id), price: Number(form.price) };
+      const payload = { ...form, manufacturer_id: Number(form.manufacturer_id), price: Number(form.price), retail_price: Number(form.retail_price) };
       if (editing?.id) {
         await productsApi.update(editing.id, payload);
         toast.success('Product updated.');
@@ -79,7 +80,7 @@ export default function ProductsPage() {
           <h1>Products</h1>
           <p>{rows.length} total</p>
         </div>
-        <button className="btn" onClick={openNew} disabled={mfgs.length === 0}>+ Add Product</button>
+        <button className="btn" onClick={openNew} disabled={mfgs.length === 0}><Plus size={16} /> Add Product</button>
       </div>
 
       {mfgs.length === 0 && !loading && (
@@ -97,7 +98,7 @@ export default function ProductsPage() {
           </select>
         </div>
         {loading ? (
-          <TableSkeleton columns={6} rows={5} />
+          <TableSkeleton columns={7} rows={5} />
         ) : (
           <div className="table-wrap">
             <table className="data-table">
@@ -106,7 +107,8 @@ export default function ProductsPage() {
                   <th>Product</th>
                   <th>Manufacturer</th>
                   <th>Size / Packaging</th>
-                  <th className="num">Price</th>
+                  <th className="num">Retail Price</th>
+                  <th className="num">Invoice Price</th>
                   <th>Status</th>
                   <th></th>
                 </tr>
@@ -117,16 +119,17 @@ export default function ProductsPage() {
                     <td><strong>{p.name}</strong></td>
                     <td>{p.manufacturer_name}</td>
                     <td>{p.size_packaging || '—'}</td>
+                    <td className="num">{money(p.retail_price)}</td>
                     <td className="num">{money(p.price)}</td>
                     <td>{p.is_active ? <span className="badge badge-green">active</span> : <span className="badge badge-neutral">inactive</span>}</td>
                     <td style={{ display: 'flex', gap: 6, justifyContent: 'flex-end' }}>
-                      <button className="btn btn-secondary btn-sm" onClick={() => openEdit(p)}>Edit</button>
-                      <button className="btn btn-danger btn-sm" onClick={() => handleDelete(p)}>Delete</button>
+                      <button className="btn btn-secondary btn-sm" onClick={() => openEdit(p)}><Pencil size={14} /> Edit</button>
+                      <button className="btn btn-danger btn-sm" onClick={() => handleDelete(p)}><Trash2 size={14} /> Delete</button>
                     </td>
                   </tr>
                 ))}
                 {rows.length === 0 && (
-                  <tr><td colSpan={6}><div className="empty-state">No products found.</div></td></tr>
+                  <tr><td colSpan={7}><div className="empty-state">No products found.</div></td></tr>
                 )}
               </tbody>
             </table>
@@ -154,9 +157,13 @@ export default function ProductsPage() {
                 <input value={form.size_packaging} onChange={(e) => setForm({ ...form, size_packaging: e.target.value })} placeholder="e.g. 500ml x 24" />
               </div>
               <div className="field">
-                <label>Price</label>
+                <label>Invoice Price</label>
                 <input type="number" step="0.01" min="0" value={form.price} onChange={(e) => setForm({ ...form, price: e.target.value })} required />
               </div>
+            </div>
+            <div className="field">
+              <label>Retail Price</label>
+              <input type="number" step="0.01" min="0" value={form.retail_price} onChange={(e) => setForm({ ...form, retail_price: e.target.value })} required />
             </div>
             <button className="btn" type="submit" disabled={saving} style={{ width: '100%', justifyContent: 'center' }}>
               {saving ? 'Saving…' : 'Save Product'}

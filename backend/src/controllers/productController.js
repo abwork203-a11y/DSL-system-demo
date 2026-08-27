@@ -45,38 +45,72 @@ const getOne = asyncHandler(async (req, res) => {
 });
 
 const create = asyncHandler(async (req, res) => {
-  const { manufacturer_id, name, size_packaging, price } = req.body;
+  const {
+  manufacturer_id,
+  name,
+  size_packaging,
+  price,
+  retail_price = 0
+} = req.body;
   if (!manufacturer_id || !name || price === undefined) {
     throw new ApiError(400, 'manufacturer_id, name, and price are required.');
   }
-  const result = await pool.query(
-    `INSERT INTO products (manufacturer_id, name, size_packaging, price)
-     VALUES ($1, $2, $3, $4)
-     RETURNING *`,
-    [manufacturer_id, name, size_packaging || null, price]
-  );
+ const result = await pool.query(
+  `INSERT INTO products (
+     manufacturer_id,
+     name,
+     size_packaging,
+     price,
+     retail_price
+   )
+   VALUES ($1, $2, $3, $4, $5)
+   RETURNING *`,
+  [
+    manufacturer_id,
+    name,
+    size_packaging || null,
+    price,
+    retail_price
+  ]
+);
   await recordAudit(pool, { userId: req.user.id, action: 'CREATE', entityType: 'product', entityId: result.rows[0].id, after: result.rows[0] });
   res.status(201).json(result.rows[0]);
 });
 
 const update = asyncHandler(async (req, res) => {
   const { id } = req.params;
-  const { manufacturer_id, name, size_packaging, price, is_active } = req.body;
+  const {
+  manufacturer_id,
+  name,
+  size_packaging,
+  price,
+  retail_price,
+  is_active
+} = req.body;
 
   const existing = await pool.query('SELECT * FROM products WHERE id = $1', [id]);
   if (existing.rows.length === 0) throw new ApiError(404, 'Product not found.');
 
-  const result = await pool.query(
-    `UPDATE products SET
-       manufacturer_id = COALESCE($1, manufacturer_id),
-       name = COALESCE($2, name),
-       size_packaging = COALESCE($3, size_packaging),
-       price = COALESCE($4, price),
-       is_active = COALESCE($5, is_active)
-     WHERE id = $6
-     RETURNING *`,
-    [manufacturer_id || null, name || null, size_packaging || null, price ?? null, is_active ?? null, id]
-  );
+ const result = await pool.query(
+  `UPDATE products SET
+     manufacturer_id = COALESCE($1, manufacturer_id),
+     name = COALESCE($2, name),
+     size_packaging = COALESCE($3, size_packaging),
+     price = COALESCE($4, price),
+     retail_price = COALESCE($5, retail_price),
+     is_active = COALESCE($6, is_active)
+   WHERE id = $7
+   RETURNING *`,
+  [
+    manufacturer_id || null,
+    name || null,
+    size_packaging || null,
+    price ?? null,
+    retail_price ?? null,
+    is_active ?? null,
+    id
+  ]
+);
   await recordAudit(pool, { userId: req.user.id, action: 'UPDATE', entityType: 'product', entityId: id, before: existing.rows[0], after: result.rows[0] });
   res.json(result.rows[0]);
 });

@@ -1,11 +1,12 @@
 import { useEffect, useState, useCallback } from 'react';
-import { useParams, Link } from 'react-router-dom';
+import { useParams, useNavigate, Link } from 'react-router-dom';
 import { orders as ordersApi, exportApi } from '../api/endpoints';
 import { apiErrorMessage, downloadFile } from '../api/client';
 import { useAuth } from '../context/AuthContext';
 import { useToast } from '../context/ToastContext';
 import StatusBadge from '../components/StatusBadge';
 import Modal from '../components/Modal';
+import DownloadFormatModal from '../components/DownloadFormatModal';
 import { TableSkeleton } from '../components/Skeleton';
 
 function money(n) {
@@ -14,6 +15,7 @@ function money(n) {
 
 export default function OrderDetailPage() {
   const { id } = useParams();
+  const navigate = useNavigate();
   const { isAdmin } = useAuth();
   const toast = useToast();
   const [order, setOrder] = useState(null);
@@ -22,6 +24,11 @@ export default function OrderDetailPage() {
   const [payAmount, setPayAmount] = useState('');
   const [paying, setPaying] = useState(false);
   const [downloading, setDownloading] = useState('');
+  const [downloadOpen, setDownloadOpen] = useState(false);
+  const [cancelOpen, setCancelOpen] = useState(false);
+  const [cancelling, setCancelling] = useState(false);
+  const [deleteOpen, setDeleteOpen] = useState(false);
+  const [deleting, setDeleting] = useState(false);
 
   const load = useCallback(async () => {
     try {
@@ -42,6 +49,7 @@ export default function OrderDetailPage() {
     try {
       await downloadFile(exportApi.invoiceUrl(id, format), `invoice-${order.order_number}.${format === 'excel' ? 'xlsx' : 'pdf'}`);
       toast.success('Invoice downloaded.');
+      setDownloadOpen(false);
     } catch (err) {
       toast.error(apiErrorMessage(err));
     } finally {
@@ -92,6 +100,42 @@ export default function OrderDetailPage() {
     }
   };
 
+  const handleCancelOrder = async () => {
+    setCancelling(true);
+    try {
+      await ordersApi.cancel(id);
+      toast.success('Order cancelled.');
+      setCancelOpen(false);
+      load(); // refresh so the corrected status and distributor balance show immediately
+    } catch (err) {
+      toast.error(apiErrorMessage(err));
+    } finally {
+      setCancelling(false);
+    }
+  };
+
+  const handleDeleteOrder = async () => {
+    setDeleting(true);
+    try {
+      await ordersApi.remove(id);
+      toast.success('Order deleted.');
+      navigate('/orders');
+    } catch (err) {
+      // A 409 here means the backend refused because newer ledger activity
+      // exists for this distributor — its message already explains why and
+      // points at Cancel instead, so surface it verbatim rather than a
+      // generic error.
+      if (err.response?.status === 409) {
+        toast.error(err.response?.data?.message || apiErrorMessage(err));
+      } else {
+        toast.error(apiErrorMessage(err));
+      }
+      setDeleteOpen(false);
+    } finally {
+      setDeleting(false);
+    }
+  };
+
   if (loading) {
     return (
       <div className="content" style={{ maxWidth: 820 }}>
@@ -124,12 +168,13 @@ export default function OrderDetailPage() {
           </p>
         </div>
         <div style={{ display: 'flex', gap: 8 }}>
-          <button className="btn btn-secondary" disabled={downloading === 'pdf'} onClick={() => handleDownload('pdf')}>
-            {downloading === 'pdf' ? 'Preparing…' : 'Download PDF'}
-          </button>
-          <button className="btn btn-secondary" disabled={downloading === 'excel'} onClick={() => handleDownload('excel')}>
-            {downloading === 'excel' ? 'Preparing…' : 'Download Excel'}
-          </button>
+          <button className="btn btn-secondary" onClick={() => setDownloadOpen(true)}>Download</button>
+          {order.order_status !== 'cancelled' && (
+            <button className="btn btn-secondary" onClick={() => setCancelOpen(true)}>Cancel Order</button>
+          )}
+          {isAdmin && (
+            <button className="btn btn-danger" onClick={() => setDeleteOpen(true)}>Delete Order</button>
+          )}
         </div>
       </div>
 
@@ -212,6 +257,14 @@ export default function OrderDetailPage() {
         </div>
       )}
 
+      {downloadOpen && (
+        <DownloadFormatModal
+          onClose={() => setDownloadOpen(false)}
+          onSelect={handleDownload}
+          downloading={downloading}
+        />
+      )}
+
       {payOpen && (
         <Modal title="Record Payment" onClose={() => setPayOpen(false)}>
           <form onSubmit={handlePay}>
@@ -223,6 +276,36 @@ export default function OrderDetailPage() {
               {paying ? 'Recording…' : 'Record Payment'}
             </button>
           </form>
+        </Modal>
+      )}
+
+      {cancelOpen && (
+        <Modal title="Cancel this order?" onClose={() => setCancelOpen(false)} width={440}>
+          <p style={{ color: 'var(--ink-muted)', marginBottom: 20 }}>
+            This will reverse this order's effect on the distributor's ledger balance.
+            The order record itself is kept for history, just marked cancelled.
+          </p>
+          <div style={{ display: 'flex', gap: 10, justifyContent: 'flex-end' }}>
+            <button className="btn btn-secondary" onClick={() => setCancelOpen(false)} disabled={cancelling}>Keep Order</button>
+            <button className="btn btn-danger" onClick={handleCancelOrder} disabled={cancelling}>
+              {cancelling ? 'Cancelling…' : 'Cancel Order'}
+            </button>
+          </div>
+        </Modal>
+      )}
+
+      {deleteOpen && (
+        <Modal title="Delete this order?" onClose={() => setDeleteOpen(false)} width={440}>
+          <p style={{ color: 'var(--ink-muted)', marginBottom: 20 }}>
+            This is permanent and cannot be undone — unlike Cancel, the order record itself
+            will be removed entirely.
+          </p>
+          <div style={{ display: 'flex', gap: 10, justifyContent: 'flex-end' }}>
+            <button className="btn btn-secondary" onClick={() => setDeleteOpen(false)} disabled={deleting}>Keep Order</button>
+            <button className="btn btn-danger" onClick={handleDeleteOrder} disabled={deleting}>
+              {deleting ? 'Deleting…' : 'Delete Order'}
+            </button>
+          </div>
         </Modal>
       )}
     </div>

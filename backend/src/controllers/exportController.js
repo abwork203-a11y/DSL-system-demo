@@ -49,6 +49,16 @@ async function getOrderWithItems(orderId) {
   return { ...orderResult.rows[0], items: itemsResult.rows };
 }
 
+// Given an order row, compute the actual dollar discount amount, regardless
+// of whether the order stores a flat amount or a percentage.
+function computeDiscountAmount(order, grossValue) {
+  const rawDiscount = Number(order.discount) || 0;
+  if (order.discount_type === 'percentage') {
+    return grossValue * (rawDiscount / 100);
+  }
+  return rawDiscount;
+}
+
 // ── Invoice: Excel ──────────────────────────────────────────
 const invoiceExcel = asyncHandler(async (req, res) => {
   const order = await getOrderWithItems(req.params.id);
@@ -57,7 +67,7 @@ const invoiceExcel = asyncHandler(async (req, res) => {
   const workbook = new ExcelJS.Workbook();
   const sheet = workbook.addWorksheet('Invoice');
 
-  sheet.mergeCells('A1:E1');
+  sheet.mergeCells('A1:F1');
   sheet.getCell('A1').value = `Invoice ${order.order_number}`;
   sheet.getCell('A1').font = { size: 16, bold: true };
 
@@ -71,25 +81,40 @@ const invoiceExcel = asyncHandler(async (req, res) => {
   sheet.getCell('B6').value = order.payment_status;
 
   sheet.addRow([]);
-  const headerRow = sheet.addRow(['Manufacturer', 'Product', 'Size/Packaging', 'Qty', 'Unit Price', 'Line Total']);
+  const headerRow = sheet.addRow(['Sr#', 'Product', 'Retail Price', 'Invoice Price', 'Qty', 'Value']);
   headerRow.font = { bold: true };
 
-  order.items.forEach((item) => {
+  let grossValue = 0;
+  order.items.forEach((item, index) => {
+    const qty = Number(item.quantity);
+    const invoicePrice = Number(item.price_at_time_of_order);
+    const retailPrice = Number(item.retail_price_at_time_of_order);
+    const value = invoicePrice * qty;
+    grossValue += value;
+
+    const productLabel = item.size_packaging
+      ? `${item.product_name} (${item.size_packaging})`
+      : item.product_name;
+
     sheet.addRow(sanitizeRow([
-      item.manufacturer_name,
-      item.product_name,
-      item.size_packaging,
-      Number(item.quantity),
-      Number(item.price_at_time_of_order),
-      Number(item.line_total),
+      index + 1,
+      productLabel,
+      retailPrice,
+      invoicePrice,
+      qty,
+      value,
     ]));
   });
 
+  const discount = computeDiscountAmount(order, grossValue);
+  const freight = Number(order.freight_cost) || 0;
+  const netValue = Number(order.total);
+
   sheet.addRow([]);
-  sheet.addRow(['', '', '', '', 'Subtotal', Number(order.subtotal)]);
-  sheet.addRow(['', '', '', '', 'Discount', -Number(order.discount)]);
-  sheet.addRow(['', '', '', '', 'Freight', Number(order.freight_cost)]);
-  const totalRow = sheet.addRow(['', '', '', '', 'Total', Number(order.total)]);
+  sheet.addRow(['', '', '', '', 'Gross Value', grossValue]);
+  sheet.addRow(['', '', '', '', 'Discount', -discount]);
+  sheet.addRow(['', '', '', '', 'Freight', freight]);
+  const totalRow = sheet.addRow(['', '', '', '', 'Net Value', netValue]);
   totalRow.font = { bold: true };
 
   sheet.columns.forEach((col) => { col.width = 20; });
@@ -121,32 +146,45 @@ const invoicePdf = asyncHandler(async (req, res) => {
   doc.moveDown();
 
   const tableTop = doc.y;
-  const cols = { mfg: 50, product: 150, qty: 320, price: 380, total: 460 };
+  const cols = { sr: 50, product: 90, retail: 280, invoice: 360, qty: 440, value: 480 };
   doc.fontSize(10).font('Helvetica-Bold');
-  doc.text('Manufacturer', cols.mfg, tableTop);
+  doc.text('Sr#', cols.sr, tableTop);
   doc.text('Product', cols.product, tableTop);
+  doc.text('Retail Price', cols.retail, tableTop);
+  doc.text('Invoice Price', cols.invoice, tableTop);
   doc.text('Qty', cols.qty, tableTop);
-  doc.text('Price', cols.price, tableTop);
-  doc.text('Total', cols.total, tableTop);
+  doc.text('Value', cols.value, tableTop);
   doc.moveDown(0.5);
   doc.font('Helvetica');
 
-  order.items.forEach((item) => {
+  let grossValue = 0;
+  order.items.forEach((item, index) => {
     const y = doc.y;
-    doc.text(item.manufacturer_name, cols.mfg, y, { width: 95 });
-    doc.text(`${item.product_name}${item.size_packaging ? ` (${item.size_packaging})` : ''}`, cols.product, y, { width: 165 });
-    doc.text(String(Number(item.quantity)), cols.qty, y);
-    doc.text(Number(item.price_at_time_of_order).toFixed(2), cols.price, y);
-    doc.text(Number(item.line_total).toFixed(2), cols.total, y);
+    const qty = Number(item.quantity);
+    const invoicePrice = Number(item.price_at_time_of_order);
+    const retailPrice = Number(item.retail_price_at_time_of_order);
+    const value = invoicePrice * qty;
+    grossValue += value;
+
+    doc.text(String(index + 1), cols.sr, y);
+    doc.text(`${item.product_name}${item.size_packaging ? ` (${item.size_packaging})` : ''}`, cols.product, y, { width: 180 });
+    doc.text(retailPrice.toFixed(2), cols.retail, y);
+    doc.text(invoicePrice.toFixed(2), cols.invoice, y);
+    doc.text(String(qty), cols.qty, y);
+    doc.text(value.toFixed(2), cols.value, y);
     doc.moveDown();
   });
 
+  const discount = computeDiscountAmount(order, grossValue);
+  const freight = Number(order.freight_cost) || 0;
+  const netValue = Number(order.total);
+
   doc.moveDown();
   doc.font('Helvetica-Bold');
-  doc.text(`Subtotal: ${Number(order.subtotal).toFixed(2)}`, { align: 'right' });
-  doc.text(`Discount: -${Number(order.discount).toFixed(2)}`, { align: 'right' });
-  doc.text(`Freight: ${Number(order.freight_cost).toFixed(2)}`, { align: 'right' });
-  doc.text(`Total: ${Number(order.total).toFixed(2)}`, { align: 'right' });
+  doc.text(`Gross Value: ${grossValue.toFixed(2)}`, { align: 'right' });
+  doc.text(`Discount: -${discount.toFixed(2)}`, { align: 'right' });
+  doc.text(`Freight: ${freight.toFixed(2)}`, { align: 'right' });
+  doc.text(`Net Value: ${netValue.toFixed(2)}`, { align: 'right' });
 
   doc.end();
 });
@@ -211,6 +249,7 @@ const exportOrders = asyncHandler(async (req, res) => {
   ], result.rows);
 });
 
+// ── Ledger: generic bulk export (all distributors, or filtered) ───
 const exportLedger = asyncHandler(async (req, res) => {
   const { distributor_id } = req.query;
   const params = [];
@@ -223,17 +262,137 @@ const exportLedger = asyncHandler(async (req, res) => {
     `SELECT d.name AS distributor, l.entry_date, l.type, l.amount, l.running_balance, l.note
      FROM ledger l JOIN distributors d ON d.id = l.distributor_id
      ${where}
-     ORDER BY l.entry_date DESC`,
+     ORDER BY l.entry_date ASC`,
     params
   );
+
+  const rows = result.rows.map((entry) => ({
+    distributor: entry.distributor,
+    entry_date: new Date(entry.entry_date).toLocaleDateString(),
+    type: entry.type,
+    debit: entry.type === 'debit' ? Number(entry.amount) : '',
+    credit: entry.type === 'credit' ? Number(entry.amount) : '',
+    running_balance: Number(entry.running_balance),
+    note: entry.note,
+  }));
+
   await sendExcel(res, 'ledger.xlsx', [
     { header: 'Distributor', key: 'distributor' },
     { header: 'Date', key: 'entry_date' },
     { header: 'Type', key: 'type' },
-    { header: 'Amount', key: 'amount' },
+    { header: 'Debit', key: 'debit' },
+    { header: 'Credit', key: 'credit' },
     { header: 'Running Balance', key: 'running_balance' },
     { header: 'Note', key: 'note' },
-  ], result.rows);
+  ], rows);
 });
 
-module.exports = { invoiceExcel, invoicePdf, exportProducts, exportDistributors, exportOrders, exportLedger };
+// ── Ledger: single-distributor "Customer Ledger" statement ────────
+// NOTE: this mirrors the query shape used by ledgerController.js's
+// `distributorSummary` (distributor lookup + ledger entries filtered by
+// distributor_id and an optional date range). If `distributorSummary` sources
+// its data differently (e.g. a different running-balance calculation or a
+// view/materialized table instead of the raw `ledger` table), point this
+// query at the same source before shipping — it wasn't available to check
+// against here.
+const exportDistributorLedger = asyncHandler(async (req, res) => {
+  const { id: distributorId } = req.params;
+  const { start_date, end_date } = req.query;
+
+  const distributorResult = await pool.query(
+    'SELECT id, name FROM distributors WHERE id = $1',
+    [distributorId]
+  );
+  if (distributorResult.rows.length === 0) throw new ApiError(404, 'Distributor not found.');
+  const distributor = distributorResult.rows[0];
+
+  const params = [distributorId];
+  let dateWhere = '';
+  if (start_date) {
+    params.push(start_date);
+    dateWhere += ` AND l.entry_date >= $${params.length}`;
+  }
+  if (end_date) {
+    params.push(end_date);
+    dateWhere += ` AND l.entry_date <= $${params.length}`;
+  }
+
+  const entriesResult = await pool.query(
+    `SELECT l.entry_date, l.type, l.amount, l.running_balance, l.note
+     FROM ledger l
+     WHERE l.distributor_id = $1 ${dateWhere}
+     ORDER BY l.entry_date ASC`,
+    params
+  );
+  const entries = entriesResult.rows;
+
+  const workbook = new ExcelJS.Workbook();
+  const sheet = workbook.addWorksheet('Customer Ledger');
+
+  sheet.mergeCells('A1:F1');
+  sheet.getCell('A1').value = 'Customer Ledger';
+  sheet.getCell('A1').font = { size: 16, bold: true };
+
+  sheet.mergeCells('A2:F2');
+  sheet.getCell('A2').value = sanitizeCellValue(distributor.name);
+  sheet.getCell('A2').font = { size: 12, bold: true };
+
+  sheet.mergeCells('A3:F3');
+  if (start_date && end_date) {
+    sheet.getCell('A3').value = `From ${start_date} to ${end_date}`;
+  } else if (start_date) {
+    sheet.getCell('A3').value = `From ${start_date}`;
+  } else if (end_date) {
+    sheet.getCell('A3').value = `To ${end_date}`;
+  } else {
+    sheet.getCell('A3').value = 'All activity';
+  }
+
+  sheet.addRow([]);
+  const headerRow = sheet.addRow(['Date', 'Description', 'Debit', 'Credit', 'Balance', 'Remarks']);
+  headerRow.font = { bold: true };
+
+  let totalDebit = 0;
+  let totalCredit = 0;
+  let lastBalance = 0;
+
+  entries.forEach((entry) => {
+    const isDebit = entry.type === 'debit';
+    const amount = Number(entry.amount);
+    const runningBalance = Number(entry.running_balance);
+    lastBalance = runningBalance;
+    if (isDebit) totalDebit += amount; else totalCredit += amount;
+
+    const remarks = runningBalance > 0 ? 'Dr' : runningBalance < 0 ? 'Cr' : '';
+
+    sheet.addRow(sanitizeRow([
+      new Date(entry.entry_date).toLocaleDateString(),
+      entry.note,
+      isDebit ? amount : '',
+      isDebit ? '' : amount,
+      runningBalance,
+      remarks,
+    ]));
+  });
+
+  const finalRemarks = lastBalance > 0 ? 'Dr' : lastBalance < 0 ? 'Cr' : '';
+  const totalRow = sheet.addRow(['Total', '', totalDebit, totalCredit, lastBalance, finalRemarks]);
+  totalRow.font = { bold: true };
+
+  sheet.columns.forEach((col) => { col.width = 20; });
+
+  res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+  res.setHeader('Content-Disposition', `attachment; filename=ledger-${distributor.name.replace(/[^a-z0-9]+/gi, '-')}.xlsx`);
+  await workbook.xlsx.write(res);
+  res.end();
+});
+
+module.exports = {
+  invoiceExcel,
+  invoicePdf,
+  exportProducts,
+  exportDistributors,
+  exportOrders,
+  exportLedger,
+  exportDistributorLedger,
+};

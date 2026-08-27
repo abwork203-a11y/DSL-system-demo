@@ -33,22 +33,46 @@ const getOne = asyncHandler(async (req, res) => {
 });
 
 const create = asyncHandler(async (req, res) => {
-  const { name, contact_name, contact_phone, contact_email, zone, region, city, area } = req.body;
+  const { name, contact_name, contact_phone, contact_email, zone, region, city, area, address } = req.body; 
   if (!name) throw new ApiError(400, 'name is required.');
 
-  const result = await pool.query(
-    `INSERT INTO distributors (name, contact_name, contact_phone, contact_email, zone, region, city, area)
-     VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
-     RETURNING *`,
-    [name, contact_name || null, contact_phone || null, contact_email || null, zone || null, region || null, city || null, area || null]
-  );
+ const result = await pool.query(
+  `INSERT INTO distributors (
+     name, contact_name, contact_phone, contact_email,
+     zone, region, city, area, address
+   )
+   VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
+   RETURNING *`,
+  [
+    name,
+    contact_name || null,
+    contact_phone || null,
+    contact_email || null,
+    zone || null,
+    region || null,
+    city || null,
+    area || null,
+    address || null
+  ]
+);
   await recordAudit(pool, { userId: req.user.id, action: 'CREATE', entityType: 'distributor', entityId: result.rows[0].id, after: result.rows[0] });
   res.status(201).json(result.rows[0]);
 });
 
 const update = asyncHandler(async (req, res) => {
   const { id } = req.params;
-  const { name, contact_name, contact_phone, contact_email, zone, region, city, area, status } = req.body;
+  const {
+  name,
+  contact_name,
+  contact_phone,
+  contact_email,
+  zone,
+  region,
+  city,
+  area,
+  address,
+  status
+} = req.body;
   if (status && !['active', 'inactive'].includes(status)) {
     throw new ApiError(400, 'status must be "active" or "inactive".');
   }
@@ -57,20 +81,33 @@ const update = asyncHandler(async (req, res) => {
   if (existing.rows.length === 0) throw new ApiError(404, 'Distributor not found.');
 
   const result = await pool.query(
-    `UPDATE distributors SET
-       name = COALESCE($1, name),
-       contact_name = COALESCE($2, contact_name),
-       contact_phone = COALESCE($3, contact_phone),
-       contact_email = COALESCE($4, contact_email),
-       zone = COALESCE($5, zone),
-       region = COALESCE($6, region),
-       city = COALESCE($7, city),
-       area = COALESCE($8, area),
-       status = COALESCE($9, status)
-     WHERE id = $10
-     RETURNING *`,
-    [name || null, contact_name || null, contact_phone || null, contact_email || null, zone || null, region || null, city || null, area || null, status || null, id]
-  );
+  `UPDATE distributors SET
+     name = COALESCE($1, name),
+     contact_name = COALESCE($2, contact_name),
+     contact_phone = COALESCE($3, contact_phone),
+     contact_email = COALESCE($4, contact_email),
+     zone = COALESCE($5, zone),
+     region = COALESCE($6, region),
+     city = COALESCE($7, city),
+     area = COALESCE($8, area),
+     address = COALESCE($9, address),
+     status = COALESCE($10, status)
+   WHERE id = $11
+   RETURNING *`,
+  [
+    name || null,
+    contact_name || null,
+    contact_phone || null,
+    contact_email || null,
+    zone || null,
+    region || null,
+    city || null,
+    area || null,
+    address || null,
+    status || null,
+    id
+  ]
+);
   await recordAudit(pool, { userId: req.user.id, action: 'UPDATE', entityType: 'distributor', entityId: id, before: existing.rows[0], after: result.rows[0] });
   res.json(result.rows[0]);
 });

@@ -11,6 +11,10 @@ const writeRules = [
   body('name').optional().trim().isLength({ min: 1, max: 200 }),
   body('contact_email').optional({ nullable: true, checkFalsy: true }).isEmail().withMessage('Contact email must be valid.'),
   body('status').optional().isIn(['active', 'inactive']),
+  body('address')
+  .optional({ nullable: true })
+  .isString()
+  .isLength({ max: 500 }),
 ];
 
 router.get('/', controller.list);

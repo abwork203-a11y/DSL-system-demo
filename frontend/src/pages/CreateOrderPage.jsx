@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useNavigate, useBlocker } from 'react-router-dom';
+import { Plus, Minus, Trash2 } from 'lucide-react';
 import { distributors as distributorsApi, products as productsApi, orders as ordersApi } from '../api/endpoints';
 import { apiErrorMessage } from '../api/client';
 import { useToast } from '../context/ToastContext';
@@ -21,9 +22,11 @@ export default function CreateOrderPage() {
   const [submitted, setSubmitted] = useState(false);
 
   const [distributorId, setDistributorId] = useState('');
+  const [distributorSearch, setDistributorSearch] = useState('');
   const [items, setItems] = useState([]);
-  const [productToAdd, setProductToAdd] = useState('');
+  const [productSearch, setProductSearch] = useState('');
   const [discount, setDiscount] = useState('0');
+  const [discountType, setDiscountType] = useState('fixed'); // 'fixed' | 'percentage'
   const [freightCost, setFreightCost] = useState('0');
   const [paymentTerm, setPaymentTerm] = useState('cash');
   const [amountPaid, setAmountPaid] = useState('0');
@@ -61,15 +64,39 @@ export default function CreateOrderPage() {
     () => items.reduce((sum, it) => sum + Number(it.price) * Number(it.quantity), 0),
     [items]
   );
+
+  // The actual dollar amount being discounted, regardless of which mode is
+  // active — this is what should always be subtracted from the subtotal and
+  // what should always be shown to the user, never the raw percentage number.
+  const discountAmount = useMemo(() => {
+    const raw = Number(discount || 0);
+    if (discountType === 'percentage') return subtotal * (raw / 100);
+    return raw;
+  }, [discount, discountType, subtotal]);
+
   const total = useMemo(
-    () => Math.max(0, subtotal - Number(discount || 0) + Number(freightCost || 0)),
-    [subtotal, discount, freightCost]
+    () => Math.max(0, subtotal - discountAmount + Number(freightCost || 0)),
+    [subtotal, discountAmount, freightCost]
   );
 
-  const addItem = () => {
-    if (!productToAdd) return;
-    const product = productsList.find((p) => p.id === Number(productToAdd));
-    if (!product) return;
+  const filteredDistributors = useMemo(() => {
+    const q = distributorSearch.trim().toLowerCase();
+    if (!q) return distributorsList;
+    return distributorsList.filter((d) => d.name.toLowerCase().includes(q));
+  }, [distributorsList, distributorSearch]);
+
+  const filteredProducts = useMemo(() => {
+    const q = productSearch.trim().toLowerCase();
+    if (!q) return productsList;
+    return productsList.filter((p) => p.name.toLowerCase().includes(q));
+  }, [productsList, productSearch]);
+
+  const selectDistributor = (d) => {
+    setDistributorId(String(d.id));
+    setDistributorSearch(d.name);
+  };
+
+  const addItem = (product) => {
     if (items.some((it) => it.product_id === product.id)) {
       toast.error('That product is already on this order — adjust its quantity instead.');
       return;
@@ -80,12 +107,16 @@ export default function CreateOrderPage() {
       manufacturer_name: product.manufacturer_name,
       size_packaging: product.size_packaging,
       price: Number(product.price),
+      retail_price: Number(product.retail_price),
       quantity: 1,
     }]);
-    setProductToAdd('');
   };
 
   const updateQty = (productId, qty) => {
+    if (qty < 1) {
+      removeItem(productId);
+      return;
+    }
     setItems(items.map((it) => (it.product_id === productId ? { ...it, quantity: qty } : it)));
   };
   const removeItem = (productId) => setItems(items.filter((it) => it.product_id !== productId));
@@ -104,6 +135,7 @@ export default function CreateOrderPage() {
         distributor_id: Number(distributorId),
         items: items.map((it) => ({ product_id: it.product_id, quantity: Number(it.quantity) })),
         discount: Number(discount || 0),
+        discount_type: discountType,
         freight_cost: Number(freightCost || 0),
         payment_term: paymentTerm,
         amount_paid: Number(amountPaid || 0),
@@ -144,14 +176,45 @@ export default function CreateOrderPage() {
             <h2 style={{ marginBottom: 14 }}>Select Distributor</h2>
             <div className="field">
               <label>Distributor</label>
-              <select value={distributorId} onChange={(e) => setDistributorId(e.target.value)}>
-                <option value="" disabled>Select a distributor</option>
-                {distributorsList.map((d) => <option key={d.id} value={d.id}>{d.name}</option>)}
-              </select>
+              <input
+                type="text"
+                placeholder="Search distributors by name…"
+                value={distributorSearch}
+                onChange={(e) => {
+                  setDistributorSearch(e.target.value);
+                  // Typing again after a selection means the user is looking
+                  // for someone else — clear the stale selection until they
+                  // click a row again.
+                  if (distributorId) setDistributorId('');
+                }}
+              />
+            </div>
+            <div className="table-wrap" style={{ maxHeight: 280, height: 'auto' }}>
+              <table className="data-table">
+                <tbody>
+                  {filteredDistributors.map((d) => (
+                    <tr
+                      key={d.id}
+                      onClick={() => selectDistributor(d)}
+                      style={{
+                        cursor: 'pointer',
+                        background: d.id === Number(distributorId) ? 'var(--surface-sunken)' : undefined,
+                      }}
+                    >
+                      <td><strong>{d.name}</strong></td>
+                      <td>{[d.zone, d.city].filter(Boolean).join(' · ') || '—'}</td>
+                      <td className="num">{money(d.balance)}</td>
+                    </tr>
+                  ))}
+                  {filteredDistributors.length === 0 && (
+                    <tr><td colSpan={3}><div className="empty-state">No distributors match "{distributorSearch}".</div></td></tr>
+                  )}
+                </tbody>
+              </table>
             </div>
             {selectedDistributor && (
-              <p style={{ color: 'var(--ink-muted)', fontSize: 13 }}>
-                Current balance: <span className="num">{money(selectedDistributor.balance)}</span>
+              <p style={{ color: 'var(--ink-muted)', fontSize: 13, marginTop: 12 }}>
+                Selected: <strong>{selectedDistributor.name}</strong> — current balance: <span className="num">{money(selectedDistributor.balance)}</span>
               </p>
             )}
           </div>
@@ -163,14 +226,57 @@ export default function CreateOrderPage() {
             <p style={{ color: 'var(--ink-muted)', fontSize: 13, marginBottom: 12 }}>
               Manufacturer is inherited per product — you can mix products from multiple manufacturers on one order.
             </p>
-            <div className="toolbar" style={{ marginBottom: 18 }}>
-              <select value={productToAdd} onChange={(e) => setProductToAdd(e.target.value)} style={{ minWidth: 260 }}>
-                <option value="" disabled>Select a product to add…</option>
-                {productsList.map((p) => (
-                  <option key={p.id} value={p.id}>{p.name} — {p.manufacturer_name} ({money(p.price)})</option>
-                ))}
-              </select>
-              <button className="btn btn-secondary" type="button" onClick={addItem}>Add</button>
+
+            <div className="toolbar" style={{ marginBottom: 12 }}>
+              <input
+                type="text"
+                placeholder="Search products…"
+                value={productSearch}
+                onChange={(e) => setProductSearch(e.target.value)}
+              />
+            </div>
+
+            <div className="table-wrap" style={{ maxHeight: 260, height: 'auto', marginBottom: 20 }}>
+              <table className="data-table">
+                <thead>
+                  <tr>
+                    <th>Product</th>
+                    <th>Manufacturer</th>
+                    <th>Size/Packaging</th>
+                    <th className="num">Retail Price</th>
+                    <th className="num">Invoice Price</th>
+                    <th></th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {filteredProducts.map((p) => {
+                    const alreadyAdded = items.some((it) => it.product_id === p.id);
+                    return (
+                      <tr key={p.id}>
+                        <td>{p.name}</td>
+                        <td>{p.manufacturer_name}</td>
+                        <td>{p.size_packaging || '—'}</td>
+                        <td className="num">{money(p.retail_price)}</td>
+                        <td className="num">{money(p.price)}</td>
+                        <td>
+                          <button
+                            type="button"
+                            className="btn btn-secondary btn-sm"
+                            disabled={alreadyAdded}
+                            onClick={() => addItem(p)}
+                            title={alreadyAdded ? 'Already on this order' : 'Add to order'}
+                          >
+                            <Plus size={14} />
+                          </button>
+                        </td>
+                      </tr>
+                    );
+                  })}
+                  {filteredProducts.length === 0 && (
+                    <tr><td colSpan={6}><div className="empty-state">No products match "{productSearch}".</div></td></tr>
+                  )}
+                </tbody>
+              </table>
             </div>
 
             {items.length > 0 ? (
@@ -193,14 +299,37 @@ export default function CreateOrderPage() {
                         <td>{it.manufacturer_name}</td>
                         <td className="num">{money(it.price)}</td>
                         <td className="num">
-                          <input
-                            type="number" min="1" step="1" value={it.quantity}
-                            onChange={(e) => updateQty(it.product_id, e.target.value)}
-                            style={{ width: 64, textAlign: 'right', border: '1px solid var(--border)', borderRadius: 6, padding: '4px 6px' }}
-                          />
+                          <div style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}>
+                            <button
+                              type="button"
+                              className="btn btn-secondary btn-sm"
+                              aria-label="Decrease quantity"
+                              onClick={() => updateQty(it.product_id, Number(it.quantity) - 1)}
+                            >
+                              <Minus size={14} />
+                            </button>
+                            <span style={{ minWidth: 24, textAlign: 'center', display: 'inline-block' }}>{it.quantity}</span>
+                            <button
+                              type="button"
+                              className="btn btn-secondary btn-sm"
+                              aria-label="Increase quantity"
+                              onClick={() => updateQty(it.product_id, Number(it.quantity) + 1)}
+                            >
+                              <Plus size={14} />
+                            </button>
+                          </div>
                         </td>
                         <td className="num">{money(it.price * it.quantity)}</td>
-                        <td><button className="btn-ghost btn btn-sm" onClick={() => removeItem(it.product_id)}>Remove</button></td>
+                        <td>
+                          <button
+                            type="button"
+                            className="btn-ghost btn btn-sm"
+                            aria-label="Remove item"
+                            onClick={() => removeItem(it.product_id)}
+                          >
+                            <Trash2 size={14} />
+                          </button>
+                        </td>
                       </tr>
                     ))}
                   </tbody>
@@ -221,10 +350,43 @@ export default function CreateOrderPage() {
         {step === 2 && (
           <div>
             <h2 style={{ marginBottom: 14 }}>Discount &amp; Freight</h2>
+
+            <div className="field">
+              <label>Discount Type</label>
+              <div style={{ display: 'flex', gap: 8 }}>
+                <button
+                  type="button"
+                  className={discountType === 'fixed' ? 'btn' : 'btn btn-secondary'}
+                  onClick={() => setDiscountType('fixed')}
+                >
+                  Fixed Amount
+                </button>
+                <button
+                  type="button"
+                  className={discountType === 'percentage' ? 'btn' : 'btn btn-secondary'}
+                  onClick={() => setDiscountType('percentage')}
+                >
+                  Percentage
+                </button>
+              </div>
+            </div>
+
             <div className="field-row">
               <div className="field">
-                <label>Discount</label>
-                <input type="number" min="0" step="0.01" value={discount} onChange={(e) => setDiscount(e.target.value)} />
+                <label>{discountType === 'percentage' ? 'Discount (%)' : 'Discount'}</label>
+                <input
+                  type="number"
+                  min="0"
+                  max={discountType === 'percentage' ? 100 : undefined}
+                  step="0.01"
+                  value={discount}
+                  onChange={(e) => setDiscount(e.target.value)}
+                />
+                {discountType === 'percentage' && (
+                  <p style={{ color: 'var(--ink-muted)', fontSize: 12.5, marginTop: 4 }}>
+                    {Number(discount || 0)}% of {money(subtotal)} = {money(discountAmount)} off
+                  </p>
+                )}
               </div>
               <div className="field">
                 <label>Freight / Transport Cost</label>
@@ -233,7 +395,7 @@ export default function CreateOrderPage() {
             </div>
             <div style={{ fontSize: 14, lineHeight: 1.9, marginTop: 8 }}>
               <div>Subtotal: <span className="num" style={{ float: 'right' }}>{money(subtotal)}</span></div>
-              <div>Discount: <span className="num" style={{ float: 'right' }}>−{money(discount)}</span></div>
+              <div>Discount: <span className="num" style={{ float: 'right' }}>−{money(discountAmount)}</span></div>
               <div>Freight: <span className="num" style={{ float: 'right' }}>+{money(freightCost)}</span></div>
               <div style={{ borderTop: '1px solid var(--border)', paddingTop: 6, fontWeight: 600 }}>
                 Total: <span className="num" style={{ float: 'right' }}>{money(total)}</span>
@@ -277,7 +439,10 @@ export default function CreateOrderPage() {
             </div>
             <div style={{ fontSize: 14, lineHeight: 1.9, marginTop: 14, borderTop: '1px solid var(--border)', paddingTop: 10 }}>
               <div>Subtotal: <span className="num" style={{ float: 'right' }}>{money(subtotal)}</span></div>
-              <div>Discount: <span className="num" style={{ float: 'right' }}>−{money(discount)}</span></div>
+              <div>
+                Discount{discountType === 'percentage' ? ` (${Number(discount || 0)}%)` : ''}:
+                <span className="num" style={{ float: 'right' }}>−{money(discountAmount)}</span>
+              </div>
               <div>Freight: <span className="num" style={{ float: 'right' }}>+{money(freightCost)}</span></div>
               <div style={{ fontWeight: 600, fontSize: 16, marginTop: 4 }}>
                 Total: <span className="num" style={{ float: 'right' }}>{money(total)}</span>

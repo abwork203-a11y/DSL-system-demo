@@ -228,3 +228,12 @@ CREATE INDEX IF NOT EXISTS idx_ledger_entry_date ON ledger(entry_date DESC);
 CREATE INDEX IF NOT EXISTS idx_orders_created_by ON orders(created_by);
 
 COMMIT;
+
+BEGIN;
+
+ALTER TABLE products ADD COLUMN IF NOT EXISTS retail_price NUMERIC(12,2) NOT NULL DEFAULT 0;
+ALTER TABLE order_items ADD COLUMN IF NOT EXISTS retail_price_at_time_of_order NUMERIC(12,2) NOT NULL DEFAULT 0;
+ALTER TABLE orders ADD COLUMN IF NOT EXISTS discount_type TEXT NOT NULL DEFAULT 'fixed'
+CHECK (discount_type IN ('fixed', 'percentage'));
+
+COMMIT;

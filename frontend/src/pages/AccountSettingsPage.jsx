@@ -1,9 +1,24 @@
 import { useEffect, useState } from 'react';
+import { Check } from 'lucide-react';
 import { account as accountApi } from '../api/endpoints';
 import { apiErrorMessage } from '../api/client';
 import { useAuth } from '../context/AuthContext';
 import { useToast } from '../context/ToastContext';
 import Modal from '../components/Modal';
+import PasswordInput from '../components/PasswordInput';
+
+const THEMES = [
+  { key: 'ocean', label: 'Ocean', swatch: ['#F8FAFC', '#2563EB', '#1E293B'] },
+  { key: 'forest', label: 'Forest', swatch: ['#F7F9F6', '#2F6D50', '#182A20'] },
+  { key: 'terracotta', label: 'Terracotta', swatch: ['#FDF8F3', '#C2571F', '#2E2018'] },
+  { key: 'slate', label: 'Slate', swatch: ['#F7F8FA', '#475569', '#111827'] },
+];
+
+const FONTS = [
+  { key: 'classic', label: 'Classic', display: "'Fraunces', Georgia, serif", body: "'Inter', -apple-system, sans-serif" },
+  { key: 'grotesk', label: 'Grotesk', display: "'Space Grotesk', -apple-system, sans-serif", body: "'Work Sans', -apple-system, sans-serif" },
+  { key: 'editorial', label: 'Editorial', display: "'Playfair Display', Georgia, serif", body: "'Lora', Georgia, serif" },
+];
 
 export default function AccountSettingsPage() {
   const { user } = useAuth();
@@ -24,8 +39,110 @@ export default function AccountSettingsPage() {
       </div>
 
       <PasswordCard toast={toast} />
+      <AppearanceCard />
       <MfaCard mfaEnabled={mfaEnabled} setMfaEnabled={setMfaEnabled} toast={toast} />
       <SessionsCard toast={toast} />
+    </div>
+  );
+}
+
+function AppearanceCard() {
+  // The saved value (if any) was already applied to <html> before this
+  // component ever mounted (see public/theme-init.js) — read it back from
+  // the DOM/localStorage here purely to highlight the right option, not to
+  // re-apply it.
+  const [theme, setTheme] = useState(() => localStorage.getItem('theme') || 'ocean');
+  const [font, setFont] = useState(() => localStorage.getItem('font') || 'classic');
+
+  const applyTheme = (key) => {
+    document.documentElement.setAttribute('data-theme', key);
+    localStorage.setItem('theme', key);
+    setTheme(key);
+  };
+
+  const applyFont = (key) => {
+    document.documentElement.setAttribute('data-font', key);
+    localStorage.setItem('font', key);
+    setFont(key);
+  };
+
+  return (
+    <div className="card">
+      <h2 style={{ marginBottom: 4 }}>Appearance</h2>
+      <p style={{ color: 'var(--ink-muted)', fontSize: 13, marginBottom: 16 }}>
+        Changes apply immediately across the whole app and are remembered on this device.
+      </p>
+
+      <div style={{ marginBottom: 20 }}>
+        <div style={{ fontSize: 12.5, fontWeight: 600, color: 'var(--ink-muted)', marginBottom: 10 }}>Theme</div>
+        <div style={{ display: 'flex', gap: 14, flexWrap: 'wrap' }}>
+          {THEMES.map((t) => {
+            const active = theme === t.key;
+            return (
+              <button
+                key={t.key}
+                type="button"
+                onClick={() => applyTheme(t.key)}
+                style={{
+                  display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 6,
+                  background: 'none', border: 'none', cursor: 'pointer', padding: 0, width: 76,
+                }}
+                aria-pressed={active}
+              >
+                <div
+                  style={{
+                    position: 'relative', width: 56, height: 56, borderRadius: '50%',
+                    overflow: 'hidden', border: active ? '2px solid var(--ink)' : '2px solid var(--rule)',
+                    display: 'grid', gridTemplateColumns: '1fr 1fr', gridTemplateRows: '1fr 1fr',
+                  }}
+                >
+                  <div style={{ gridColumn: '1 / span 2', background: t.swatch[0] }} />
+                  <div style={{ background: t.swatch[1] }} />
+                  <div style={{ background: t.swatch[2] }} />
+                  {active && (
+                    <div style={{
+                      position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center',
+                      background: 'rgba(0,0,0,0.15)',
+                    }}>
+                      <Check size={20} color="#fff" strokeWidth={3} />
+                    </div>
+                  )}
+                </div>
+                <span style={{ fontSize: 12.5, color: 'var(--ink)' }}>{t.label}</span>
+              </button>
+            );
+          })}
+        </div>
+      </div>
+
+      <div>
+        <div style={{ fontSize: 12.5, fontWeight: 600, color: 'var(--ink-muted)', marginBottom: 10 }}>Font Pairing</div>
+        <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap' }}>
+          {FONTS.map((f) => {
+            const active = font === f.key;
+            return (
+              <button
+                key={f.key}
+                type="button"
+                onClick={() => applyFont(f.key)}
+                style={{
+                  display: 'flex', flexDirection: 'column', gap: 4, textAlign: 'left', cursor: 'pointer',
+                  width: 168, padding: '10px 12px', borderRadius: 8,
+                  border: active ? '2px solid var(--ink)' : '1px solid var(--rule)',
+                  background: active ? 'var(--surface-sunken)' : 'var(--surface)',
+                }}
+                aria-pressed={active}
+              >
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                  <span style={{ fontFamily: f.display, fontSize: 17, fontWeight: 600, color: 'var(--ink)' }}>Aa</span>
+                  {active && <Check size={14} color="var(--ink)" strokeWidth={3} />}
+                </div>
+                <span style={{ fontFamily: f.body, fontSize: 12, color: 'var(--ink-muted)' }}>{f.label} pairing</span>
+              </button>
+            );
+          })}
+        </div>
+      </div>
     </div>
   );
 }
@@ -60,11 +177,11 @@ function PasswordCard({ toast }) {
         <div className="field-row">
           <div className="field">
             <label>Current password</label>
-            <input type="password" value={currentPassword} onChange={(e) => setCurrentPassword(e.target.value)} required />
+            <PasswordInput value={currentPassword} onChange={(e) => setCurrentPassword(e.target.value)} required />
           </div>
           <div className="field">
             <label>New password (min. 8 characters)</label>
-            <input type="password" value={newPassword} onChange={(e) => setNewPassword(e.target.value)} minLength={8} required />
+            <PasswordInput value={newPassword} onChange={(e) => setNewPassword(e.target.value)} minLength={8} required />
           </div>
         </div>
         <button className="btn" type="submit" disabled={saving}>{saving ? 'Saving…' : 'Change Password'}</button>
@@ -186,7 +303,7 @@ function MfaCard({ mfaEnabled, setMfaEnabled, toast }) {
             </p>
             <div className="field">
               <label>Current password</label>
-              <input type="password" value={disablePassword} onChange={(e) => setDisablePassword(e.target.value)} required autoFocus />
+              <PasswordInput value={disablePassword} onChange={(e) => setDisablePassword(e.target.value)} required autoFocus />
             </div>
             <button className="btn btn-danger" type="submit" disabled={busy} style={{ width: '100%', justifyContent: 'center' }}>
               {busy ? 'Disabling…' : 'Disable MFA'}

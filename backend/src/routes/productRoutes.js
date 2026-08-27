@@ -12,6 +12,10 @@ const writeRules = [
   body('manufacturer_id').optional().isInt({ min: 1 }).withMessage('manufacturer_id must be a valid id.'),
   body('price').optional().isFloat({ min: 0, max: 100000000 }).withMessage('Price must be a non-negative number.'),
   body('size_packaging').optional({ nullable: true }).trim().isLength({ max: 100 }),
+  body('retail_price')
+  .optional()
+  .isFloat({ min: 0, max: 100000000 })
+  .withMessage('Retail price must be a non-negative number.'),
 ];
 
 router.get('/', controller.list);

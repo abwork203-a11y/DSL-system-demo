@@ -1,9 +1,11 @@
 import { useEffect, useState, useCallback } from 'react';
+import { Plus, Pencil, Trash2 } from 'lucide-react';
 import { usersApi } from '../api/endpoints';
 import { apiErrorMessage } from '../api/client';
 import { useAuth } from '../context/AuthContext';
 import { useToast } from '../context/ToastContext';
 import Modal from '../components/Modal';
+import PasswordInput from '../components/PasswordInput';
 import { TableSkeleton } from '../components/Skeleton';
 
 const EMPTY_FORM = { name: '', email: '', password: '', role: 'sales_rep', assigned_zone: '' };
@@ -87,7 +89,7 @@ export default function UsersPage() {
           <h1>Sales Reps &amp; Admins</h1>
           <p>{rows.length} accounts</p>
         </div>
-        <button className="btn" onClick={openNew}>+ Add Account</button>
+        <button className="btn" onClick={openNew}><Plus size={16} /> Add Account</button>
       </div>
 
       <div className="card">
@@ -108,12 +110,12 @@ export default function UsersPage() {
                     <td>{u.assigned_zone || '—'}</td>
                     <td>{u.is_active ? <span className="badge badge-green">active</span> : <span className="badge badge-neutral">inactive</span>}</td>
                     <td style={{ display: 'flex', gap: 6, justifyContent: 'flex-end' }}>
-                      <button className="btn btn-secondary btn-sm" onClick={() => openEdit(u)}>Edit</button>
+                      <button className="btn btn-secondary btn-sm" onClick={() => openEdit(u)}><Pencil size={14} /> Edit</button>
                       <button className="btn btn-secondary btn-sm" onClick={() => toggleActive(u)}>
                         {u.is_active ? 'Deactivate' : 'Reactivate'}
                       </button>
                       {u.id !== currentUser.id && (
-                        <button className="btn btn-danger btn-sm" onClick={() => handleDelete(u)}>Delete</button>
+                        <button className="btn btn-danger btn-sm" onClick={() => handleDelete(u)}><Trash2 size={14} /> Delete</button>
                       )}
                     </td>
                   </tr>
@@ -138,7 +140,7 @@ export default function UsersPage() {
             </div>
             <div className="field">
               <label>{editing.id ? 'New Password (leave blank to keep current)' : 'Password'}</label>
-              <input type="password" value={form.password} onChange={(e) => setForm({ ...form, password: e.target.value })} required={!editing.id} />
+              <PasswordInput value={form.password} onChange={(e) => setForm({ ...form, password: e.target.value })} required={!editing.id} />
             </div>
             <div className="field-row">
               <div className="field">

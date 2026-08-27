@@ -1,4 +1,5 @@
 import { useEffect, useState, useCallback } from 'react';
+import { Plus, Pencil, Trash2 } from 'lucide-react';
 import { manufacturers as mfgApi } from '../api/endpoints';
 import { apiErrorMessage } from '../api/client';
 import { useToast } from '../context/ToastContext';
@@ -75,7 +76,7 @@ export default function ManufacturersPage() {
           <h1>Manufacturers</h1>
           <p>{rows.length} total</p>
         </div>
-        <button className="btn" onClick={openNew}>+ Add Manufacturer</button>
+        <button className="btn" onClick={openNew}><Plus size={16} /> Add Manufacturer</button>
       </div>
 
       <div className="card">
@@ -104,8 +105,8 @@ export default function ManufacturersPage() {
                     <td className="num">{money(m.balance)}</td>
                     <td>{m.is_active ? <span className="badge badge-green">active</span> : <span className="badge badge-neutral">inactive</span>}</td>
                     <td style={{ display: 'flex', gap: 6, justifyContent: 'flex-end' }}>
-                      <button className="btn btn-secondary btn-sm" onClick={() => openEdit(m)}>Edit</button>
-                      <button className="btn btn-danger btn-sm" onClick={() => handleDelete(m)}>Delete</button>
+                      <button className="btn btn-secondary btn-sm" onClick={() => openEdit(m)}><Pencil size={14} /> Edit</button>
+                      <button className="btn btn-danger btn-sm" onClick={() => handleDelete(m)}><Trash2 size={14} /> Delete</button>
                     </td>
                   </tr>
                 ))}
