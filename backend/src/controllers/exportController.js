@@ -112,7 +112,7 @@ const invoiceExcel = asyncHandler(async (req, res) => {
 
   sheet.addRow([]);
   sheet.addRow(['', '', '', '', 'Gross Value', grossValue]);
-  sheet.addRow(['', '', '', '', 'Discount', -discount]);
+  sheet.addRow(['', '', '', '', 'Discount', discount]);
   sheet.addRow(['', '', '', '', 'Freight', freight]);
   const totalRow = sheet.addRow(['', '', '', '', 'Net Value', netValue]);
   totalRow.font = { bold: true };
@@ -175,17 +175,18 @@ const invoicePdf = asyncHandler(async (req, res) => {
     doc.moveDown();
   });
 
-  const discount = computeDiscountAmount(order, grossValue);
+  const discountAmount = Number(order.discount) || 0;
+  const discountDisplay = discountAmount > 0 ? `-${discountAmount.toFixed(2)}` : discountAmount.toFixed(2);
+  
   const freight = Number(order.freight_cost) || 0;
   const netValue = Number(order.total);
 
   doc.moveDown();
-  doc.moveDown();
   doc.font('Helvetica-Bold');
-  doc.text(`Gross Value: ${grossValue.toFixed(2)}`, { align: 'left' });
-  doc.text(`Discount: -${discount.toFixed(2)}`, { align: 'left' });
-  doc.text(`Freight: ${freight.toFixed(2)}`, { align: 'left' });
-  doc.text(`Net Value: ${netValue.toFixed(2)}`, { align: 'left' });
+  doc.text(`Gross Value: ${grossValue.toFixed(2)}`, { align: 'right' });
+  doc.text(`Discount: ${discountDisplay}`, { align: 'right' });
+  doc.text(`Freight: ${freight.toFixed(2)}`, { align: 'right' });
+  doc.text(`Net Value: ${netValue.toFixed(2)}`, { align: 'right' });
 
   doc.end();
 });
