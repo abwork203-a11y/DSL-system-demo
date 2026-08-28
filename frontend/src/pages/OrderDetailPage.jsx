@@ -239,8 +239,8 @@ export default function OrderDetailPage() {
         </div>
         <div style={{ marginTop: 16, marginLeft: 'auto', width: 260, fontSize: 14, lineHeight: 1.9 }}>
           <div>Subtotal <span className="num" style={{ float: 'right' }}>{money(order.subtotal)}</span></div>
-          <div>Discount <span className="num" style={{ float: 'right' }}>−{money(order.discount)}</span></div>
-          <div>Freight <span className="num" style={{ float: 'right' }}>+{money(order.freight_cost)}</span></div>
+          <div>Discount <span className="num" style={{ float: 'right' }}>{money(order.discount)}</span></div>
+          <div>Freight <span className="num" style={{ float: 'right' }}>{money(order.freight_cost)}</span></div>
           <div style={{ borderTop: '1px solid var(--border)', paddingTop: 6, fontWeight: 600 }}>
             Total <span className="num" style={{ float: 'right' }}>{money(order.total)}</span>
           </div>
