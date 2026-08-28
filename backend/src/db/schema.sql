@@ -127,7 +127,7 @@ CREATE TABLE IF NOT EXISTS ledger (
   distributor_id    INTEGER NOT NULL REFERENCES distributors(id) ON DELETE RESTRICT,
   order_id          INTEGER REFERENCES orders(id) ON DELETE SET NULL,
   entry_date        TIMESTAMPTZ NOT NULL DEFAULT now(),
-  type              TEXT NOT NULL CHECK (type IN ('debit', 'credit')), -- debit = owes more (order), credit = payment received
+  type              TEXT NOT NULL CHECK (type IN ('Cash', 'credit')), -- debit = owes more (order), credit = payment received
   amount            NUMERIC(14,2) NOT NULL CHECK (amount > 0),
   running_balance   NUMERIC(14,2) NOT NULL,
   note              TEXT,
