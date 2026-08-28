@@ -181,10 +181,10 @@ const invoicePdf = asyncHandler(async (req, res) => {
 
   doc.moveDown();
   doc.font('Helvetica-Bold');
-  doc.text(`Gross Value: ${grossValue.toFixed(2)}`, { align: 'right' });
-  doc.text(`Discount: -${discount.toFixed(2)}`, { align: 'right' });
-  doc.text(`Freight: ${freight.toFixed(2)}`, { align: 'right' });
-  doc.text(`Net Value: ${netValue.toFixed(2)}`, { align: 'right' });
+  doc.text(`Gross Value: ${grossValue.toFixed(2)}`, { align: 'left' });
+  doc.text(`Discount: -${discount.toFixed(2)}`, { align: 'left' });
+  doc.text(`Freight: ${freight.toFixed(2)}`, { align: 'left' });
+  doc.text(`Net Value: ${netValue.toFixed(2)}`, { align: 'left' });
 
   doc.end();
 });
