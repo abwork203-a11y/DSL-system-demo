@@ -84,7 +84,6 @@ body {
   border-top: 1px solid rgba(255, 255, 255, 0.1);
   padding-top: 12px;
   margin-top: 12px;
-  display:flex;
 }
 .sidebar-user { padding: 6px 12px; font-size: 12.5px; color: var(--sidebar-muted); }
 .sidebar-user strong { color: var(--sidebar-ink); display: block; font-size: 13.5px; }
@@ -163,12 +162,25 @@ body {
 .site-footer {
   margin-top: auto;
   padding: 16px 28px;
-  text-align: center;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  flex-wrap: wrap;          /* stacks back to two centered lines on narrow screens */
   font-size: 12.5px;
   color: var(--ink-muted);
   border-top: 1px solid var(--rule);
 }
-.site-footer a { color: var(--ink-muted); text-decoration: underline; margin: 0 8px; }
+.site-footer > *:first-child {
+  text-align: left;
+}
+.site-footer nav,
+.site-footer > *:last-child {
+  display: flex;
+  gap: 16px;
+  margin: 0;
+}
+.site-footer a { color: var(--ink-muted); text-decoration: underline; }
 .site-footer a:hover { color: var(--green); }
 
 /* ── Hamburger menu (mobile) ────────────────────────────────
@@ -283,7 +295,7 @@ body {
 .btn-brass:hover { background: var(--brass-hover); }
 
 .btn-danger { background: var(--status-negative); }
-.btn-danger:hover { background: #8b2011; }
+.btn-danger:hover { background: #6E251C; }
 
 .btn-sm { padding: 5px 10px; font-size: 12.5px; }
 .btn-ghost { background: transparent; color: var(--ink-muted); border: none; }
@@ -486,6 +498,31 @@ table.data-table { width: 100%; border-collapse: collapse; font-size: 13.5px; ba
 }
 .stepper-item.active { border-color: var(--brass); color: var(--ink); }
 .stepper-item.done { border-color: var(--status-positive); color: var(--ink); }
+
+/* ── Hide the browser's native password-reveal "eye" icon.
+   Edge/Windows adds this automatically to any <input type="password">
+   — it's not something this app's own code renders, so it can only be
+   removed via this vendor-specific pseudo-element, not by editing JSX. */
+input[type='password']::-ms-reveal,
+input[type='password']::-ms-clear {
+  display: none;
+}
+
+/* ── Long list pages (Products, Distributors, etc.) —
+   caps table height and scrolls internally instead of growing
+   the whole page indefinitely. Add this class alongside .table-wrap. */
+.page-table-scroll {
+  max-height: 640px;
+  overflow-y: auto;
+  border: 1px solid var(--rule);
+  border-radius: var(--radius);
+}
+.page-table-scroll table.data-table thead th {
+  position: sticky;
+  top: 0;
+  z-index: 1;
+  background: var(--surface);
+}
 
 /* ── Order builder: inline editable quantity field ─────────
    Sits between the −/+ buttons — narrow, centered text, no
