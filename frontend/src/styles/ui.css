@@ -161,19 +161,14 @@ body {
    login page); it flows naturally below content when a page is long. */
 .site-footer {
   margin-top: auto;
-  padding: 14px 28px;
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  flex-wrap: wrap;
-  gap: 10px;
+  padding: 16px 28px;
+  text-align: center;
   font-size: 12.5px;
   color: var(--ink-muted);
   border-top: 1px solid var(--rule);
 }
-.site-footer-links { display: flex; gap: 16px; }
-.site-footer a { color: var(--ink-muted); font-weight: 500; text-decoration: none; }
-.site-footer a:hover { color: var(--ink); text-decoration: underline; }
+.site-footer a { color: var(--ink-muted); text-decoration: underline; margin: 0 8px; }
+.site-footer a:hover { color: var(--green); }
 
 /* ── Hamburger menu (mobile) ────────────────────────────────
    Hidden by default; only shown + wired up below 768px. */
@@ -198,9 +193,7 @@ body {
 
 @media (max-width: 768px) {
   .hamburger-btn { display: flex; }
-  .hamburger-btn.is-hidden {
-    display: none;
-  }
+
   .sidebar {
     position: fixed;
     left: 0;
@@ -210,7 +203,7 @@ body {
     transition: transform 0.2s ease;
   }
   .sidebar.sidebar-open { transform: translateX(0); }
-  
+
   /* Dims the page behind the sidebar when it's open on mobile —
      add this element in JSX only when sidebarOpen is true */
   .sidebar-scrim {
@@ -229,8 +222,8 @@ body {
   border: 1px solid var(--rule);
   border-radius: var(--radius);
   padding: 20px;
+  border-top: 2px solid var(--brass);
   box-shadow: var(--shadow-sm);
-
 }
 .card + .card { margin-top: 16px; }
 
@@ -243,12 +236,9 @@ body {
 .stat-card {
   background: var(--surface);
   border: 1px solid var(--rule);
-  border-left: 3px solid var(--blue);
   border-radius: var(--radius);
   padding: 16px 18px;
-  transition: box-shadow 0.15s;
 }
-.stat-card:hover { box-shadow: var(--shadow-sm); }
 .stat-label {
   font-size: 11.5px;
   color: var(--ink-muted);
@@ -332,10 +322,6 @@ input[data-currency],
 /* ── Table — ledger-ruled look ──────────────────────────── */
 .table-wrap {
   overflow-x: auto;
-  overflow-y: auto;
-  height: 100vh;
-
-
 }
 table.data-table { width: 100%; border-collapse: collapse; font-size: 13.5px; background: var(--surface); }
 .data-table th {
@@ -349,15 +335,12 @@ table.data-table { width: 100%; border-collapse: collapse; font-size: 13.5px; ba
   border-bottom: 2px solid var(--rule-strong);
   white-space: nowrap;
   background: var(--surface);
-  
-  
 }
 .data-table td {
   padding: 11px 12px;
   border-bottom: 1px solid var(--rule);
   vertical-align: middle;
 }
-.data-table tbody tr { transition: background 0.1s; }
 .data-table tbody tr:hover { background: var(--surface-sunken); }
 .data-table td.num,
 .data-table th.num {
@@ -393,7 +376,7 @@ table.data-table { width: 100%; border-collapse: collapse; font-size: 13.5px; ba
   font-weight: 700;
   text-transform: uppercase;
   letter-spacing: 0.06em;
- /* border: 1.5px solid currentColor;*/
+  border: 1.5px solid currentColor;
   background: transparent;
 }
 .badge-green  { color: var(--status-positive); background: var(--status-positive-bg); }
@@ -439,25 +422,14 @@ table.data-table { width: 100%; border-collapse: collapse; font-size: 13.5px; ba
   color: #fff;
   box-shadow: var(--shadow-md);
   cursor: pointer;
-  animation: toast-in 0.32s cubic-bezier(0.16, 1, 0.3, 1);
-}
-.toast.toast-leaving {
-  animation: toast-out 0.22s ease-in forwards;
+  animation: toast-in 0.18s ease-out;
 }
 .toast-success { background: var(--status-positive); }
 .toast-error { background: var(--status-negative); }
 .toast-info { background: var(--ink); }
 @keyframes toast-in {
-  from { opacity: 0; transform: translateY(10px) scale(0.94); }
-  to { opacity: 1; transform: translateY(0) scale(1); }
-}
-@keyframes toast-out {
-  from { opacity: 1; transform: translateY(0) scale(1); }
-  to { opacity: 0; transform: translateY(6px) scale(0.94); }
-}
-@media (prefers-reduced-motion: reduce) {
-  .toast { animation: none; }
-  .toast.toast-leaving { animation: none; }
+  from { opacity: 0; transform: translateY(6px); }
+  to { opacity: 1; transform: translateY(0); }
 }
 
 /* ── Skeleton loading ───────────────────────────────────── */
@@ -487,6 +459,7 @@ table.data-table { width: 100%; border-collapse: collapse; font-size: 13.5px; ba
 .modal {
   background: var(--surface);
   border-radius: 10px;
+  border-top: 3px solid var(--brass);
   padding: 24px;
   width: 100%;
   max-width: 560px;
@@ -512,6 +485,57 @@ table.data-table { width: 100%; border-collapse: collapse; font-size: 13.5px; ba
 }
 .stepper-item.active { border-color: var(--brass); color: var(--ink); }
 .stepper-item.done { border-color: var(--status-positive); color: var(--ink); }
+
+/* ── Order builder: divider between "search products" and
+   "added to order" ─────────────────────────────────────── */
+.order-builder-divider {
+  margin: 24px 0 14px;
+  padding-top: 18px;
+  border-top: 2px solid var(--rule-strong);
+}
+.order-builder-divider h3 {
+  font-size: 12.5px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--ink-muted);
+  margin: 0;
+}
+
+/* ── Order builder: fixed-height, scrollable added-products list ── */
+.added-products-list {
+  max-height: 320px;
+  overflow-y: auto;
+}
+.added-products-list table.data-table thead th {
+  position: sticky;
+  top: 0;
+  z-index: 1;
+  background: var(--surface);
+}
+
+/* ── Order builder: entrance animation for a newly added row ──
+   Fires automatically whenever a <tr className="added-product-row">
+   is newly mounted into the DOM — existing rows are untouched since
+   React reuses their DOM nodes by key. */
+@keyframes row-enter {
+  from {
+    opacity: 0;
+    transform: translateY(-6px);
+    background: var(--blue-light, var(--green-light));
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+    background: transparent;
+  }
+}
+.added-product-row {
+  animation: row-enter 0.35s ease-out;
+}
+@media (prefers-reduced-motion: reduce) {
+  .added-product-row { animation: none; }
+}
 
 /* ── Accessibility floor ────────────────────────────────── */
 a:focus-visible,

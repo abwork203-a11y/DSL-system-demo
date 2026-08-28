@@ -1,5 +1,6 @@
 import { useEffect, useState, useCallback } from 'react';
 import { Link } from 'react-router-dom';
+import { Plus, Pencil, Trash2 } from 'lucide-react';
 import { distributors as distributorsApi } from '../api/endpoints';
 import { apiErrorMessage } from '../api/client';
 import { useAuth } from '../context/AuthContext';
@@ -96,7 +97,7 @@ export default function DistributorsPage() {
           <h1>Distributors</h1>
           <p>{rows.length} total</p>
         </div>
-        <button className="btn" onClick={openNew}>+ Add Distributor</button>
+        <button className="btn" onClick={openNew}><Plus size={16} /> Add Distributor</button>
       </div>
 
       <div className="card">
@@ -134,11 +135,11 @@ export default function DistributorsPage() {
                     <td><StatusBadge value={d.status} /></td>
                     <td style={{ display: 'flex', gap: 6, justifyContent: 'flex-end' }}>
                       <Link to={`/ledger?distributor_id=${d.id}`} className="btn btn-secondary btn-sm" onClick={(e) => e.stopPropagation()}>Ledger</Link>
-                      <button className="btn btn-secondary btn-sm" onClick={(e) => { e.stopPropagation(); openEdit(d); }}>Edit</button>
+                      <button className="btn btn-secondary btn-sm" onClick={(e) => { e.stopPropagation(); openEdit(d); }}><Pencil size={14} /> Edit</button>
                       <button className="btn btn-secondary btn-sm" onClick={(e) => { e.stopPropagation(); toggleStatus(d); }}>
                         {d.status === 'active' ? 'Mark inactive' : 'Reactivate'}
                       </button>
-                      {isAdmin && <button className="btn btn-danger btn-sm" onClick={(e) => { e.stopPropagation(); handleDelete(d); }}>Delete</button>}
+                      {isAdmin && <button className="btn btn-danger btn-sm" onClick={(e) => { e.stopPropagation(); handleDelete(d); }}><Trash2 size={14} /> Delete</button>}
                     </td>
                   </tr>
                 ))}

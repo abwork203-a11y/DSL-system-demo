@@ -279,8 +279,12 @@ export default function CreateOrderPage() {
               </table>
             </div>
 
+            <div className="order-builder-divider">
+              <h3>Added to order ({items.length})</h3>
+            </div>
+
             {items.length > 0 ? (
-              <div className="table-wrap">
+              <div className="table-wrap added-products-list">
                 <table className="data-table">
                   <thead>
                     <tr>
@@ -294,7 +298,7 @@ export default function CreateOrderPage() {
                   </thead>
                   <tbody>
                     {items.map((it) => (
-                      <tr key={it.product_id}>
+                      <tr key={it.product_id} className="added-product-row">
                         <td>{it.name}{it.size_packaging ? <span style={{ color: 'var(--ink-muted)' }}> ({it.size_packaging})</span> : ''}</td>
                         <td>{it.manufacturer_name}</td>
                         <td className="num">{money(it.price)}</td>
