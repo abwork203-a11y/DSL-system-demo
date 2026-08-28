@@ -180,6 +180,7 @@ const invoicePdf = asyncHandler(async (req, res) => {
   const netValue = Number(order.total);
 
   doc.moveDown();
+  doc.moveDown();
   doc.font('Helvetica-Bold');
   doc.text(`Gross Value: ${grossValue.toFixed(2)}`, { align: 'left' });
   doc.text(`Discount: -${discount.toFixed(2)}`, { align: 'left' });
