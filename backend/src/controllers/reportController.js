@@ -11,6 +11,8 @@ const dashboardSummary = asyncHandler(async (req, res) => {
       SELECT COALESCE(SUM(total), 0) AS total, COUNT(*)::int AS order_count
       FROM orders
       WHERE date_trunc('month', order_date) = date_trunc('month', CURRENT_DATE)
+        AND order_status != 'cancelled'
+        AND payment_status != 'unpaid'
     `),
   ]);
 

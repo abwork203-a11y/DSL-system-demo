@@ -353,6 +353,7 @@ table.data-table { width: 100%; border-collapse: collapse; font-size: 13.5px; ba
   padding: 11px 12px;
   border-bottom: 1px solid var(--rule);
   vertical-align: middle;
+  overflow-y:auto;
 }
 .data-table tbody tr:hover { background: var(--surface-sunken); }
 .data-table td.num,

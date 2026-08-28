@@ -73,12 +73,14 @@ const invoiceExcel = asyncHandler(async (req, res) => {
 
   sheet.getCell('A3').value = 'Distributor:';
   sheet.getCell('B3').value = sanitizeCellValue(order.distributor_name);
-  sheet.getCell('A4').value = 'Date:';
-  sheet.getCell('B4').value = new Date(order.order_date).toLocaleDateString();
-  sheet.getCell('A5').value = 'Payment Term:';
-  sheet.getCell('B5').value = order.payment_term;
-  sheet.getCell('A6').value = 'Payment Status:';
-  sheet.getCell('B6').value = order.payment_status;
+  sheet.getCell('A4').value = 'City:';
+  sheet.getCell('B4').value = sanitizeCellValue(order.city || '—');
+  sheet.getCell('A5').value = 'Date:';
+  sheet.getCell('B5').value = new Date(order.order_date).toLocaleDateString();
+  sheet.getCell('A6').value = 'Payment Term:';
+  sheet.getCell('B6').value = order.payment_term;
+  sheet.getCell('A7').value = 'Payment Status:';
+  sheet.getCell('B7').value = order.payment_status;
 
   sheet.addRow([]);
   const headerRow = sheet.addRow(['Sr#', 'Product', 'Retail Price', 'Invoice Price', 'Qty', 'Value']);
@@ -140,6 +142,7 @@ const invoicePdf = asyncHandler(async (req, res) => {
   doc.moveDown();
   doc.fontSize(11)
     .text(`Distributor: ${order.distributor_name}`)
+    .text(`City: ${order.city || '—'}`)
     .text(`Date: ${new Date(order.order_date).toLocaleDateString()}`)
     .text(`Payment Term: ${order.payment_term}`)
     .text(`Payment Status: ${order.payment_status}`);
@@ -175,18 +178,35 @@ const invoicePdf = asyncHandler(async (req, res) => {
     doc.moveDown();
   });
 
-  const discountAmount = Number(order.discount) || 0;
-  const discountDisplay = discountAmount > 0 ? `-${discountAmount.toFixed(2)}` : discountAmount.toFixed(2);
-  
+  const discount = computeDiscountAmount(order, grossValue);
   const freight = Number(order.freight_cost) || 0;
   const netValue = Number(order.total);
 
+  // Explicit x/y for both the label and the value on every summary line —
+  // deliberately not relying on PDFKit's internal text cursor (which the
+  // item loop above left at an arbitrary x position) or on { align: 'right' }
+  // without a bounded width (which right-aligns against whatever width
+  // happens to be left on the current line, wrapping long label+value
+  // strings onto two lines when that's narrow). Passing the same explicit y
+  // to both calls guarantees the label and its value always sit side by
+  // side on one line, regardless of string length.
+  const summaryLabelX = 370;
+  const summaryValueX = 470;
+  const summaryValueWidth = 92; // 470 + 92 = 562 = the page's right content edge (612 - 50 margin)
+
   doc.moveDown();
-  doc.font('Helvetica-Bold');
-  doc.text(`Gross Value: ${grossValue.toFixed(2)}`, { align: 'right' });
-  doc.text(`Discount: ${discountDisplay}`, { align: 'right' });
-  doc.text(`Freight: ${freight.toFixed(2)}`, { align: 'right' });
-  doc.text(`Net Value: ${netValue.toFixed(2)}`, { align: 'right' });
+  doc.font('Helvetica-Bold').fontSize(10);
+  [
+    ['Gross Value:', grossValue],
+    ['Discount:', discount],
+    ['Freight:', freight],
+    ['Net Value:', netValue],
+  ].forEach(([label, value]) => {
+    const y = doc.y;
+    doc.text(label, summaryLabelX, y);
+    doc.text(value.toFixed(2), summaryValueX, y, { width: summaryValueWidth, align: 'right' });
+    doc.moveDown(0.6);
+  });
 
   doc.end();
 });
@@ -261,8 +281,10 @@ const exportLedger = asyncHandler(async (req, res) => {
     where = `WHERE l.distributor_id = $${params.length}`;
   }
   const result = await pool.query(
-    `SELECT d.name AS distributor, l.entry_date, l.type, l.amount, l.running_balance, l.note
-     FROM ledger l JOIN distributors d ON d.id = l.distributor_id
+    `SELECT d.name AS distributor, l.entry_date, l.type, l.amount, l.running_balance, l.note, o.payment_term
+     FROM ledger l
+     JOIN distributors d ON d.id = l.distributor_id
+     LEFT JOIN orders o ON o.id = l.order_id
      ${where}
      ORDER BY l.entry_date ASC`,
     params
@@ -271,6 +293,7 @@ const exportLedger = asyncHandler(async (req, res) => {
   const rows = result.rows.map((entry) => ({
     distributor: entry.distributor,
     entry_date: new Date(entry.entry_date).toLocaleDateString(),
+    payment_term: entry.payment_term || '',
     type: entry.type,
     debit: entry.type === 'debit' ? Number(entry.amount) : '',
     credit: entry.type === 'credit' ? Number(entry.amount) : '',
@@ -281,6 +304,7 @@ const exportLedger = asyncHandler(async (req, res) => {
   await sendExcel(res, 'ledger.xlsx', [
     { header: 'Distributor', key: 'distributor' },
     { header: 'Date', key: 'entry_date' },
+    { header: 'Payment Term', key: 'payment_term' },
     { header: 'Type', key: 'type' },
     { header: 'Debit', key: 'debit' },
     { header: 'Credit', key: 'credit' },
@@ -320,8 +344,9 @@ const exportDistributorLedger = asyncHandler(async (req, res) => {
   }
 
   const entriesResult = await pool.query(
-    `SELECT l.entry_date, l.type, l.amount, l.running_balance, l.note
+    `SELECT l.entry_date, l.type, l.amount, l.running_balance, l.note, o.payment_term
      FROM ledger l
+     LEFT JOIN orders o ON o.id = l.order_id
      WHERE l.distributor_id = $1 ${dateWhere}
      ORDER BY l.entry_date ASC`,
     params
@@ -331,15 +356,15 @@ const exportDistributorLedger = asyncHandler(async (req, res) => {
   const workbook = new ExcelJS.Workbook();
   const sheet = workbook.addWorksheet('Customer Ledger');
 
-  sheet.mergeCells('A1:F1');
+  sheet.mergeCells('A1:G1');
   sheet.getCell('A1').value = 'Customer Ledger';
   sheet.getCell('A1').font = { size: 16, bold: true };
 
-  sheet.mergeCells('A2:F2');
+  sheet.mergeCells('A2:G2');
   sheet.getCell('A2').value = sanitizeCellValue(distributor.name);
   sheet.getCell('A2').font = { size: 12, bold: true };
 
-  sheet.mergeCells('A3:F3');
+  sheet.mergeCells('A3:G3');
   if (start_date && end_date) {
     sheet.getCell('A3').value = `From ${start_date} to ${end_date}`;
   } else if (start_date) {
@@ -351,7 +376,7 @@ const exportDistributorLedger = asyncHandler(async (req, res) => {
   }
 
   sheet.addRow([]);
-  const headerRow = sheet.addRow(['Date', 'Description', 'Debit', 'Credit', 'Balance', 'Remarks']);
+  const headerRow = sheet.addRow(['Date', 'Description', 'Payment Term', 'Debit', 'Credit', 'Balance', 'Remarks']);
   headerRow.font = { bold: true };
 
   let totalDebit = 0;
@@ -370,6 +395,7 @@ const exportDistributorLedger = asyncHandler(async (req, res) => {
     sheet.addRow(sanitizeRow([
       new Date(entry.entry_date).toLocaleDateString(),
       entry.note,
+      entry.payment_term || '',
       isDebit ? amount : '',
       isDebit ? '' : amount,
       runningBalance,
@@ -378,7 +404,7 @@ const exportDistributorLedger = asyncHandler(async (req, res) => {
   });
 
   const finalRemarks = lastBalance > 0 ? 'Dr' : lastBalance < 0 ? 'Cr' : '';
-  const totalRow = sheet.addRow(['Total', '', totalDebit, totalCredit, lastBalance, finalRemarks]);
+  const totalRow = sheet.addRow(['Total', '', '', totalDebit, totalCredit, lastBalance, finalRemarks]);
   totalRow.font = { bold: true };
 
   sheet.columns.forEach((col) => { col.width = 20; });

@@ -1,5 +1,6 @@
-import { useEffect, useState, useCallback } from 'react';
+import { useEffect, useState, useCallback, useRef } from 'react';
 import { useSearchParams } from 'react-router-dom';
+import { Loader2 } from 'lucide-react';
 import { ledger as ledgerApi, distributors as distributorsApi, exportApi } from '../api/endpoints';
 import { apiErrorMessage, downloadFile } from '../api/client';
 import { useAuth } from '../context/AuthContext';
@@ -27,6 +28,8 @@ export default function LedgerPage() {
   const [distributor, setDistributor] = useState(null);
   const [loading, setLoading] = useState(true);
   const [downloading, setDownloading] = useState(false);
+  const [downloadProgress, setDownloadProgress] = useState(null);
+  const downloadingRef = useRef(false);
 
   useEffect(() => { distributorsApi.list().then((res) => setDistributorsList(res.data)).catch(() => {}); }, []);
 
@@ -64,14 +67,26 @@ export default function LedgerPage() {
   };
 
   const handleExport = async () => {
+    if (downloadingRef.current) return; // guard against a fast double-click starting two downloads
+    downloadingRef.current = true;
     setDownloading(true);
+    setDownloadProgress(null);
     try {
-      await downloadFile(exportApi.ledgerUrl(distributorId || undefined), 'ledger.xlsx');
+      if (distributorId) {
+        // The per-distributor "Customer Ledger" statement (header block +
+        // Dr/Cr remarks) is a nicer format than the flat bulk export below —
+        // use it whenever we're already filtered down to one distributor.
+        await downloadFile(exportApi.distributorLedgerUrl(distributorId), `ledger-${distributor?.name || distributorId}.xlsx`, setDownloadProgress);
+      } else {
+        await downloadFile(exportApi.ledgerUrl(), 'ledger.xlsx', setDownloadProgress);
+      }
       toast.success('Ledger exported.');
     } catch (err) {
       toast.error(apiErrorMessage(err));
     } finally {
+      downloadingRef.current = false;
       setDownloading(false);
+      setDownloadProgress(null);
     }
   };
 
@@ -83,9 +98,22 @@ export default function LedgerPage() {
           <p>{distributor ? `${distributor.name} — running balance` : `All distributors${pagination ? ` · ${pagination.total} entries` : ''}`}</p>
         </div>
         {isAdmin && (
-          <button className="btn btn-secondary" disabled={downloading} onClick={handleExport}>
-            {downloading ? 'Preparing…' : 'Export Excel'}
-          </button>
+          <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 6 }}>
+            <button className="btn btn-secondary" disabled={downloading} onClick={handleExport}>
+              {downloading && <Loader2 size={16} className="spin" />}
+              {downloading ? 'Downloading…' : 'Export Excel'}
+            </button>
+            {downloading && (
+              <div style={{ width: 180 }}>
+                <div className="progress-track">
+                  <div
+                    className={`progress-fill${downloadProgress == null ? ' indeterminate' : ''}`}
+                    style={downloadProgress != null ? { width: `${downloadProgress}%` } : undefined}
+                  />
+                </div>
+              </div>
+            )}
+          </div>
         )}
       </div>
 
@@ -107,7 +135,7 @@ export default function LedgerPage() {
 
       <div className="card">
         {loading ? (
-          <TableSkeleton columns={distributor ? 6 : 7} rows={6} />
+          <TableSkeleton columns={distributor ? 7 : 8} rows={6} />
         ) : (
           <div className="table-wrap">
             <table className="data-table">
@@ -116,6 +144,7 @@ export default function LedgerPage() {
                   {!distributor && <th>Distributor</th>}
                   <th>Date</th>
                   <th>Order</th>
+                  <th>Payment Term</th>
                   <th>Type</th>
                   <th className="num">Amount</th>
                   <th className="num">Running Balance</th>
@@ -128,6 +157,7 @@ export default function LedgerPage() {
                     {!distributor && <td>{e.distributor_name}</td>}
                     <td>{new Date(e.entry_date).toLocaleDateString()}</td>
                     <td>{e.order_number || '—'}</td>
+                    <td style={{ textTransform: 'capitalize' }}>{e.payment_term || '—'}</td>
                     <td><StatusBadge value={e.type} /></td>
                     <td className="num">{e.type === 'debit' ? '+' : '−'}{money(e.amount)}</td>
                     <td className="num">{money(e.running_balance)}</td>
@@ -135,7 +165,7 @@ export default function LedgerPage() {
                   </tr>
                 ))}
                 {entries.length === 0 && (
-                  <tr><td colSpan={distributor ? 6 : 7}><div className="empty-state">No ledger entries yet.</div></td></tr>
+                  <tr><td colSpan={distributor ? 7 : 8}><div className="empty-state">No ledger entries yet.</div></td></tr>
                 )}
               </tbody>
             </table>

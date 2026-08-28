@@ -32,7 +32,7 @@ const list = asyncHandler(async (req, res) => {
 
   const dataParams = [...params, pageSize, offset];
   const result = await pool.query(
-    `SELECT l.*, d.name AS distributor_name, o.order_number
+    `SELECT l.*, d.name AS distributor_name, o.order_number, o.payment_term
      FROM ledger l
      JOIN distributors d ON d.id = l.distributor_id
      LEFT JOIN orders o ON o.id = l.order_id
@@ -55,7 +55,7 @@ const distributorSummary = asyncHandler(async (req, res) => {
   if (distResult.rows.length === 0) throw new ApiError(404, 'Distributor not found.');
 
   const entriesResult = await pool.query(
-    `SELECT l.*, o.order_number
+    `SELECT l.*, o.order_number, o.payment_term
      FROM ledger l
      LEFT JOIN orders o ON o.id = l.order_id
      WHERE l.distributor_id = $1

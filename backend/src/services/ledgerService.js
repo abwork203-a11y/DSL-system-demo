@@ -121,9 +121,16 @@ async function createOrderWithLedger(client, {
   // 'fixed' is unchanged existing behavior — the number IS the dollar amount.
   // 'percentage' means `discount` is e.g. 10 for "10%", not $10 — so it has
   // to be validated as a 0-100 range and converted against the subtotal.
+  // The route-level validator already rejects a negative `discount` for
+  // normal API traffic, but this service function is the actual source of
+  // truth — checking again here means a negative discount can never be
+  // stored regardless of what calls this function.
+  if (Number(discount) < 0) {
+    throw new ApiError(400, 'Discount cannot be negative.');
+  }
   let discountAmount;
   if (discountType === 'percentage') {
-    if (Number(discount) < 0 || Number(discount) > 100) {
+    if (Number(discount) > 100) {
       throw new ApiError(400, 'Percentage discount must be between 0 and 100.');
     }
     discountAmount = Number((subtotal * (Number(discount) / 100)).toFixed(2));
