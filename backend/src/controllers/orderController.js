@@ -1,7 +1,7 @@
 const { pool } = require('../config/db');
 const { asyncHandler } = require('../utils/asyncHandler');
 const { ApiError } = require('../utils/ApiError');
-const { createOrderWithLedger, recordPayment } = require('../services/ledgerService');
+const { createOrderWithLedger, recordPayment, cancelOrder, deleteOrder } = require('../services/ledgerService');
 const { recordAudit } = require('../utils/audit');
 const { parsePagination, paginatedResponse } = require('../utils/pagination');
 const { invalidatePrefix } = require('../utils/cache');
@@ -86,7 +86,7 @@ const getOne = asyncHandler(async (req, res) => {
 });
 
 const create = asyncHandler(async (req, res) => {
-  const { distributor_id, items, discount, freight_cost, payment_term, payment_status, amount_paid, notes } = req.body;
+  const { distributor_id, items, discount, discount_type, freight_cost, payment_term, payment_status, amount_paid, notes } = req.body;
   if (!distributor_id) throw new ApiError(400, 'distributor_id is required.');
 
   const client = await pool.connect();
@@ -97,6 +97,7 @@ const create = asyncHandler(async (req, res) => {
       createdBy: req.user.id,
       items,
       discount,
+      discountType: discount_type || 'fixed',
       freightCost: freight_cost,
       paymentTerm: payment_term,
       paymentStatus: payment_status,
@@ -172,4 +173,49 @@ const pay = asyncHandler(async (req, res) => {
   }
 });
 
-module.exports = { list, getOne, create, updateStatus, pay };
+const cancel = asyncHandler(async (req, res) => {
+  const { id } = req.params;
+
+  const client = await pool.connect();
+  try {
+    await client.query('BEGIN');
+    const order = await cancelOrder(client, { orderId: id, userId: req.user.id });
+    await client.query('COMMIT');
+
+    invalidatePrefix('route:/api/reports'); // outstanding-receivables figure just changed
+
+    const io = req.app.get('io');
+    if (io) io.emit('order:cancelled', { orderId: Number(id) });
+
+    res.json(order);
+  } catch (err) {
+    await client.query('ROLLBACK');
+    throw err;
+  } finally {
+    client.release();
+  }
+});
+
+const remove = asyncHandler(async (req, res) => {
+  const { id } = req.params;
+
+  const client = await pool.connect();
+  try {
+    await client.query('BEGIN');
+    await deleteOrder(client, { orderId: id, userId: req.user.id });
+    await client.query('COMMIT');
+
+    invalidatePrefix('route:/api/reports');
+
+    res.status(204).end();
+  } catch (err) {
+    await client.query('ROLLBACK');
+    throw err; // includes the 409 "unsafe to delete" case — the existing
+               // error-handling middleware already turns ApiError into the
+               // right status code, no special handling needed here
+  } finally {
+    client.release();
+  }
+});
+
+module.exports = { list, getOne, create, updateStatus, pay, cancel, remove };

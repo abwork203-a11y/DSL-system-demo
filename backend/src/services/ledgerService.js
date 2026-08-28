@@ -58,6 +58,7 @@ async function createOrderWithLedger(client, {
   createdBy,
   items,
   discount = 0,
+  discountType = 'fixed',
   freightCost = 0,
   paymentTerm,
   paymentStatus = 'unpaid',
@@ -69,6 +70,9 @@ async function createOrderWithLedger(client, {
   }
   if (!['cash', 'credit'].includes(paymentTerm)) {
     throw new ApiError(400, `Invalid payment term: ${paymentTerm}`);
+  }
+  if (!['fixed', 'percentage'].includes(discountType)) {
+    throw new ApiError(400, `Invalid discount_type: ${discountType}`);
   }
 
   // Lock + validate distributor
@@ -83,7 +87,7 @@ async function createOrderWithLedger(client, {
   // Resolve product prices + manufacturers as of right now (snapshotted onto order_items)
   const productIds = items.map((i) => i.product_id);
   const productResult = await client.query(
-    `SELECT id, manufacturer_id, price, is_active FROM products WHERE id = ANY($1::int[])`,
+    `SELECT id, manufacturer_id, price, retail_price, is_active FROM products WHERE id = ANY($1::int[])`,
     [productIds]
   );
   const productMap = new Map(productResult.rows.map((p) => [p.id, p]));
@@ -107,11 +111,27 @@ async function createOrderWithLedger(client, {
       manufacturer_id: product.manufacturer_id,
       quantity: item.quantity,
       price_at_time_of_order: product.price,
+      retail_price_at_time_of_order: product.retail_price,
     };
   });
 
   subtotal = Number(subtotal.toFixed(2));
-  const total = Number((subtotal - Number(discount) + Number(freightCost)).toFixed(2));
+
+  // Turn the raw `discount` value into an actual dollar amount to subtract.
+  // 'fixed' is unchanged existing behavior — the number IS the dollar amount.
+  // 'percentage' means `discount` is e.g. 10 for "10%", not $10 — so it has
+  // to be validated as a 0-100 range and converted against the subtotal.
+  let discountAmount;
+  if (discountType === 'percentage') {
+    if (Number(discount) < 0 || Number(discount) > 100) {
+      throw new ApiError(400, 'Percentage discount must be between 0 and 100.');
+    }
+    discountAmount = Number((subtotal * (Number(discount) / 100)).toFixed(2));
+  } else {
+    discountAmount = Number(discount);
+  }
+
+  const total = Number((subtotal - discountAmount + Number(freightCost)).toFixed(2));
   if (total < 0) {
     throw new ApiError(400, 'Discount cannot exceed subtotal + freight.');
   }
@@ -127,11 +147,11 @@ async function createOrderWithLedger(client, {
 
   const orderInsert = await client.query(
     `INSERT INTO orders
-       (order_number, distributor_id, created_by, subtotal, discount, freight_cost, total,
+       (order_number, distributor_id, created_by, subtotal, discount, discount_type, freight_cost, total,
         payment_term, payment_status, amount_paid, order_status, notes)
-     VALUES ('PENDING', $1, $2, $3, $4, $5, $6, $7, $8, $9, 'pending', $10)
+     VALUES ('PENDING', $1, $2, $3, $4, $5, $6, $7, $8, $9, $10, 'pending', $11)
      RETURNING *`,
-    [distributorId, createdBy, subtotal, discount, freightCost, total, paymentTerm, resolvedPaymentStatus, amountPaid, notes]
+    [distributorId, createdBy, subtotal, discount, discountType, freightCost, total, paymentTerm, resolvedPaymentStatus, amountPaid, notes]
   );
   const order = orderInsert.rows[0];
 
@@ -141,9 +161,9 @@ async function createOrderWithLedger(client, {
 
   for (const item of resolvedItems) {
     await client.query(
-      `INSERT INTO order_items (order_id, product_id, manufacturer_id, quantity, price_at_time_of_order)
-       VALUES ($1, $2, $3, $4, $5)`,
-      [order.id, item.product_id, item.manufacturer_id, item.quantity, item.price_at_time_of_order]
+      `INSERT INTO order_items (order_id, product_id, manufacturer_id, quantity, price_at_time_of_order, retail_price_at_time_of_order)
+       VALUES ($1, $2, $3, $4, $5, $6)`,
+      [order.id, item.product_id, item.manufacturer_id, item.quantity, item.price_at_time_of_order, item.retail_price_at_time_of_order]
     );
   }
 
@@ -231,4 +251,117 @@ async function recordPayment(client, { orderId, amount, note = null, userId = nu
   return { order: { ...order, amount_paid: newAmountPaid, payment_status: newStatus }, ledgerEntry: entry };
 }
 
-module.exports = { postLedgerEntry, createOrderWithLedger, recordPayment };
+/**
+ * Cancels an order WITHOUT deleting any history. If the order still has a net
+ * outstanding balance (total - amount_paid), posts an offsetting credit so the
+ * distributor's balance goes back to what it was before this order existed —
+ * this is the append-only-safe way to "undo" an order's effect on the ledger.
+ */
+async function cancelOrder(client, { orderId, userId }) {
+  const orderResult = await client.query('SELECT * FROM orders WHERE id = $1 FOR UPDATE', [orderId]);
+  if (orderResult.rows.length === 0) {
+    throw new ApiError(404, `Order ${orderId} not found.`);
+  }
+  const order = orderResult.rows[0];
+
+  if (order.order_status === 'cancelled') {
+    throw new ApiError(400, 'This order is already cancelled.');
+  }
+
+  const netOutstanding = Number((Number(order.total) - Number(order.amount_paid)).toFixed(2));
+  if (netOutstanding > 0) {
+    await postLedgerEntry(client, {
+      distributorId: order.distributor_id,
+      orderId: order.id,
+      type: 'credit',
+      amount: netOutstanding,
+      note: `Cancellation reversal for ${order.order_number}`,
+      userId,
+    });
+  }
+
+  const updateResult = await client.query(
+    `UPDATE orders SET order_status = 'cancelled' WHERE id = $1 RETURNING *`,
+    [orderId]
+  );
+
+  await recordAudit(client, {
+    userId,
+    action: 'CANCEL',
+    entityType: 'order',
+    entityId: orderId,
+    before: { order_status: order.order_status },
+    after: { order_status: 'cancelled' },
+  });
+
+  return updateResult.rows[0];
+}
+
+/**
+ * A hard delete — actually removes the order and its ledger entries, rather
+ * than just marking it cancelled. Only ever safe if NOTHING has happened to
+ * this distributor's ledger since this order's entries were posted, because
+ * every later ledger row's stored running_balance was computed assuming this
+ * order's entries came before it. Deleting out from under that would leave
+ * every later running_balance silently wrong.
+ */
+async function deleteOrder(client, { orderId, userId }) {
+  const orderResult = await client.query('SELECT * FROM orders WHERE id = $1 FOR UPDATE', [orderId]);
+  if (orderResult.rows.length === 0) {
+    throw new ApiError(404, `Order ${orderId} not found.`);
+  }
+  const order = orderResult.rows[0];
+
+  // Lock the distributor row too — we're about to directly overwrite its
+  // balance, so no concurrent order/payment for this distributor should be
+  // able to interleave with this delete.
+  await client.query('SELECT id FROM distributors WHERE id = $1 FOR UPDATE', [order.distributor_id]);
+
+  const ledgerEntries = await client.query('SELECT * FROM ledger WHERE order_id = $1', [orderId]);
+
+  if (ledgerEntries.rows.length > 0) {
+    const highestOwnEntryId = Math.max(...ledgerEntries.rows.map((r) => r.id));
+    const newerActivity = await client.query(
+      'SELECT id FROM ledger WHERE distributor_id = $1 AND id > $2 LIMIT 1',
+      [order.distributor_id, highestOwnEntryId]
+    );
+    if (newerActivity.rows.length > 0) {
+      throw new ApiError(
+        409,
+        "This order can't be safely deleted because the distributor has newer ledger activity since it — deleting it now would corrupt their running balance history. Use Cancel instead, which is always safe."
+      );
+    }
+  }
+
+  // Safe to proceed: unwind this order's exact net effect on the balance,
+  // then remove its ledger trail and the order itself.
+  const netEffect = ledgerEntries.rows.reduce((sum, entry) => {
+    const amount = Number(entry.amount);
+    return sum + (entry.type === 'debit' ? amount : -amount);
+  }, 0);
+
+  if (netEffect !== 0) {
+    const distResult = await client.query('SELECT balance FROM distributors WHERE id = $1', [order.distributor_id]);
+    const newBalance = Number((Number(distResult.rows[0].balance) - netEffect).toFixed(2));
+    await client.query('UPDATE distributors SET balance = $1 WHERE id = $2', [newBalance, order.distributor_id]);
+  }
+
+  await client.query('DELETE FROM ledger WHERE order_id = $1', [orderId]);
+
+  await recordAudit(client, {
+    userId,
+    action: 'DELETE',
+    entityType: 'order',
+    entityId: orderId,
+    before: order,
+  });
+
+  // order_items rows are removed automatically via ON DELETE CASCADE on
+  // order_items.order_id — confirm this exists in schema.sql before relying
+  // on it; if it doesn't, order_items must be deleted explicitly here first.
+  await client.query('DELETE FROM orders WHERE id = $1', [orderId]);
+
+  return { deleted: true, orderId };
+}
+
+module.exports = { postLedgerEntry, createOrderWithLedger, recordPayment, cancelOrder, deleteOrder };
