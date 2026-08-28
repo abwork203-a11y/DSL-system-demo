@@ -312,7 +312,19 @@ export default function CreateOrderPage() {
                             >
                               <Minus size={14} />
                             </button>
-                            <span style={{ minWidth: 24, textAlign: 'center', display: 'inline-block' }}>{it.quantity}</span>
+                            <input
+                              type="number"
+                              min="1"
+                              className="qty-input"
+                              key={`qty-${it.product_id}-${it.quantity}`}
+                              defaultValue={it.quantity}
+                              aria-label={`Quantity for ${it.name}`}
+                              onFocus={(e) => e.target.select()}
+                              onBlur={(e) => updateQty(it.product_id, Number(e.target.value) || 0)}
+                              onKeyDown={(e) => {
+                                if (e.key === 'Enter') e.target.blur();
+                              }}
+                            />
                             <button
                               type="button"
                               className="btn btn-secondary btn-sm"

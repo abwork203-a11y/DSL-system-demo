@@ -84,6 +84,7 @@ body {
   border-top: 1px solid rgba(255, 255, 255, 0.1);
   padding-top: 12px;
   margin-top: 12px;
+  display:flex;
 }
 .sidebar-user { padding: 6px 12px; font-size: 12.5px; color: var(--sidebar-muted); }
 .sidebar-user strong { color: var(--sidebar-ink); display: block; font-size: 13.5px; }
@@ -282,7 +283,7 @@ body {
 .btn-brass:hover { background: var(--brass-hover); }
 
 .btn-danger { background: var(--status-negative); }
-.btn-danger:hover { background: #6E251C; }
+.btn-danger:hover { background: #8b2011; }
 
 .btn-sm { padding: 5px 10px; font-size: 12.5px; }
 .btn-ghost { background: transparent; color: var(--ink-muted); border: none; }
@@ -485,6 +486,38 @@ table.data-table { width: 100%; border-collapse: collapse; font-size: 13.5px; ba
 }
 .stepper-item.active { border-color: var(--brass); color: var(--ink); }
 .stepper-item.done { border-color: var(--status-positive); color: var(--ink); }
+
+/* ── Order builder: inline editable quantity field ─────────
+   Sits between the −/+ buttons — narrow, centered text, no
+   spinner arrows (those are handled by the +/- buttons instead). */
+.qty-input {
+  width: 44px;
+  text-align: center;
+  padding: 5px 4px;
+  border: 1px solid var(--rule);
+  border-radius: var(--radius-sm);
+  font-family: var(--font-mono);
+  font-variant-numeric: tabular-nums;
+  font-size: 13.5px;
+  background: var(--surface);
+  color: var(--ink);
+}
+.qty-input:focus {
+  border-color: var(--brass);
+  outline: 2px solid rgba(150, 116, 42, 0.25);
+  outline-offset: 0;
+}
+/* Hide the native up/down spinner arrows — the app already has
+   dedicated −/+ buttons right next to this field, so the browser's
+   built-in ones would just be redundant clutter. */
+.qty-input::-webkit-outer-spin-button,
+.qty-input::-webkit-inner-spin-button {
+  -webkit-appearance: none;
+  margin: 0;
+}
+.qty-input[type='number'] {
+  -moz-appearance: textfield;
+}
 
 /* ── Order builder: divider between "search products" and
    "added to order" ─────────────────────────────────────── */
