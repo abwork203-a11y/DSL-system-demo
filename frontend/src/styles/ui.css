@@ -1,3 +1,1887 @@
+/* ═══════════════════════════════════════════════════════════════
+   LEDGERONE — UI STYLES
+   Import tokens.css BEFORE this file.
+   ═══════════════════════════════════════════════════════════════ */
+
+
+/* ==============================================================
+   GLOBAL RESET
+   ============================================================== */
+
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+html,
+body,
+#root {
+  margin: 0;
+  padding: 0;
+  width: 100%;
+  min-height: 100%;
+  overflow-x: hidden;
+}
+
+body {
+  font-family: var(--font-body);
+  color: var(--ink);
+  background: var(--paper);
+  -webkit-font-smoothing: antialiased;
+}
+
+
+/* ==============================================================
+   APPLICATION LAYOUT
+   ============================================================== */
+
+.app-shell {
+  display: flex;
+  min-height: 100vh;
+}
+
+.main-area {
+  flex: 1;
+  min-width: 0;
+  min-height: 100vh;
+
+  display: flex;
+  flex-direction: column;
+}
+
+
+/* ==============================================================
+   SIDEBAR
+   ============================================================== */
+
+.sidebar {
+  width: 232px;
+  flex-shrink: 0;
+
+  background: var(--sidebar-bg);
+  color: var(--sidebar-ink);
+
+  display: flex;
+  flex-direction: column;
+
+  padding: 20px 14px;
+
+  position: sticky;
+  top: 0;
+
+  height: 100vh;
+  overflow-y: auto;
+
+  box-shadow:
+    inset -1px 0 0 rgba(255, 255, 255, 0.05);
+}
+
+.sidebar-brand {
+  font-family: var(--font-display);
+  font-size: 19px;
+  font-weight: 600;
+  color: #fff;
+
+  padding: 4px 10px 22px;
+
+  letter-spacing: 0.01em;
+}
+
+.sidebar-brand span {
+  color: var(--brass);
+}
+
+.sidebar-nav {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  flex: 1;
+}
+
+.sidebar-link {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+
+  padding: 9px 12px;
+
+  border-radius: var(--radius-sm);
+  border-left: 2px solid transparent;
+
+  color: var(--sidebar-muted);
+  text-decoration: none;
+
+  font-size: 13.5px;
+  font-weight: 500;
+
+  transition:
+    background 0.12s,
+    color 0.12s,
+    border-color 0.12s;
+}
+
+.sidebar-link:hover {
+  background: rgba(255, 255, 255, 0.06);
+  color: var(--sidebar-ink);
+}
+
+.sidebar-link.active {
+  background: rgba(37, 99, 235, 0.16);
+  color: #fff;
+  border-left-color: var(--blue);
+}
+
+.sidebar-footer {
+  border-top: 1px solid rgba(255, 255, 255, 0.1);
+
+  padding-top: 12px;
+  margin-top: 12px;
+}
+
+.sidebar-user {
+  padding: 6px 12px;
+
+  font-size: 12.5px;
+  color: var(--sidebar-muted);
+}
+
+.sidebar-user strong {
+  display: block;
+
+  color: var(--sidebar-ink);
+  font-size: 13.5px;
+}
+
+
+/* ==============================================================
+   TOPBAR
+   Date/time intentionally aligned RIGHT.
+   ============================================================== */
+
+.topbar {
+  height: 60px;
+
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+
+  padding: 0 28px;
+
+  border-bottom: 1px solid var(--rule);
+  background: var(--surface);
+
+  flex-shrink: 0;
+}
+
+.topbar-title {
+  display: none;
+}
+
+.topbar-date-time {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+
+  font-size: 13px;
+  white-space: nowrap;
+}
+
+.topbar-date {
+  color: var(--ink-muted);
+}
+
+.topbar-divider {
+  color: var(--ink-muted);
+}
+
+.topbar-time {
+  font-family: var(--font-mono);
+  font-weight: 600;
+  color: var(--ink);
+
+  font-variant-numeric: tabular-nums;
+}
+
+
+/* ==============================================================
+   CONTENT
+   ============================================================== */
+
+.content {
+  padding: 28px;
+
+  flex: 1;
+  min-width: 0;
+
+  overflow-y: auto;
+}
+
+.page-header {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+
+  gap: 16px;
+  margin-bottom: 22px;
+
+  flex-wrap: wrap;
+}
+
+.page-header h1 {
+  margin: 0;
+
+  font-family: var(--font-display);
+  font-weight: 600;
+}
+
+.page-header p {
+  margin: 4px 0 0;
+
+  color: var(--ink-muted);
+  font-size: 13.5px;
+}
+
+.ledger-page-header {
+  margin-bottom: 20px;
+}
+
+
+/* ==============================================================
+   CARDS
+   ============================================================== */
+
+.card {
+  background: var(--surface);
+
+  border: 1px solid var(--rule);
+  border-top: 2px solid var(--brass);
+
+  border-radius: var(--radius);
+
+  padding: 20px;
+
+  box-shadow: var(--shadow-sm);
+}
+
+.card + .card {
+  margin-top: 16px;
+}
+
+
+/* ==============================================================
+   ERP LEDGER CONTROL BAR
+   ============================================================== */
+
+.ledger-control-bar {
+  position: relative;
+
+  display: flex;
+  align-items: flex-end;
+
+  gap: 32px;
+
+  width: 100%;
+
+  margin-bottom: 20px;
+  padding: 20px 28px;
+
+  background: var(--surface);
+
+  border: 1px solid var(--rule);
+  border-top: 2px solid var(--brass);
+
+  border-radius: var(--radius);
+
+  box-shadow: var(--shadow-sm);
+}
+
+
+/* ── Filter group ─────────────────────────────────────────── */
+
+.ledger-control-group {
+  display: flex;
+  flex-direction: column;
+
+  gap: 6px;
+
+  margin: 0;
+}
+
+.ledger-control-group > label {
+  display: block;
+
+  margin: 0;
+
+  font-size: 11px;
+  font-weight: 700;
+
+  color: var(--ink-muted);
+
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+}
+
+
+/* ── Distributor ──────────────────────────────────────────── */
+
+.ledger-distributor-group {
+  width: 360px;
+  flex-shrink: 0;
+}
+
+.ledger-distributor-group select {
+  width: 100%;
+  height: 38px;
+
+  padding: 0 12px;
+
+  border: 1px solid var(--rule);
+  border-radius: var(--radius-sm);
+
+  background: var(--surface);
+  color: var(--ink);
+
+  font-family: var(--font-body);
+  font-size: 13.5px;
+
+  cursor: pointer;
+}
+
+.ledger-distributor-group select:hover {
+  border-color: var(--rule-strong);
+}
+
+.ledger-distributor-group select:focus {
+  border-color: var(--brass);
+
+  outline: 2px solid rgba(150, 116, 42, 0.20);
+  outline-offset: 0;
+}
+
+
+/* ── Accounting period ────────────────────────────────────── */
+
+.ledger-period-group {
+  position: relative;
+
+  flex: 1;
+  min-width: 0;
+}
+
+.ledger-period-actions {
+  display: flex;
+  align-items: center;
+
+  gap: 10px;
+}
+
+
+/* ==============================================================
+   ACCOUNTING PERIOD BUTTON
+   ============================================================== */
+
+.ledger-period-trigger {
+  width: 210px;
+  height: 38px;
+
+  display: flex;
+  align-items: center;
+
+  gap: 8px;
+
+  padding: 0 11px;
+
+  border: 1px solid var(--rule);
+  border-radius: var(--radius-sm);
+
+  background: var(--surface);
+  color: var(--ink);
+
+  font-family: var(--font-body);
+  font-size: 13.5px;
+  font-weight: 500;
+
+  cursor: pointer;
+
+  transition:
+    background 0.12s,
+    border-color 0.12s,
+    box-shadow 0.12s;
+}
+
+.ledger-period-trigger:hover {
+  background: var(--surface-sunken);
+  border-color: var(--rule-strong);
+}
+
+.ledger-period-trigger.is-open {
+  border-color: var(--brass);
+
+  box-shadow:
+    0 0 0 2px rgba(150, 116, 42, 0.12);
+}
+
+.ledger-period-trigger svg:first-child {
+  flex-shrink: 0;
+  color: var(--ink-muted);
+}
+
+.ledger-period-trigger span {
+  flex: 1;
+
+  text-align: left;
+}
+
+.ledger-period-chevron {
+  flex-shrink: 0;
+
+  color: var(--ink-muted);
+
+  transition:
+    transform 0.15s ease;
+}
+
+.ledger-period-chevron.rotate {
+  transform: rotate(90deg);
+}
+
+
+/* ==============================================================
+   DOWNLOAD BUTTON
+   ============================================================== */
+
+.ledger-download-btn {
+  height: 38px;
+
+  flex-shrink: 0;
+
+  white-space: nowrap;
+}
+
+
+/* ==============================================================
+   CURRENT BALANCE
+   ============================================================== */
+
+.ledger-current-balance {
+  margin-left: auto;
+
+  min-width: 160px;
+
+  padding-left: 24px;
+
+  border-left: 1px solid var(--rule);
+}
+
+.ledger-current-balance .stat-label {
+  margin-bottom: 5px;
+}
+
+.ledger-current-balance .stat-value {
+  font-size: 20px;
+}
+
+
+/* ==============================================================
+   YEAR → MONTH PICKER
+   ============================================================== */
+
+.ledger-month-picker {
+  position: absolute;
+
+  top: calc(100% + 9px);
+  left: 0;
+
+  z-index: 40;
+
+  width: 340px;
+
+  background: var(--surface);
+
+  border: 1px solid var(--rule);
+  border-radius: var(--radius);
+
+  box-shadow: var(--shadow-md);
+
+  overflow: hidden;
+}
+
+
+/* ── Picker header ────────────────────────────────────────── */
+
+.ledger-month-picker-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+
+  padding: 16px 18px;
+
+  border-bottom: 1px solid var(--rule);
+}
+
+.ledger-month-picker-caption {
+  margin-bottom: 3px;
+
+  font-size: 10px;
+  font-weight: 700;
+
+  color: var(--ink-muted);
+
+  text-transform: uppercase;
+  letter-spacing: 0.07em;
+}
+
+.ledger-month-picker-year {
+  font-family: var(--font-display);
+
+  font-size: 22px;
+  font-weight: 600;
+
+  line-height: 1.2;
+
+  color: var(--ink);
+}
+
+
+/* ── Year navigation ─────────────────────────────────────── */
+
+.ledger-year-controls {
+  display: flex;
+  align-items: center;
+
+  gap: 4px;
+}
+
+.ledger-year-button {
+  width: 32px;
+  height: 32px;
+
+  display: flex;
+  align-items: center;
+  justify-content: center;
+
+  padding: 0;
+
+  border: 1px solid var(--rule);
+  border-radius: var(--radius-sm);
+
+  background: var(--surface);
+  color: var(--ink-muted);
+
+  cursor: pointer;
+
+  transition:
+    background 0.12s,
+    color 0.12s,
+    border-color 0.12s;
+}
+
+.ledger-year-button:hover {
+  background: var(--surface-sunken);
+
+  color: var(--ink);
+
+  border-color: var(--rule-strong);
+}
+
+
+/* ==============================================================
+   MONTH GRID
+   ============================================================== */
+
+.ledger-month-grid {
+  display: grid;
+
+  grid-template-columns:
+    repeat(4, 1fr);
+
+  gap: 6px;
+
+  padding: 16px;
+}
+
+.ledger-month-option {
+  position: relative;
+
+  min-height: 44px;
+
+  display: flex;
+  align-items: center;
+  justify-content: center;
+
+  border: 1px solid transparent;
+  border-radius: var(--radius-sm);
+
+  background: transparent;
+  color: var(--ink);
+
+  font-family: var(--font-body);
+  font-size: 13px;
+  font-weight: 500;
+
+  cursor: pointer;
+
+  transition:
+    background 0.12s,
+    color 0.12s,
+    border-color 0.12s;
+}
+
+.ledger-month-option:hover {
+  background: var(--surface-sunken);
+
+  border-color: var(--rule);
+}
+
+.ledger-month-option.selected {
+  background: var(--green);
+
+  border-color: var(--green);
+
+  color: #fff;
+
+  font-weight: 600;
+}
+
+.ledger-month-option.current:not(.selected) {
+  border-color: var(--brass);
+
+  color: var(--ink);
+
+  font-weight: 600;
+}
+
+.ledger-month-option small {
+  position: absolute;
+
+  bottom: 4px;
+
+  font-size: 8px;
+  font-weight: 600;
+
+  line-height: 1;
+
+  color: var(--brass);
+}
+
+.ledger-month-option.selected small {
+  color: #fff;
+}
+
+
+/* ==============================================================
+   MONTH PICKER FOOTER
+   ============================================================== */
+
+.ledger-month-picker-footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+
+  padding: 10px 16px;
+
+  border-top: 1px solid var(--rule);
+
+  background: var(--surface-sunken);
+}
+
+.ledger-picker-secondary,
+.ledger-picker-primary {
+  height: 32px;
+
+  padding: 0 11px;
+
+  border-radius: var(--radius-sm);
+
+  font-family: var(--font-body);
+  font-size: 12px;
+  font-weight: 600;
+
+  cursor: pointer;
+}
+
+.ledger-picker-secondary {
+  border: 1px solid var(--rule);
+
+  background: var(--surface);
+  color: var(--ink-muted);
+}
+
+.ledger-picker-secondary:hover {
+  background: var(--surface-sunken);
+  color: var(--ink);
+}
+
+.ledger-picker-primary {
+  border: 1px solid var(--green);
+
+  background: var(--green);
+  color: #fff;
+}
+
+.ledger-picker-primary:hover {
+  background: var(--green-hover);
+}
+
+
+/* ==============================================================
+   DOWNLOAD PROGRESS
+   ============================================================== */
+
+.ledger-download-progress {
+  width: 100%;
+
+  margin-top: -12px;
+  margin-bottom: 20px;
+}
+
+.progress-track {
+  width: 100%;
+  height: 3px;
+
+  overflow: hidden;
+
+  background: var(--surface-sunken);
+
+  border-radius: 999px;
+}
+
+.progress-fill {
+  height: 100%;
+
+  background: var(--green);
+
+  transition: width 0.15s ease;
+}
+
+.progress-fill.indeterminate {
+  width: 35%;
+
+  animation:
+    download-progress 1.1s ease-in-out infinite;
+}
+
+@keyframes download-progress {
+  0% {
+    transform: translateX(-120%);
+  }
+
+  100% {
+    transform: translateX(330%);
+  }
+}
+
+
+/* ==============================================================
+   TABLE CARD
+   ============================================================== */
+
+.ledger-table-card {
+  padding: 20px 28px;
+
+  overflow: hidden;
+}
+
+.table-wrap {
+  width: 100%;
+
+  overflow-x: auto;
+}
+
+table.data-table {
+  width: 100%;
+
+  border-collapse: collapse;
+
+  font-size: 13.5px;
+
+  background: var(--surface);
+}
+
+.data-table th {
+  text-align: left;
+
+  padding: 10px 12px;
+
+  border-bottom:
+    2px solid var(--rule-strong);
+
+  background: var(--surface);
+
+  color: var(--ink-muted);
+
+  font-size: 11px;
+  font-weight: 700;
+
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+
+  white-space: nowrap;
+}
+
+.data-table td {
+  padding: 11px 12px;
+
+  border-bottom:
+    1px solid var(--rule);
+
+  vertical-align: middle;
+}
+
+.data-table tbody tr:hover {
+  background: var(--surface-sunken);
+}
+
+.data-table td.num,
+.data-table th.num {
+  text-align: right;
+
+  font-family: var(--font-mono);
+
+  font-variant-numeric:
+    tabular-nums;
+}
+
+.data-table td:first-child,
+.data-table th:first-child {
+  padding-left: 0;
+}
+
+.data-table td:last-child,
+.data-table th:last-child {
+  padding-right: 0;
+}
+
+.capitalize {
+  text-transform: capitalize;
+}
+
+.ledger-note {
+  color: var(--ink-muted);
+}
+
+
+/* ==============================================================
+   EMPTY STATE
+   ============================================================== */
+
+.empty-state {
+  text-align: center;
+
+  padding: 56px 20px;
+
+  color: var(--ink-muted);
+}
+
+
+/* ==============================================================
+   BUTTONS
+   ============================================================== */
+
+.btn {
+  display: inline-flex;
+  align-items: center;
+
+  gap: 6px;
+
+  border: 1px solid transparent;
+  border-radius: var(--radius-sm);
+
+  padding: 8px 14px;
+
+  font-size: 13.5px;
+  font-weight: 500;
+
+  background: var(--green);
+  color: #fff;
+
+  text-decoration: none;
+
+  cursor: pointer;
+
+  transition:
+    background 0.12s,
+    border-color 0.12s;
+}
+
+.btn:hover {
+  background: var(--green-hover);
+}
+
+.btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.btn-secondary {
+  background: var(--surface);
+
+  color: var(--ink);
+
+  border-color: var(--rule);
+}
+
+.btn-secondary:hover {
+  background: var(--surface-sunken);
+
+  border-color: var(--rule-strong);
+}
+
+.btn-brass {
+  background: var(--brass);
+  color: #fff;
+}
+
+.btn-brass:hover {
+  background: var(--brass-hover);
+}
+
+.btn-danger {
+  background: var(--status-negative);
+}
+
+.btn-danger:hover {
+  background: #6E251C;
+}
+
+.btn-sm {
+  padding: 5px 10px;
+  font-size: 12.5px;
+}
+
+.btn-ghost {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+
+  background: transparent;
+
+  color: var(--ink-muted);
+
+  border: none;
+
+  padding: 6px;
+
+  border-radius: var(--radius-sm);
+
+  cursor: pointer;
+}
+
+.btn-ghost:hover {
+  color: var(--ink);
+
+  background: var(--surface-sunken);
+}
+
+
+/* ==============================================================
+   DOWNLOAD MODAL
+   ============================================================== */
+
+.ledger-download-modal {
+  max-width: 440px;
+}
+
+.ledger-download-modal .modal-header {
+  align-items: flex-start;
+}
+
+.ledger-download-modal h2 {
+  margin: 0;
+
+  font-family: var(--font-display);
+  font-size: 21px;
+  font-weight: 600;
+}
+
+.ledger-download-modal .modal-header p {
+  margin: 5px 0 0;
+
+  color: var(--ink-muted);
+
+  font-size: 12.5px;
+}
+
+.download-options {
+  display: flex;
+  flex-direction: column;
+
+  gap: 10px;
+}
+
+.download-option {
+  width: 100%;
+
+  display: flex;
+  align-items: center;
+
+  gap: 13px;
+
+  padding: 14px 16px;
+
+  border: 1px solid var(--rule);
+
+  border-radius: var(--radius-sm);
+
+  background: var(--surface);
+
+  color: var(--ink);
+
+  text-align: left;
+
+  cursor: pointer;
+
+  transition:
+    background 0.12s,
+    border-color 0.12s;
+}
+
+.download-option:hover {
+  background: var(--surface-sunken);
+
+  border-color: var(--brass);
+}
+
+.download-option > svg {
+  flex-shrink: 0;
+
+  color: var(--ink-muted);
+}
+
+.download-option span {
+  display: flex;
+  flex-direction: column;
+
+  gap: 2px;
+}
+
+.download-option strong {
+  font-size: 13.5px;
+  font-weight: 600;
+}
+
+.download-option small {
+  color: var(--ink-muted);
+
+  font-size: 11.5px;
+}
+
+
+/* ==============================================================
+   MODAL
+   ============================================================== */
+
+.modal-overlay {
+  position: fixed;
+
+  inset: 0;
+
+  z-index: 50;
+
+  display: flex;
+  align-items: center;
+  justify-content: center;
+
+  padding: 20px;
+
+  background:
+    rgba(27, 33, 28, 0.50);
+}
+
+.modal {
+  width: 100%;
+  max-width: 560px;
+
+  max-height: 88vh;
+
+  overflow-y: auto;
+
+  padding: 24px;
+
+  background: var(--surface);
+
+  border-radius: 10px;
+
+  border-top: 3px solid var(--brass);
+
+  box-shadow: var(--shadow-md);
+}
+
+.modal-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+
+  margin-bottom: 18px;
+}
+
+
+/* ==============================================================
+   FORMS
+   ============================================================== */
+
+.field {
+  display: flex;
+  flex-direction: column;
+
+  gap: 5px;
+
+  margin-bottom: 14px;
+}
+
+.field label {
+  font-size: 12.5px;
+  font-weight: 600;
+
+  color: var(--ink-muted);
+}
+
+.field input,
+.field select,
+.field textarea {
+  border: 1px solid var(--rule);
+
+  border-radius: var(--radius-sm);
+
+  padding: 8px 10px;
+
+  background: var(--surface);
+  color: var(--ink);
+
+  font-family: var(--font-body);
+  font-size: 13.5px;
+}
+
+.field input:focus,
+.field select:focus,
+.field textarea:focus {
+  border-color: var(--brass);
+
+  outline:
+    2px solid rgba(150, 116, 42, 0.20);
+
+  outline-offset: 0;
+}
+
+.field-row {
+  display: grid;
+
+  grid-template-columns:
+    1fr 1fr;
+
+  gap: 14px;
+}
+
+.field-error {
+  color: var(--status-negative);
+
+  font-size: 12.5px;
+
+  margin-top: -8px;
+  margin-bottom: 12px;
+}
+
+
+/* ==============================================================
+   STAT CARDS
+   ============================================================== */
+
+.stat-grid {
+  display: grid;
+
+  grid-template-columns:
+    repeat(auto-fit, minmax(180px, 1fr));
+
+  gap: 14px;
+
+  margin-bottom: 20px;
+}
+
+.stat-card {
+  background: var(--surface);
+
+  border: 1px solid var(--rule);
+
+  border-radius: var(--radius);
+
+  padding: 16px 18px;
+}
+
+.stat-label {
+  margin-bottom: 6px;
+
+  font-size: 11.5px;
+  font-weight: 600;
+
+  color: var(--ink-muted);
+
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+}
+
+.stat-value {
+  font-family: var(--font-mono);
+
+  font-size: 25px;
+  font-weight: 500;
+
+  font-variant-numeric:
+    tabular-nums;
+
+  color: var(--ink);
+}
+
+
+/* ==============================================================
+   BADGES
+   ============================================================== */
+
+.badge {
+  display: inline-flex;
+  align-items: center;
+
+  padding: 3px 11px;
+
+  border-radius: var(--radius-sm);
+
+  border: 1.5px solid currentColor;
+
+  background: transparent;
+
+  font-size: 10.5px;
+  font-weight: 700;
+
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+}
+
+.badge-green {
+  color: var(--status-positive);
+  background: var(--status-positive-bg);
+}
+
+.badge-amber {
+  color: var(--status-pending);
+  background: var(--status-pending-bg);
+}
+
+.badge-red {
+  color: var(--status-negative);
+  background: var(--status-negative-bg);
+}
+
+.badge-neutral {
+  color: var(--status-neutral);
+  background: var(--status-neutral-bg);
+
+  border: 1px solid var(--rule);
+}
+
+
+/* ==============================================================
+   TOASTS
+   ============================================================== */
+
+.toast-stack {
+  position: fixed;
+
+  right: 20px;
+  bottom: 20px;
+
+  z-index: 100;
+
+  display: flex;
+  flex-direction: column;
+
+  gap: 8px;
+
+  max-width: 340px;
+}
+
+.toast {
+  padding: 12px 16px;
+
+  border-radius: var(--radius-sm);
+
+  font-size: 13.5px;
+  font-weight: 500;
+
+  color: #fff;
+
+  box-shadow: var(--shadow-md);
+
+  cursor: pointer;
+
+  animation:
+    toast-in 0.18s ease-out;
+}
+
+.toast-success {
+  background: var(--status-positive);
+}
+
+.toast-error {
+  background: var(--status-negative);
+}
+
+.toast-info {
+  background: var(--ink);
+}
+
+@keyframes toast-in {
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+
+/* ==============================================================
+   SPINNER
+   ============================================================== */
+
+.spin {
+  animation:
+    spin 0.8s linear infinite;
+}
+
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+
+/* ==============================================================
+   SKELETON
+   ============================================================== */
+
+.skeleton {
+  background:
+    linear-gradient(
+      90deg,
+      var(--surface-sunken) 25%,
+      #E2E8F0 37%,
+      var(--surface-sunken) 63%
+    );
+
+  background-size: 400% 100%;
+
+  animation:
+    skeleton-shine 1.4s ease infinite;
+
+  border-radius: var(--radius-sm);
+}
+
+@keyframes skeleton-shine {
+  0% {
+    background-position: 100% 50%;
+  }
+
+  100% {
+    background-position: 0 50%;
+  }
+}
+
+.skeleton-row {
+  display: flex;
+  align-items: center;
+
+  gap: 16px;
+
+  padding: 11px 12px;
+}
+
+.skeleton-text {
+  height: 13px;
+  flex: 1;
+}
+
+.skeleton-stat {
+  width: 90px;
+  height: 24px;
+}
+
+
+/* ==============================================================
+   FOOTER
+   ============================================================== */
+
+.site-footer {
+  margin-top: auto;
+
+  padding: 16px 28px;
+
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+
+  gap: 16px;
+
+  flex-wrap: wrap;
+
+  font-size: 12.5px;
+
+  color: var(--ink-muted);
+
+  border-top: 1px solid var(--rule);
+}
+
+.site-footer > *:first-child {
+  text-align: left;
+}
+
+.site-footer nav,
+.site-footer > *:last-child {
+  display: flex;
+
+  gap: 16px;
+
+  margin: 0;
+}
+
+.site-footer a {
+  color: var(--ink-muted);
+
+  text-decoration: underline;
+}
+
+.site-footer a:hover {
+  color: var(--green);
+}
+
+
+/* ==============================================================
+   HAMBURGER / MOBILE SIDEBAR
+   ============================================================== */
+
+.hamburger-btn {
+  display: none;
+
+  position: fixed;
+
+  top: 14px;
+  left: 14px;
+
+  z-index: 50;
+
+  width: 40px;
+  height: 40px;
+
+  align-items: center;
+  justify-content: center;
+
+  border: 1px solid var(--rule);
+
+  border-radius: var(--radius-sm);
+
+  background: var(--surface);
+  color: var(--ink);
+
+  box-shadow: var(--shadow-sm);
+
+  cursor: pointer;
+}
+
+.sidebar-scrim {
+  display: none;
+}
+
+
+/* ==============================================================
+   ACCESSIBILITY
+   ============================================================== */
+
+a:focus-visible,
+button:focus-visible,
+input:focus-visible,
+select:focus-visible,
+textarea:focus-visible {
+  outline: 2px solid var(--brass);
+
+  outline-offset: 2px;
+}
+
+
+/* ==============================================================
+   PASSWORD REVEAL
+   ============================================================== */
+
+input[type='password']::-ms-reveal,
+input[type='password']::-ms-clear {
+  display: none;
+}
+
+
+/* ==============================================================
+   LONG TABLES
+   ============================================================== */
+
+.page-table-scroll {
+  max-height: 640px;
+
+  overflow-y: auto;
+
+  border: 1px solid var(--rule);
+
+  border-radius: var(--radius);
+}
+
+.page-table-scroll table.data-table thead th {
+  position: sticky;
+
+  top: 0;
+
+  z-index: 1;
+
+  background: var(--surface);
+}
+
+
+/* ==============================================================
+   QUANTITY INPUT
+   ============================================================== */
+
+.qty-input {
+  width: 44px;
+
+  padding: 5px 4px;
+
+  text-align: center;
+
+  border: 1px solid var(--rule);
+
+  border-radius: var(--radius-sm);
+
+  background: var(--surface);
+  color: var(--ink);
+
+  font-family: var(--font-mono);
+  font-size: 13.5px;
+
+  font-variant-numeric:
+    tabular-nums;
+}
+
+.qty-input:focus {
+  border-color: var(--brass);
+
+  outline:
+    2px solid rgba(150, 116, 42, 0.25);
+
+  outline-offset: 0;
+}
+
+.qty-input::-webkit-outer-spin-button,
+.qty-input::-webkit-inner-spin-button {
+  -webkit-appearance: none;
+  margin: 0;
+}
+
+.qty-input[type='number'] {
+  -moz-appearance: textfield;
+}
+
+
+/* ==============================================================
+   ORDER BUILDER
+   ============================================================== */
+
+.order-builder-divider {
+  margin: 24px 0 14px;
+
+  padding-top: 18px;
+
+  border-top: 2px solid var(--rule-strong);
+}
+
+.order-builder-divider h3 {
+  margin: 0;
+
+  font-size: 12.5px;
+  font-weight: 700;
+
+  color: var(--ink-muted);
+
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.added-products-list {
+  max-height: 320px;
+
+  overflow-y: auto;
+}
+
+.added-products-list table.data-table thead th {
+  position: sticky;
+
+  top: 0;
+
+  z-index: 1;
+
+  background: var(--surface);
+}
+
+@keyframes row-enter {
+  from {
+    opacity: 0;
+    transform: translateY(-6px);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.added-product-row {
+  animation:
+    row-enter 0.35s ease-out;
+}
+
+
+/* ==============================================================
+   AUTH
+   ============================================================== */
+
+.auth-shell {
+  min-height: 100vh;
+  width: 100%;
+
+  display: flex;
+  flex-direction: column;
+
+  background: var(--sidebar-bg);
+}
+
+.auth-center {
+  flex: 1;
+
+  display: flex;
+  align-items: center;
+  justify-content: center;
+
+  padding: 24px;
+}
+
+.auth-card {
+  width: 100%;
+  max-width: 420px;
+
+  padding: 36px 40px;
+
+  background: var(--surface);
+
+  border-radius: var(--radius);
+
+  border-top: 3px solid var(--brass);
+
+  box-shadow: var(--shadow-md);
+}
+
+.auth-shell .site-footer {
+  border-top:
+    1px solid rgba(255, 255, 255, 0.1);
+
+  color: var(--sidebar-muted);
+}
+
+.auth-shell .site-footer a {
+  color: var(--sidebar-muted);
+}
+
+.auth-shell .site-footer a:hover {
+  color: var(--brass);
+}
+
+
+/* ==============================================================
+   MOBILE
+   ============================================================== */
+
+@media (max-width: 768px) {
+
+  .hamburger-btn {
+    display: flex;
+  }
+
+  .sidebar {
+    position: fixed;
+
+    left: 0;
+    top: 0;
+
+    z-index: 40;
+
+    transform:
+      translateX(-100%);
+
+    transition:
+      transform 0.2s ease;
+  }
+
+  .sidebar.sidebar-open {
+    transform:
+      translateX(0);
+  }
+
+  .sidebar-scrim {
+    display: block;
+
+    position: fixed;
+
+    inset: 0;
+
+    z-index: 30;
+
+    background:
+      rgba(27, 33, 28, 0.4);
+  }
+
+
+  /* ── Topbar ───────────────────────────────────── */
+
+  .topbar {
+    height: 60px;
+
+    padding:
+      0 20px 0 64px;
+
+    justify-content:
+      flex-end;
+  }
+
+  .topbar-date-time {
+    font-size: 12px;
+  }
+
+
+  /* ── Content ──────────────────────────────────── */
+
+  .content {
+    padding: 20px 16px;
+  }
+
+
+  /* ── Ledger controls ──────────────────────────── */
+
+  .ledger-control-bar {
+    flex-direction: column;
+
+    align-items: stretch;
+
+    gap: 18px;
+
+    padding: 18px;
+  }
+
+  .ledger-distributor-group {
+    width: 100%;
+  }
+
+  .ledger-period-group {
+    width: 100%;
+  }
+
+  .ledger-period-actions {
+    width: 100%;
+  }
+
+  .ledger-period-trigger {
+    flex: 1;
+
+    width: auto;
+  }
+
+  .ledger-current-balance {
+    width: 100%;
+
+    margin-left: 0;
+
+    padding-left: 0;
+    padding-top: 14px;
+
+    border-left: none;
+    border-top: 1px solid var(--rule);
+  }
+
+
+  /* ── Calendar ────────────────────────────────── */
+
+  .ledger-month-picker {
+    left: 0;
+    right: 0;
+
+    width: 100%;
+  }
+
+
+  /* ── Table ───────────────────────────────────── */
+
+  .ledger-table-card {
+    padding: 16px;
+  }
+
+
+  /* ── Forms ───────────────────────────────────── */
+
+  .field-row {
+    grid-template-columns:
+      1fr;
+  }
+
+
+  /* ── Footer ──────────────────────────────────── */
+
+  .site-footer {
+    padding: 16px;
+
+    justify-content:
+      center;
+
+    text-align: center;
+  }
+
+  .site-footer > *:first-child {
+    text-align: center;
+  }
+
+  .site-footer nav,
+  .site-footer > *:last-child {
+    justify-content:
+      center;
+  }
+
+}
+
+
+/* ==============================================================
+   REDUCED MOTION
+   ============================================================== */
+
+@media (prefers-reduced-motion: reduce) {
+
+  *,
+  *::before,
+  *::after {
+    scroll-behavior: auto !important;
+  }
+
+  .skeleton,
+  .spin,
+  .added-product-row,
+  .toast,
+  .progress-fill.indeterminate {
+    animation: none !important;
+  }
+}
 /* ============================================================
    PROFESSIONAL ERP DASHBOARD
    LedgerOne
