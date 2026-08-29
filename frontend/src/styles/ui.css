@@ -67,7 +67,7 @@ body {
 
   padding: 20px 14px;
 
-  position: sticky;
+  position:fixed;
   top: 0;
 
   height: 100vh;
