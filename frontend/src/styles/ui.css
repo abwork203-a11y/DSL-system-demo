@@ -205,13 +205,9 @@ body {
 
 .content {
   padding: 28px;
-
   flex: 1;
   min-width: 0;
-
-  overflow-y: auto;
 }
-
 .page-header {
   display: flex;
   align-items: flex-end;
