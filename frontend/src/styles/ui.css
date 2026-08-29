@@ -1456,7 +1456,7 @@ textarea:focus-visible {
   height: 60px;
   display: flex;
   align-items: center;
-  justify-content: space-between;
+  justify-content: flex-start;
   padding: 0 28px;
   border-bottom: 1px solid var(--rule);
   background: var(--surface);
@@ -1465,10 +1465,12 @@ textarea:focus-visible {
 
 .topbar-date-time {
   display: flex;
-  align-items: left;
+  align-items: center;
   gap: 8px;
   font-size: 13px;
   white-space: nowrap;
+  order: 1;
+  margin-right:0;
 }
 
 .topbar-date {
@@ -1485,19 +1487,14 @@ textarea:focus-visible {
   color: var(--ink);
   font-variant-numeric: tabular-nums;
 }
-
 @media (max-width: 768px) {
   .topbar {
     padding: 0 20px;
     padding-left: 64px;
   }
 
-  .topbar-title {
-    display: none;
-  }
-
   .topbar-date-time {
-    margin-left: auto;
+    margin-right: 0;
     font-size: 12px;
   }
 }
