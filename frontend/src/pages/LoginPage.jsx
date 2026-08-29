@@ -4,6 +4,7 @@ import { useAuth } from '../context/AuthContext';
 import { apiErrorMessage } from '../api/client';
 import { APP_NAME } from '../config';
 import Footer from '../components/Footer';
+import PasswordInput from '../components/PasswordInput';
 
 export default function LoginPage() {
   const { login, completeMfaLogin } = useAuth();
@@ -70,7 +71,7 @@ export default function LoginPage() {
               </div>
               <div className="field">
                 <label htmlFor="password">Password</label>
-                <input id="password" type="password" value={password} onChange={(e) => setPassword(e.target.value)} required />
+                <PasswordInput id="password" value={password} onChange={(e) => setPassword(e.target.value)} required />
               </div>
               <button className="btn" type="submit" disabled={loading} style={{ width: '100%', justifyContent: 'center', marginTop: 4 }}>
                 {loading ? 'Signing in…' : 'Sign in'}
