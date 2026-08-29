@@ -19,7 +19,6 @@ import { useAuth } from '../context/AuthContext';
 import Footer from './Footer';
 import { APP_NAME } from '../config';
 
-
 const NAV_ITEMS = [
   { to: '/', label: 'Dashboard', icon: LayoutDashboard, end: true },
   { to: '/orders', label: 'Orders', icon: FileText },
@@ -33,16 +32,15 @@ const NAV_ITEMS = [
   { to: '/account', label: 'Account Settings', icon: Settings },
 ];
 
-
 export default function Layout() {
   const { user, logout, isAdmin } = useAuth();
   const navigate = useNavigate();
 
   const [sidebarOpen, setSidebarOpen] = useState(false);
+
+  // Live date and time
   const [currentDateTime, setCurrentDateTime] = useState(new Date());
 
-
-  // Update the time every second
   useEffect(() => {
     const timer = setInterval(() => {
       setCurrentDateTime(new Date());
@@ -51,23 +49,19 @@ export default function Layout() {
     return () => clearInterval(timer);
   }, []);
 
-
   const handleLogout = async () => {
     await logout();
     navigate('/login');
   };
 
-
-  // Close mobile sidebar after clicking a navigation link
   const closeSidebar = () => {
     setSidebarOpen(false);
   };
 
-
   return (
     <div className="app-shell">
 
-      {/* Mobile hamburger button */}
+      {/* Mobile menu button */}
       <button
         className={`hamburger-btn${sidebarOpen ? ' is-hidden' : ''}`}
         onClick={() => setSidebarOpen(!sidebarOpen)}
@@ -75,7 +69,6 @@ export default function Layout() {
       >
         <Menu size={22} strokeWidth={2} />
       </button>
-
 
       {/* Mobile sidebar overlay */}
       {sidebarOpen && (
@@ -85,23 +78,18 @@ export default function Layout() {
         />
       )}
 
-
       {/* Sidebar */}
       <aside className={`sidebar${sidebarOpen ? ' sidebar-open' : ''}`}>
 
-        {/* Logo / App name */}
         <div className="sidebar-brand">
           {APP_NAME}
           <span>.</span>
         </div>
 
-
-        {/* Navigation */}
         <nav className="sidebar-nav">
           {NAV_ITEMS
             .filter((item) => !item.adminOnly || isAdmin)
             .map(({ to, label, icon: Icon, end }) => (
-
               <NavLink
                 key={to}
                 to={to}
@@ -114,22 +102,14 @@ export default function Layout() {
                 <Icon size={16} strokeWidth={2} />
                 {label}
               </NavLink>
-
             ))}
         </nav>
 
-
-        {/* Sidebar footer */}
         <div className="sidebar-footer">
-
           <div className="sidebar-user">
             <strong>{user?.name}</strong>
-
-            {user?.role === 'admin'
-              ? 'Admin'
-              : 'Sales Rep'}
+            {user?.role === 'admin' ? 'Admin' : 'Sales Rep'}
           </div>
-
 
           <button
             className="sidebar-link"
@@ -143,25 +123,20 @@ export default function Layout() {
             <LogOut size={16} strokeWidth={2} />
             Log out
           </button>
-
         </div>
 
       </aside>
 
-
-      {/* Main application area */}
+      {/* Main area */}
       <div className="main-area">
 
         {/* Global topbar */}
         <header className="topbar">
 
-          {/* You can later replace this with the current page name */}
           <div className="topbar-title">
-            Dashboard
+            LedgerOne
           </div>
 
-
-          {/* Live date and time */}
           <div className="topbar-date-time">
 
             <span className="topbar-date">
@@ -173,11 +148,7 @@ export default function Layout() {
               })}
             </span>
 
-
-            <span className="topbar-divider">
-              •
-            </span>
-
+            <span className="topbar-divider">•</span>
 
             <span className="topbar-time">
               {currentDateTime.toLocaleTimeString([], {
@@ -190,10 +161,8 @@ export default function Layout() {
 
         </header>
 
-
         {/* Current page */}
         <Outlet />
-
 
         {/* Footer */}
         <Footer />
