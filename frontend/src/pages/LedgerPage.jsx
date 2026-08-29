@@ -24,7 +24,6 @@ import StatusBadge from '../components/StatusBadge';
 import Pagination from '../components/Pagination';
 import { TableSkeleton } from '../components/Skeleton';
 
-
 const PAGE_SIZE = 50;
 
 const MONTHS = [
@@ -42,14 +41,12 @@ const MONTHS = [
   'December',
 ];
 
-
 function money(n) {
   return Number(n || 0).toLocaleString(undefined, {
     minimumFractionDigits: 2,
     maximumFractionDigits: 2,
   });
 }
-
 
 function formatMonth(monthStr) {
   if (!monthStr) return 'All activity';
@@ -61,13 +58,36 @@ function formatMonth(monthStr) {
   return `${MONTHS[month - 1]} ${year}`;
 }
 
+function monthToDateRange(monthStr) {
+  if (!monthStr) {
+    return {
+      startDate: undefined,
+      endDate: undefined,
+    };
+  }
+
+  const [year, month] = monthStr.split('-').map(Number);
+
+  const startDate = `${monthStr}-01`;
+
+  const lastDay = new Date(year, month, 0).getDate();
+
+  const endDate = `${monthStr}-${String(lastDay).padStart(2, '0')}`;
+
+  return {
+    startDate,
+    endDate,
+  };
+}
 
 export default function LedgerPage() {
   const { isAdmin } = useAuth();
   const toast = useToast();
 
   const [searchParams, setSearchParams] = useSearchParams();
-  const distributorId = searchParams.get('distributor_id') || '';
+
+  const distributorId =
+    searchParams.get('distributor_id') || '';
 
   const [distributorsList, setDistributorsList] = useState([]);
   const [entries, setEntries] = useState([]);
@@ -83,19 +103,18 @@ export default function LedgerPage() {
   const downloadingRef = useRef(false);
 
   /*
-   * Selected export month.
+   * Selected accounting period.
    *
-   * Format:
    * YYYY-MM
-   *
-   * Empty string = all activity.
+   * Empty = All activity
    */
   const [exportMonth, setExportMonth] = useState('');
 
   /*
-   * Custom Year → Month picker
+   * Year → Month picker
    */
-  const [showMonthPicker, setShowMonthPicker] = useState(false);
+  const [showMonthPicker, setShowMonthPicker] =
+    useState(false);
 
   const [pickerYear, setPickerYear] = useState(
     new Date().getFullYear()
@@ -103,11 +122,14 @@ export default function LedgerPage() {
 
   const monthPickerRef = useRef(null);
 
-  const [showDownloadModal, setShowDownloadModal] = useState(false);
-
+  /*
+   * Download modal
+   */
+  const [showDownloadModal, setShowDownloadModal] =
+    useState(false);
 
   /*
-   * Close month picker when clicking outside.
+   * Close calendar when clicking outside.
    */
   useEffect(() => {
     const handleClickOutside = (event) => {
@@ -120,43 +142,19 @@ export default function LedgerPage() {
     };
 
     if (showMonthPicker) {
-      document.addEventListener('mousedown', handleClickOutside);
+      document.addEventListener(
+        'mousedown',
+        handleClickOutside
+      );
     }
 
     return () => {
-      document.removeEventListener('mousedown', handleClickOutside);
+      document.removeEventListener(
+        'mousedown',
+        handleClickOutside
+      );
     };
   }, [showMonthPicker]);
-
-
-  /*
-   * Converts YYYY-MM into the start_date/end_date pair
-   * accepted by the existing backend export endpoints.
-   */
-  function monthToDateRange(monthStr) {
-    if (!monthStr) {
-      return {
-        startDate: undefined,
-        endDate: undefined,
-      };
-    }
-
-    const [year, month] = monthStr.split('-').map(Number);
-
-    const startDate = `${monthStr}-01`;
-
-    // Day 0 of the next month = last day of selected month.
-    const lastDay = new Date(year, month, 0).getDate();
-
-    const endDate =
-      `${monthStr}-${String(lastDay).padStart(2, '0')}`;
-
-    return {
-      startDate,
-      endDate,
-    };
-  }
-
 
   /*
    * Load distributors.
@@ -164,10 +162,11 @@ export default function LedgerPage() {
   useEffect(() => {
     distributorsApi
       .list()
-      .then((res) => setDistributorsList(res.data))
+      .then((res) => {
+        setDistributorsList(res.data);
+      })
       .catch(() => {});
   }, []);
-
 
   /*
    * Load ledger.
@@ -177,11 +176,10 @@ export default function LedgerPage() {
 
     try {
       if (distributorId) {
-        /*
-         * A single distributor's full history.
-         */
         const res =
-          await ledgerApi.distributorSummary(distributorId);
+          await ledgerApi.distributorSummary(
+            distributorId
+          );
 
         setDistributor(res.data.distributor);
         setEntries(res.data.entries);
@@ -205,34 +203,34 @@ export default function LedgerPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [distributorId, page]);
 
-
   useEffect(() => {
     load();
   }, [load]);
 
-
   /*
    * Distributor filter.
    */
-  const handleDistributorChange = (val) => {
+  const handleDistributorChange = (value) => {
     setPage(1);
 
-    if (val) {
+    if (value) {
       setSearchParams({
-        distributor_id: val,
+        distributor_id: value,
       });
     } else {
       setSearchParams({});
     }
   };
 
-
   /*
-   * Open month picker.
+   * Open Year → Month calendar.
    */
   const openMonthPicker = () => {
     if (exportMonth) {
-      const [year] = exportMonth.split('-').map(Number);
+      const [year] = exportMonth
+        .split('-')
+        .map(Number);
+
       setPickerYear(year);
     } else {
       setPickerYear(new Date().getFullYear());
@@ -241,26 +239,29 @@ export default function LedgerPage() {
     setShowMonthPicker((current) => !current);
   };
 
-
   /*
-   * Select a month.
+   * Select month.
    */
   const handleMonthSelect = (monthIndex) => {
-    const month = String(monthIndex + 1).padStart(2, '0');
+    const month = String(monthIndex + 1).padStart(
+      2,
+      '0'
+    );
 
-    setExportMonth(`${pickerYear}-${month}`);
+    setExportMonth(
+      `${pickerYear}-${month}`
+    );
+
     setShowMonthPicker(false);
   };
 
-
   /*
-   * Clear selected month.
+   * Clear accounting period.
    */
   const handleClearMonth = () => {
     setExportMonth('');
     setShowMonthPicker(false);
   };
-
 
   /*
    * Select current month.
@@ -280,14 +281,14 @@ export default function LedgerPage() {
     setShowMonthPicker(false);
   };
 
-
   /*
-   * Change picker year.
+   * Change calendar year.
    */
   const changePickerYear = (amount) => {
-    setPickerYear((year) => year + amount);
+    setPickerYear(
+      (year) => year + amount
+    );
   };
-
 
   /*
    * Export ledger.
@@ -307,10 +308,9 @@ export default function LedgerPage() {
         endDate,
       } = monthToDateRange(exportMonth);
 
-      const monthLabel =
-        exportMonth
-          ? `-${exportMonth}`
-          : '';
+      const monthLabel = exportMonth
+        ? `-${exportMonth}`
+        : '';
 
       const ext =
         format === 'pdf'
@@ -318,9 +318,6 @@ export default function LedgerPage() {
           : 'xlsx';
 
       if (distributorId) {
-        /*
-         * Distributor-specific Customer Ledger.
-         */
         const url =
           exportApi.distributorLedgerUrl(
             distributorId,
@@ -337,9 +334,6 @@ export default function LedgerPage() {
           setDownloadProgress
         );
       } else {
-        /*
-         * Full ledger export.
-         */
         const url =
           exportApi.ledgerUrl(
             format,
@@ -366,6 +360,16 @@ export default function LedgerPage() {
     }
   };
 
+  /*
+   * Current selected month.
+   */
+  const currentMonthValue = (() => {
+    const now = new Date();
+
+    return `${now.getFullYear()}-${String(
+      now.getMonth() + 1
+    ).padStart(2, '0')}`;
+  })();
 
   return (
     <div className="content">
@@ -374,7 +378,7 @@ export default function LedgerPage() {
           PAGE HEADER
       ====================================================== */}
 
-      <div className="page-header">
+      <div className="page-header ledger-page-header">
 
         <div>
           <h1>Ledger</h1>
@@ -390,27 +394,62 @@ export default function LedgerPage() {
           </p>
         </div>
 
+      </div>
 
-        {/* =================================================
-            ADMIN ACTIONS
-        ================================================== */}
+
+      {/* =====================================================
+          PROFESSIONAL ERP FILTER BAR
+      ====================================================== */}
+
+      <div className="ledger-control-bar">
+
+        {/* DISTRIBUTOR */}
+
+        <div className="ledger-control-group ledger-distributor-group">
+
+          <label htmlFor="ledger-distributor">
+            DISTRIBUTOR
+          </label>
+
+          <select
+            id="ledger-distributor"
+            value={distributorId}
+            onChange={(e) =>
+              handleDistributorChange(
+                e.target.value
+              )
+            }
+          >
+            <option value="">
+              All distributors
+            </option>
+
+            {distributorsList.map((d) => (
+              <option
+                key={d.id}
+                value={d.id}
+              >
+                {d.name}
+              </option>
+            ))}
+          </select>
+
+        </div>
+
+
+        {/* ACCOUNTING PERIOD */}
 
         {isAdmin && (
-          <div className="ledger-header-actions">
+          <div
+            className="ledger-control-group ledger-period-group"
+            ref={monthPickerRef}
+          >
 
-            {/* ---------------------------------------------
-                ACCOUNTING PERIOD
-            ---------------------------------------------- */}
+            <label>
+              ACCOUNTING PERIOD
+            </label>
 
-            <div
-              className="ledger-period-picker"
-              ref={monthPickerRef}
-            >
-
-              <label className="ledger-period-label">
-                ACCOUNTING PERIOD
-              </label>
-
+            <div className="ledger-period-actions">
 
               <button
                 type="button"
@@ -421,7 +460,9 @@ export default function LedgerPage() {
                 }`}
                 onClick={openMonthPicker}
                 aria-haspopup="dialog"
-                aria-expanded={showMonthPicker}
+                aria-expanded={
+                  showMonthPicker
+                }
               >
 
                 <CalendarDays
@@ -446,87 +487,113 @@ export default function LedgerPage() {
               </button>
 
 
-              {/* -------------------------------------------
-                  YEAR → MONTH POPUP
-              -------------------------------------------- */}
+              {/* DOWNLOAD */}
 
-              {showMonthPicker && (
-                <div
-                  className="ledger-month-picker"
-                  role="dialog"
-                  aria-label="Select accounting period"
-                >
+              <button
+                type="button"
+                className="btn btn-secondary ledger-download-btn"
+                disabled={downloading}
+                onClick={() =>
+                  setShowDownloadModal(true)
+                }
+              >
 
-                  {/* Header */}
+                {downloading ? (
+                  <Loader2
+                    size={16}
+                    className="spin"
+                  />
+                ) : (
+                  <Download
+                    size={16}
+                    strokeWidth={1.8}
+                  />
+                )}
 
-                  <div className="ledger-month-picker-header">
+                {downloading
+                  ? 'Downloading…'
+                  : 'Download'}
 
-                    <div>
-                      <div className="ledger-month-picker-caption">
-                        SELECT ACCOUNTING PERIOD
-                      </div>
+              </button>
 
-                      <div className="ledger-month-picker-year">
-                        {pickerYear}
-                      </div>
+            </div>
+
+
+            {/* =================================================
+                YEAR → MONTH PICKER
+            ================================================== */}
+
+            {showMonthPicker && (
+              <div
+                className="ledger-month-picker"
+                role="dialog"
+                aria-label="Select accounting period"
+              >
+
+                <div className="ledger-month-picker-header">
+
+                  <div>
+
+                    <div className="ledger-month-picker-caption">
+                      SELECT ACCOUNTING PERIOD
                     </div>
 
-
-                    <div className="ledger-year-controls">
-
-                      <button
-                        type="button"
-                        className="ledger-year-button"
-                        onClick={() =>
-                          changePickerYear(-1)
-                        }
-                        aria-label="Previous year"
-                      >
-                        <ChevronLeft
-                          size={17}
-                        />
-                      </button>
-
-                      <button
-                        type="button"
-                        className="ledger-year-button"
-                        onClick={() =>
-                          changePickerYear(1)
-                        }
-                        aria-label="Next year"
-                      >
-                        <ChevronRight
-                          size={17}
-                        />
-                      </button>
-
+                    <div className="ledger-month-picker-year">
+                      {pickerYear}
                     </div>
 
                   </div>
 
 
-                  {/* Month grid */}
+                  <div className="ledger-year-controls">
 
-                  <div className="ledger-month-grid">
+                    <button
+                      type="button"
+                      className="ledger-year-button"
+                      onClick={() =>
+                        changePickerYear(-1)
+                      }
+                      aria-label="Previous year"
+                    >
+                      <ChevronLeft
+                        size={17}
+                      />
+                    </button>
 
-                    {MONTHS.map((month, index) => {
+                    <button
+                      type="button"
+                      className="ledger-year-button"
+                      onClick={() =>
+                        changePickerYear(1)
+                      }
+                      aria-label="Next year"
+                    >
+                      <ChevronRight
+                        size={17}
+                      />
+                    </button>
+
+                  </div>
+
+                </div>
+
+
+                <div className="ledger-month-grid">
+
+                  {MONTHS.map(
+                    (month, index) => {
                       const monthValue =
                         `${pickerYear}-${String(
                           index + 1
                         ).padStart(2, '0')}`;
 
                       const isSelected =
-                        exportMonth === monthValue;
-
-                      const now = new Date();
-
-                      const currentValue =
-                        `${now.getFullYear()}-${String(
-                          now.getMonth() + 1
-                        ).padStart(2, '0')}`;
+                        exportMonth ===
+                        monthValue;
 
                       const isCurrent =
-                        currentValue === monthValue;
+                        currentMonthValue ===
+                        monthValue;
 
                       return (
                         <button
@@ -542,104 +609,52 @@ export default function LedgerPage() {
                               : ''
                           }`}
                           onClick={() =>
-                            handleMonthSelect(index)
+                            handleMonthSelect(
+                              index
+                            )
                           }
                         >
+
                           <span>
                             {month.slice(0, 3)}
                           </span>
 
-                          {isCurrent && !isSelected && (
-                            <small>Current</small>
-                          )}
+                          {isCurrent &&
+                            !isSelected && (
+                              <small>
+                                Current
+                              </small>
+                            )}
+
                         </button>
                       );
-                    })}
-
-                  </div>
-
-
-                  {/* Footer */}
-
-                  <div className="ledger-month-picker-footer">
-
-                    <button
-                      type="button"
-                      className="ledger-picker-secondary"
-                      onClick={handleClearMonth}
-                    >
-                      Clear
-                    </button>
-
-                    <button
-                      type="button"
-                      className="ledger-picker-primary"
-                      onClick={handleCurrentMonth}
-                    >
-                      Current Month
-                    </button>
-
-                  </div>
+                    }
+                  )}
 
                 </div>
-              )}
-
-            </div>
 
 
-            {/* ---------------------------------------------
-                DOWNLOAD
-            ---------------------------------------------- */}
+                <div className="ledger-month-picker-footer">
 
-            <button
-              type="button"
-              className="btn btn-secondary ledger-download-btn"
-              disabled={downloading}
-              onClick={() =>
-                setShowDownloadModal(true)
-              }
-            >
-
-              {downloading ? (
-                <Loader2
-                  size={16}
-                  className="spin"
-                />
-              ) : (
-                <Download
-                  size={16}
-                  strokeWidth={1.8}
-                />
-              )}
-
-              {downloading
-                ? 'Downloading…'
-                : 'Download'}
-
-            </button>
-
-
-            {/* Download progress */}
-
-            {downloading && (
-              <div className="ledger-download-progress">
-
-                <div className="progress-track">
-
-                  <div
-                    className={`progress-fill${
-                      downloadProgress == null
-                        ? ' indeterminate'
-                        : ''
-                    }`}
-                    style={
-                      downloadProgress != null
-                        ? {
-                            width: `${downloadProgress}%`,
-                          }
-                        : undefined
+                  <button
+                    type="button"
+                    className="ledger-picker-secondary"
+                    onClick={
+                      handleClearMonth
                     }
-                  />
+                  >
+                    Clear
+                  </button>
+
+                  <button
+                    type="button"
+                    className="ledger-picker-primary"
+                    onClick={
+                      handleCurrentMonth
+                    }
+                  >
+                    Current Month
+                  </button>
 
                 </div>
 
@@ -649,7 +664,56 @@ export default function LedgerPage() {
           </div>
         )}
 
+
+        {/* CURRENT BALANCE */}
+
+        {distributor && (
+          <div className="ledger-current-balance">
+
+            <div className="stat-label">
+              Current Balance
+            </div>
+
+            <div className="stat-value num">
+              {money(
+                distributor.balance
+              )}
+            </div>
+
+          </div>
+        )}
+
       </div>
+
+
+      {/* =====================================================
+          DOWNLOAD PROGRESS
+      ====================================================== */}
+
+      {downloading && (
+        <div className="ledger-download-progress">
+
+          <div className="progress-track">
+
+            <div
+              className={`progress-fill${
+                downloadProgress == null
+                  ? ' indeterminate'
+                  : ''
+              }`}
+              style={
+                downloadProgress != null
+                  ? {
+                      width: `${downloadProgress}%`,
+                    }
+                  : undefined
+              }
+            />
+
+          </div>
+
+        </div>
+      )}
 
 
       {/* =====================================================
@@ -665,8 +729,7 @@ export default function LedgerPage() {
         >
 
           <div
-            className="modal"
-            style={{ maxWidth: 420 }}
+            className="modal ledger-download-modal"
             onClick={(e) =>
               e.stopPropagation()
             }
@@ -674,11 +737,20 @@ export default function LedgerPage() {
 
             <div className="modal-header">
 
-              <h2 style={{ margin: 0 }}>
-                Download
-              </h2>
+              <div>
+                <h2>
+                  Download Ledger
+                </h2>
+
+                <p>
+                  {exportMonth
+                    ? `Accounting period: ${formatMonth(exportMonth)}`
+                    : 'All activity'}
+                </p>
+              </div>
 
               <button
+                type="button"
                 className="btn-ghost"
                 onClick={() =>
                   setShowDownloadModal(false)
@@ -691,33 +763,53 @@ export default function LedgerPage() {
             </div>
 
 
-            <div
-              style={{
-                display: 'flex',
-                flexDirection: 'column',
-                gap: 10,
-              }}
-            >
+            <div className="download-options">
 
               <button
+                type="button"
                 className="download-option"
                 onClick={() =>
                   handleExport('excel')
                 }
               >
-                <FileSpreadsheet size={20} />
-                Excel (.xlsx)
+                <FileSpreadsheet
+                  size={20}
+                />
+
+                <span>
+                  <strong>
+                    Excel
+                  </strong>
+
+                  <small>
+                    .xlsx spreadsheet
+                  </small>
+                </span>
+
               </button>
 
 
               <button
+                type="button"
                 className="download-option"
                 onClick={() =>
                   handleExport('pdf')
                 }
               >
-                <FileText size={20} />
-                PDF (.pdf)
+                <FileText
+                  size={20}
+                />
+
+                <span>
+                  <strong>
+                    PDF
+                  </strong>
+
+                  <small>
+                    .pdf document
+                  </small>
+                </span>
+
               </button>
 
             </div>
@@ -729,69 +821,12 @@ export default function LedgerPage() {
 
 
       {/* =====================================================
-          FILTER BAR
-      ====================================================== */}
-
-      <div className="card ledger-filter-bar">
-
-        <div className="field ledger-distributor-field">
-
-          <label>
-            DISTRIBUTOR
-          </label>
-
-          <select
-            value={distributorId}
-            onChange={(e) =>
-              handleDistributorChange(
-                e.target.value
-              )
-            }
-          >
-
-            <option value="">
-              All distributors
-            </option>
-
-            {distributorsList.map((d) => (
-              <option
-                key={d.id}
-                value={d.id}
-              >
-                {d.name}
-              </option>
-            ))}
-
-          </select>
-
-        </div>
-
-
-        {distributor && (
-          <div className="ledger-current-balance">
-
-            <div className="stat-label">
-              Current Balance
-            </div>
-
-            <div className="stat-value num">
-              {money(distributor.balance)}
-            </div>
-
-          </div>
-        )}
-
-      </div>
-
-
-      {/* =====================================================
           LEDGER TABLE
       ====================================================== */}
 
-      <div className="card">
+      <div className="card ledger-table-card">
 
         {loading ? (
-
           <TableSkeleton
             columns={
               distributor
@@ -800,7 +835,6 @@ export default function LedgerPage() {
             }
             rows={6}
           />
-
         ) : (
 
           <div className="table-wrap">
@@ -808,7 +842,6 @@ export default function LedgerPage() {
             <table className="data-table">
 
               <thead>
-
                 <tr>
 
                   {!distributor && (
@@ -846,14 +879,12 @@ export default function LedgerPage() {
                   </th>
 
                 </tr>
-
               </thead>
 
 
               <tbody>
 
                 {entries.map((e) => (
-
                   <tr key={e.id}>
 
                     {!distributor && (
@@ -872,12 +903,7 @@ export default function LedgerPage() {
                       {e.order_number || '—'}
                     </td>
 
-                    <td
-                      style={{
-                        textTransform:
-                          'capitalize',
-                      }}
-                    >
+                    <td className="capitalize">
                       {e.payment_term || '—'}
                     </td>
 
@@ -900,17 +926,11 @@ export default function LedgerPage() {
                       )}
                     </td>
 
-                    <td
-                      style={{
-                        color:
-                          'var(--ink-muted)',
-                      }}
-                    >
+                    <td className="ledger-note">
                       {e.note || '—'}
                     </td>
 
                   </tr>
-
                 ))}
 
 
