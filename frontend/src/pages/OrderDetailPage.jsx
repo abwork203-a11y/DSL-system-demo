@@ -196,12 +196,11 @@ export default function OrderDetailPage() {
       <div className="card" style={{ display: 'flex', gap: 28, flexWrap: 'wrap' }}>
         <div>
           <div className="stat-label">Order Status</div>
-          {isAdmin ? (
+          {isAdmin && order.order_status !== 'cancelled' ? (
             <select value={order.order_status} onChange={(e) => handleStatusChange(e.target.value)} style={{ marginTop: 6, border: '1px solid var(--border)', borderRadius: 6, padding: '6px 8px' }}>
               <option value="pending">Pending</option>
               <option value="current">Current</option>
               <option value="completed">Completed</option>
-              <option value="cancelled">Cancelled</option>
             </select>
           ) : (
             <div style={{ marginTop: 6 }}><StatusBadge value={order.order_status} /></div>
@@ -219,7 +218,7 @@ export default function OrderDetailPage() {
           <div className="stat-label">Balance Remaining</div>
           <div className="num" style={{ marginTop: 6 }}>{money(balanceRemaining)}</div>
         </div>
-        {balanceRemaining > 0 && (
+        {balanceRemaining > 0 && order.order_status !== 'cancelled' && (
           <div style={{ marginLeft: 'auto', alignSelf: 'center' }}>
             <button className="btn" onClick={() => { setPayAmount(String(balanceRemaining)); setPayOpen(true); }}>Record Payment</button>
           </div>

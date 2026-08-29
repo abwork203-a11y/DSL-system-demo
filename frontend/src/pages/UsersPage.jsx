@@ -111,9 +111,11 @@ export default function UsersPage() {
                     <td>{u.is_active ? <span className="badge badge-green">active</span> : <span className="badge badge-neutral">inactive</span>}</td>
                     <td style={{ display: 'flex', gap: 6, justifyContent: 'flex-end' }}>
                       <button className="btn btn-secondary btn-sm" onClick={() => openEdit(u)}><Pencil size={14} /> Edit</button>
-                      <button className="btn btn-secondary btn-sm" onClick={() => toggleActive(u)}>
-                        {u.is_active ? 'Deactivate' : 'Reactivate'}
-                      </button>
+                      {u.id !== currentUser.id && (
+                        <button className="btn btn-secondary btn-sm" onClick={() => toggleActive(u)}>
+                          {u.is_active ? 'Deactivate' : 'Reactivate'}
+                        </button>
+                      )}
                       {u.id !== currentUser.id && (
                         <button className="btn btn-danger btn-sm" onClick={() => handleDelete(u)}><Trash2 size={14} /> Delete</button>
                       )}
@@ -144,8 +146,12 @@ export default function UsersPage() {
             </div>
             <div className="field-row">
               <div className="field">
-                <label>Role</label>
-                <select value={form.role} onChange={(e) => setForm({ ...form, role: e.target.value })}>
+                <label>Role{editing.id === currentUser.id ? ' (you can\'t change your own role)' : ''}</label>
+                <select
+                  value={form.role}
+                  onChange={(e) => setForm({ ...form, role: e.target.value })}
+                  disabled={editing.id === currentUser.id}
+                >
                   <option value="sales_rep">Sales Rep</option>
                   <option value="admin">Admin</option>
                 </select>
