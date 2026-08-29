@@ -271,15 +271,27 @@ const exportOrders = asyncHandler(async (req, res) => {
   ], result.rows);
 });
 
-// ── Ledger: generic bulk export (all distributors, or filtered) ───
-const exportLedger = asyncHandler(async (req, res) => {
-  const { distributor_id } = req.query;
+// ── Ledger: shared row-fetching for the bulk (all/filtered distributors)
+// export. Used by both exportLedgerExcel and exportLedgerPdf so the two
+// formats can never silently drift apart on what counts as "this month's
+// entries" — one query, two renderers.
+async function fetchBulkLedgerEntries({ distributorId, startDate, endDate }) {
   const params = [];
-  let where = '';
-  if (distributor_id) {
-    params.push(distributor_id);
-    where = `WHERE l.distributor_id = $${params.length}`;
+  const clauses = [];
+  if (distributorId) {
+    params.push(distributorId);
+    clauses.push(`l.distributor_id = $${params.length}`);
   }
+  if (startDate) {
+    params.push(startDate);
+    clauses.push(`l.entry_date >= $${params.length}`);
+  }
+  if (endDate) {
+    params.push(endDate);
+    clauses.push(`l.entry_date <= $${params.length}`);
+  }
+  const where = clauses.length ? `WHERE ${clauses.join(' AND ')}` : '';
+
   const result = await pool.query(
     `SELECT d.name AS distributor, l.entry_date, l.type, l.amount, l.running_balance, l.note, o.payment_term
      FROM ledger l
@@ -289,8 +301,15 @@ const exportLedger = asyncHandler(async (req, res) => {
      ORDER BY l.entry_date ASC`,
     params
   );
+  return result.rows;
+}
 
-  const rows = result.rows.map((entry) => ({
+// ── Ledger: generic bulk export (all distributors, or filtered) — Excel ──
+const exportLedgerExcel = asyncHandler(async (req, res) => {
+  const { distributor_id, start_date, end_date } = req.query;
+  const entries = await fetchBulkLedgerEntries({ distributorId: distributor_id, startDate: start_date, endDate: end_date });
+
+  const rows = entries.map((entry) => ({
     distributor: entry.distributor,
     entry_date: new Date(entry.entry_date).toLocaleDateString(),
     payment_term: entry.payment_term || '',
@@ -313,7 +332,81 @@ const exportLedger = asyncHandler(async (req, res) => {
   ], rows);
 });
 
-// ── Ledger: single-distributor "Customer Ledger" statement ────────
+// ── Ledger: generic bulk export (all distributors, or filtered) — PDF ──
+// Mirrors invoicePdf's explicit x/y column layout — deliberately not relying
+// on PDFKit's text cursor or unbounded { align: 'right' }, same reasoning as
+// documented on invoicePdf's summary rows: keeps every column lined up
+// regardless of how long a distributor name or note happens to be.
+const exportLedgerPdf = asyncHandler(async (req, res) => {
+  const { distributor_id, start_date, end_date } = req.query;
+  const entries = await fetchBulkLedgerEntries({ distributorId: distributor_id, startDate: start_date, endDate: end_date });
+
+  res.setHeader('Content-Type', 'application/pdf');
+  res.setHeader('Content-Disposition', 'attachment; filename=ledger.pdf');
+
+  const doc = new PDFDocument({ margin: 50, size: 'A4', layout: 'landscape' });
+  doc.pipe(res);
+
+  doc.fontSize(18).text('Ledger', { align: 'left' });
+  doc.fontSize(10).fillColor('#555');
+  if (start_date && end_date) doc.text(`${start_date} to ${end_date}`);
+  else if (start_date) doc.text(`From ${start_date}`);
+  else if (end_date) doc.text(`To ${end_date}`);
+  else doc.text('All activity');
+  doc.fillColor('#000');
+  doc.moveDown();
+
+  const cols = { dist: 50, date: 200, term: 280, debit: 360, credit: 440, balance: 520, note: 600 };
+  const pageBottom = doc.page.height - doc.page.margins.bottom;
+
+  function drawHeader() {
+    const y = doc.y;
+    doc.font('Helvetica-Bold').fontSize(9);
+    doc.text('Distributor', cols.dist, y);
+    doc.text('Date', cols.date, y);
+    doc.text('Term', cols.term, y);
+    doc.text('Debit', cols.debit, y);
+    doc.text('Credit', cols.credit, y);
+    doc.text('Balance', cols.balance, y);
+    doc.text('Note', cols.note, y, { width: 140 });
+    doc.moveDown(0.6);
+    doc.font('Helvetica').fontSize(9);
+  }
+
+  drawHeader();
+
+  let totalDebit = 0;
+  let totalCredit = 0;
+
+  entries.forEach((entry) => {
+    if (doc.y > pageBottom - 30) {
+      doc.addPage();
+      drawHeader();
+    }
+    const isDebit = entry.type === 'debit';
+    const amount = Number(entry.amount);
+    if (isDebit) totalDebit += amount; else totalCredit += amount;
+
+    const y = doc.y;
+    doc.text(entry.distributor, cols.dist, y, { width: 145 });
+    doc.text(new Date(entry.entry_date).toLocaleDateString(), cols.date, y);
+    doc.text(entry.payment_term || '—', cols.term, y);
+    doc.text(isDebit ? amount.toFixed(2) : '', cols.debit, y);
+    doc.text(isDebit ? '' : amount.toFixed(2), cols.credit, y);
+    doc.text(Number(entry.running_balance).toFixed(2), cols.balance, y);
+    doc.text(entry.note || '—', cols.note, y, { width: 140 });
+    doc.moveDown(0.6);
+  });
+
+  doc.moveDown();
+  doc.font('Helvetica-Bold');
+  doc.text(`Total Debit: ${totalDebit.toFixed(2)}`, cols.debit, doc.y);
+  doc.text(`Total Credit: ${totalCredit.toFixed(2)}`, cols.credit, doc.y);
+
+  doc.end();
+});
+
+// ── Ledger: single-distributor "Customer Ledger" — shared data fetch ──
 // NOTE: this mirrors the query shape used by ledgerController.js's
 // `distributorSummary` (distributor lookup + ledger entries filtered by
 // distributor_id and an optional date range). If `distributorSummary` sources
@@ -321,10 +414,7 @@ const exportLedger = asyncHandler(async (req, res) => {
 // view/materialized table instead of the raw `ledger` table), point this
 // query at the same source before shipping — it wasn't available to check
 // against here.
-const exportDistributorLedger = asyncHandler(async (req, res) => {
-  const { id: distributorId } = req.params;
-  const { start_date, end_date } = req.query;
-
+async function fetchDistributorLedger(distributorId, { start_date, end_date }) {
   const distributorResult = await pool.query(
     'SELECT id, name FROM distributors WHERE id = $1',
     [distributorId]
@@ -351,7 +441,22 @@ const exportDistributorLedger = asyncHandler(async (req, res) => {
      ORDER BY l.entry_date ASC`,
     params
   );
-  const entries = entriesResult.rows;
+
+  return { distributor, entries: entriesResult.rows };
+}
+
+function dateRangeLabel(start_date, end_date) {
+  if (start_date && end_date) return `From ${start_date} to ${end_date}`;
+  if (start_date) return `From ${start_date}`;
+  if (end_date) return `To ${end_date}`;
+  return 'All activity';
+}
+
+// ── Ledger: single-distributor "Customer Ledger" statement — Excel ────
+const exportDistributorLedgerExcel = asyncHandler(async (req, res) => {
+  const { id: distributorId } = req.params;
+  const { start_date, end_date } = req.query;
+  const { distributor, entries } = await fetchDistributorLedger(distributorId, { start_date, end_date });
 
   const workbook = new ExcelJS.Workbook();
   const sheet = workbook.addWorksheet('Customer Ledger');
@@ -365,15 +470,7 @@ const exportDistributorLedger = asyncHandler(async (req, res) => {
   sheet.getCell('A2').font = { size: 12, bold: true };
 
   sheet.mergeCells('A3:G3');
-  if (start_date && end_date) {
-    sheet.getCell('A3').value = `From ${start_date} to ${end_date}`;
-  } else if (start_date) {
-    sheet.getCell('A3').value = `From ${start_date}`;
-  } else if (end_date) {
-    sheet.getCell('A3').value = `To ${end_date}`;
-  } else {
-    sheet.getCell('A3').value = 'All activity';
-  }
+  sheet.getCell('A3').value = dateRangeLabel(start_date, end_date);
 
   sheet.addRow([]);
   const headerRow = sheet.addRow(['Date', 'Description', 'Payment Term', 'Debit', 'Credit', 'Balance', 'Remarks']);
@@ -415,12 +512,99 @@ const exportDistributorLedger = asyncHandler(async (req, res) => {
   res.end();
 });
 
+// ── Ledger: single-distributor "Customer Ledger" statement — PDF ─────
+// Same explicit x/y summary-row technique as invoicePdf, for the same
+// reason documented there: guarantees label+value always sit on one line.
+const exportDistributorLedgerPdf = asyncHandler(async (req, res) => {
+  const { id: distributorId } = req.params;
+  const { start_date, end_date } = req.query;
+  const { distributor, entries } = await fetchDistributorLedger(distributorId, { start_date, end_date });
+
+  res.setHeader('Content-Type', 'application/pdf');
+  res.setHeader('Content-Disposition', `attachment; filename=ledger-${distributor.name.replace(/[^a-z0-9]+/gi, '-')}.pdf`);
+
+  const doc = new PDFDocument({ margin: 50 });
+  doc.pipe(res);
+
+  doc.fontSize(18).text('Customer Ledger', { align: 'left' });
+  doc.fontSize(13).font('Helvetica-Bold').text(distributor.name);
+  doc.font('Helvetica').fontSize(10).fillColor('#555').text(dateRangeLabel(start_date, end_date));
+  doc.fillColor('#000');
+  doc.moveDown();
+
+  const cols = { date: 50, desc: 130, term: 290, debit: 360, credit: 430, balance: 500 };
+  const pageBottom = doc.page.height - doc.page.margins.bottom;
+
+  function drawHeader() {
+    const y = doc.y;
+    doc.font('Helvetica-Bold').fontSize(9);
+    doc.text('Date', cols.date, y);
+    doc.text('Description', cols.desc, y);
+    doc.text('Term', cols.term, y);
+    doc.text('Debit', cols.debit, y);
+    doc.text('Credit', cols.credit, y);
+    doc.text('Balance', cols.balance, y);
+    doc.moveDown(0.6);
+    doc.font('Helvetica').fontSize(9);
+  }
+
+  drawHeader();
+
+  let totalDebit = 0;
+  let totalCredit = 0;
+  let lastBalance = 0;
+
+  entries.forEach((entry) => {
+    if (doc.y > pageBottom - 30) {
+      doc.addPage();
+      drawHeader();
+    }
+    const isDebit = entry.type === 'debit';
+    const amount = Number(entry.amount);
+    const runningBalance = Number(entry.running_balance);
+    lastBalance = runningBalance;
+    if (isDebit) totalDebit += amount; else totalCredit += amount;
+
+    const y = doc.y;
+    doc.text(new Date(entry.entry_date).toLocaleDateString(), cols.date, y);
+    doc.text(entry.note || '—', cols.desc, y, { width: 150 });
+    doc.text(entry.payment_term || '—', cols.term, y);
+    doc.text(isDebit ? amount.toFixed(2) : '', cols.debit, y);
+    doc.text(isDebit ? '' : amount.toFixed(2), cols.credit, y);
+    doc.text(runningBalance.toFixed(2), cols.balance, y);
+    doc.moveDown(0.6);
+  });
+
+  doc.moveDown();
+  const summaryLabelX = 360;
+  const summaryValueX = 470;
+  const summaryValueWidth = 92;
+  const finalRemarks = lastBalance > 0 ? 'Dr' : lastBalance < 0 ? 'Cr' : '';
+
+  doc.font('Helvetica-Bold').fontSize(10);
+  [
+    ['Total Debit:', totalDebit],
+    ['Total Credit:', totalCredit],
+    ['Balance:', lastBalance],
+  ].forEach(([label, value]) => {
+    const y = doc.y;
+    doc.text(label, summaryLabelX, y);
+    doc.text(value.toFixed(2), summaryValueX, y, { width: summaryValueWidth, align: 'right' });
+    doc.moveDown(0.6);
+  });
+  doc.text(`Status: ${finalRemarks}`, summaryLabelX, doc.y);
+
+  doc.end();
+});
+
 module.exports = {
   invoiceExcel,
   invoicePdf,
   exportProducts,
   exportDistributors,
   exportOrders,
-  exportLedger,
-  exportDistributorLedger,
+  exportLedgerExcel,
+  exportLedgerPdf,
+  exportDistributorLedgerExcel,
+  exportDistributorLedgerPdf,
 };

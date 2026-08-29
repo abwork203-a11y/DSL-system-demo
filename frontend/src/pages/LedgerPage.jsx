@@ -30,6 +30,20 @@ export default function LedgerPage() {
   const [downloading, setDownloading] = useState(false);
   const [downloadProgress, setDownloadProgress] = useState(null);
   const downloadingRef = useRef(false);
+  const [exportMonth, setExportMonth] = useState(''); // 'YYYY-MM', empty = all time
+  const [exportFormat, setExportFormat] = useState('excel');
+
+  // Converts a 'YYYY-MM' month string into the start_date/end_date pair the
+  // backend already accepts (both exportLedgerExcel/Pdf and the distributor
+  // versions filter on these two params) — no new backend date format needed.
+  function monthToDateRange(monthStr) {
+    if (!monthStr) return { startDate: undefined, endDate: undefined };
+    const [year, month] = monthStr.split('-').map(Number);
+    const startDate = `${monthStr}-01`;
+    const lastDay = new Date(year, month, 0).getDate(); // day 0 of next month = last day of this month
+    const endDate = `${monthStr}-${String(lastDay).padStart(2, '0')}`;
+    return { startDate, endDate };
+  }
 
   useEffect(() => { distributorsApi.list().then((res) => setDistributorsList(res.data)).catch(() => {}); }, []);
 
@@ -72,13 +86,19 @@ export default function LedgerPage() {
     setDownloading(true);
     setDownloadProgress(null);
     try {
+      const { startDate, endDate } = monthToDateRange(exportMonth);
+      const monthLabel = exportMonth ? `-${exportMonth}` : '';
       if (distributorId) {
         // The per-distributor "Customer Ledger" statement (header block +
         // Dr/Cr remarks) is a nicer format than the flat bulk export below —
         // use it whenever we're already filtered down to one distributor.
-        await downloadFile(exportApi.distributorLedgerUrl(distributorId), `ledger-${distributor?.name || distributorId}.xlsx`, setDownloadProgress);
+        const url = exportApi.distributorLedgerUrl(distributorId, exportFormat, { start_date: startDate, end_date: endDate });
+        const ext = exportFormat === 'pdf' ? 'pdf' : 'xlsx';
+        await downloadFile(url, `ledger-${distributor?.name || distributorId}${monthLabel}.${ext}`, setDownloadProgress);
       } else {
-        await downloadFile(exportApi.ledgerUrl(), 'ledger.xlsx', setDownloadProgress);
+        const url = exportApi.ledgerUrl(exportFormat, { start_date: startDate, end_date: endDate });
+        const ext = exportFormat === 'pdf' ? 'pdf' : 'xlsx';
+        await downloadFile(url, `ledger${monthLabel}.${ext}`, setDownloadProgress);
       }
       toast.success('Ledger exported.');
     } catch (err) {
@@ -98,11 +118,30 @@ export default function LedgerPage() {
           <p>{distributor ? `${distributor.name} — running balance` : `All distributors${pagination ? ` · ${pagination.total} entries` : ''}`}</p>
         </div>
         {isAdmin && (
-          <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 6 }}>
-            <button className="btn btn-secondary" disabled={downloading} onClick={handleExport}>
-              {downloading && <Loader2 size={16} className="spin" />}
-              {downloading ? 'Downloading…' : 'Export Excel'}
-            </button>
+          <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 8 }}>
+            <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+              <input
+                type="month"
+                value={exportMonth}
+                onChange={(e) => setExportMonth(e.target.value)}
+                aria-label="Export month (leave blank for all time)"
+                title="Leave blank to export all activity"
+                style={{ padding: '7px 8px', border: '1px solid var(--rule)', borderRadius: 'var(--radius-sm)', fontSize: 13 }}
+              />
+              <select
+                value={exportFormat}
+                onChange={(e) => setExportFormat(e.target.value)}
+                aria-label="Export format"
+                style={{ padding: '7px 8px', border: '1px solid var(--rule)', borderRadius: 'var(--radius-sm)', fontSize: 13 }}
+              >
+                <option value="excel">Excel</option>
+                <option value="pdf">PDF</option>
+              </select>
+              <button className="btn btn-secondary" disabled={downloading} onClick={handleExport}>
+                {downloading && <Loader2 size={16} className="spin" />}
+                {downloading ? 'Downloading…' : `Export ${exportFormat === 'pdf' ? 'PDF' : 'Excel'}`}
+              </button>
+            </div>
             {downloading && (
               <div style={{ width: 180 }}>
                 <div className="progress-track">
