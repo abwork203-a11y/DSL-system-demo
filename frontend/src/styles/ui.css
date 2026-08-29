@@ -1463,16 +1463,9 @@ textarea:focus-visible {
   flex-shrink: 0;
 }
 
-.topbar-title {
-  font-family: var(--font-display);
-  font-size: 15px;
-  font-weight: 600;
-  color: var(--ink);
-}
-
 .topbar-date-time {
   display: flex;
-  align-items: center;
+  align-items: left;
   gap: 8px;
   font-size: 13px;
   white-space: nowrap;
