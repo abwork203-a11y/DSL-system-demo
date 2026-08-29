@@ -8,6 +8,10 @@ import { useLiveOrderEvents } from '../context/SocketContext';
 import StatusBadge from '../components/StatusBadge';
 import { StatSkeleton, TableSkeleton } from '../components/Skeleton';
 
+const [summary, setSummary] = useState(null);
+const [recentOrders, setRecentOrders] = useState([]);
+const [loading, setLoading] = useState(true);
+
 const [currentDateTime, setCurrentDateTime] = useState(new Date());
 
 useEffect(() => {
@@ -17,7 +21,6 @@ useEffect(() => {
 
   return () => clearInterval(timer);
 }, []);
-
 
 
 function money(n) {
