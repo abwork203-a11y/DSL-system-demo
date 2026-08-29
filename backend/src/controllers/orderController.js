@@ -123,12 +123,29 @@ const create = asyncHandler(async (req, res) => {
 const updateStatus = asyncHandler(async (req, res) => {
   const { id } = req.params;
   const { order_status } = req.body;
-  if (!['pending', 'current', 'completed', 'cancelled'].includes(order_status)) {
-    throw new ApiError(400, 'Invalid order_status.');
+  // 'cancelled' is deliberately NOT one of the allowed values here — cancelling
+  // an order has a real ledger side effect (reversing whatever's still
+  // outstanding), which only cancelOrder()/the PATCH /:id/cancel route does.
+  // Allowing 'cancelled' through this generic status-update endpoint would
+  // let an order be marked cancelled with its debit still fully in effect on
+  // the distributor's balance — silently wrong books with no error raised.
+  if (!['pending', 'current', 'completed'].includes(order_status)) {
+    throw new ApiError(
+      400,
+      "Invalid order_status. To cancel an order, use the Cancel action instead — it also reverses the order's effect on the distributor's ledger balance, which this status field does not."
+    );
   }
 
   const existing = await pool.query('SELECT * FROM orders WHERE id = $1', [id]);
   if (existing.rows.length === 0) throw new ApiError(404, 'Order not found.');
+
+  // Once cancelled (via the proper Cancel action), the ledger has already
+  // been reversed for this order — changing the status field back to
+  // 'active' here wouldn't restore that debit, leaving an order that looks
+  // active with no matching ledger entry. Cancelled is terminal.
+  if (existing.rows[0].order_status === 'cancelled') {
+    throw new ApiError(400, 'This order is cancelled and its status can no longer be changed.');
+  }
 
   const result = await pool.query(
     'UPDATE orders SET order_status = $1 WHERE id = $2 RETURNING *',

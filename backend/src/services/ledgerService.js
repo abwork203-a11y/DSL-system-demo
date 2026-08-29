@@ -225,6 +225,14 @@ async function recordPayment(client, { orderId, amount, note = null, userId = nu
   }
   const order = orderResult.rows[0];
 
+  // A cancelled order has already had its outstanding balance reversed on
+  // the ledger — recording a new payment against it now would post an
+  // additional credit on top of that reversal, double-crediting the
+  // distributor's balance for a transaction that's supposed to be closed.
+  if (order.order_status === 'cancelled') {
+    throw new ApiError(400, 'Cannot record a payment against a cancelled order.');
+  }
+
   const newAmountPaid = Number((Number(order.amount_paid) + Number(amount)).toFixed(2));
   if (newAmountPaid > Number(order.total)) {
     throw new ApiError(400, 'Payment would exceed the order total.');
@@ -259,10 +267,13 @@ async function recordPayment(client, { orderId, amount, note = null, userId = nu
 }
 
 /**
- * Cancels an order WITHOUT deleting any history. If the order still has a net
- * outstanding balance (total - amount_paid), posts an offsetting credit so the
- * distributor's balance goes back to what it was before this order existed —
- * this is the append-only-safe way to "undo" an order's effect on the ledger.
+ * Cancels an order WITHOUT deleting any history. Always fully reverses the
+ * order's effect on the distributor's ledger balance — if the order had
+ * already been paid (in full or in part), that payment is treated as
+ * REFUNDED to the distributor outside this system, not kept as a credit
+ * toward future orders. The balance always ends up exactly where it was
+ * before this order ever existed, which is the append-only-safe way to
+ * "undo" an order's effect on the ledger.
  */
 async function cancelOrder(client, { orderId, userId }) {
   const orderResult = await client.query('SELECT * FROM orders WHERE id = $1 FOR UPDATE', [orderId]);
@@ -275,17 +286,37 @@ async function cancelOrder(client, { orderId, userId }) {
     throw new ApiError(400, 'This order is already cancelled.');
   }
 
-  const netOutstanding = Number((Number(order.total) - Number(order.amount_paid)).toFixed(2));
+  // Policy: cancelling always fully unwinds the order's effect on the
+  // ledger. Any amount already paid is treated as REFUNDED to the
+  // distributor outside this system (cash/bank transfer, tracked
+  // elsewhere) — not kept as a credit toward future orders. If a given
+  // cancellation should instead leave the payment as a credit-forward, don't
+  // use this action; post a manual adjusting entry instead.
+  const amountPaid = Number(order.amount_paid);
+  const netOutstanding = Number((Number(order.total) - amountPaid).toFixed(2));
+
   if (netOutstanding > 0) {
     await postLedgerEntry(client, {
       distributorId: order.distributor_id,
       orderId: order.id,
       type: 'credit',
       amount: netOutstanding,
-      note: `Cancellation reversal for ${order.order_number}`,
+      // Called out explicitly whenever a payment was involved, so anyone
+      // reading the ledger later can see this reversal also covers a refund
+      // of what was already paid — not just "the unpaid part went away."
+      note: amountPaid > 0
+        ? `Cancellation reversal for ${order.order_number} (includes refund of ${amountPaid.toFixed(2)} already paid)`
+        : `Cancellation reversal for ${order.order_number}`,
       userId,
     });
   }
+  // If the order was paid IN FULL before being cancelled, netOutstanding is
+  // 0 — the debit and the original payment credit already net to zero on
+  // the running balance, so no further ledger entry is needed to keep the
+  // balance correct. But a real refund of the full amount still happened,
+  // and with no ledger entry to show it (postLedgerEntry can't post a
+  // zero-amount row), that fact would otherwise leave no trace anywhere.
+  // The audit record below is what captures it in that case.
 
   const updateResult = await client.query(
     `UPDATE orders SET order_status = 'cancelled' WHERE id = $1 RETURNING *`,
@@ -298,7 +329,10 @@ async function cancelOrder(client, { orderId, userId }) {
     entityType: 'order',
     entityId: orderId,
     before: { order_status: order.order_status },
-    after: { order_status: 'cancelled' },
+    after: {
+      order_status: 'cancelled',
+      ...(amountPaid > 0 ? { amount_refunded: amountPaid } : {}),
+    },
   });
 
   return updateResult.rows[0];

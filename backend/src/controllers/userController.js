@@ -48,6 +48,34 @@ const update = asyncHandler(async (req, res) => {
 
   const existing = await pool.query('SELECT * FROM users WHERE id = $1', [id]);
   if (existing.rows.length === 0) throw new ApiError(404, 'User not found.');
+  const targetUser = existing.rows[0];
+
+  const isSelf = Number(id) === req.user.id;
+  const losingAdminAccess = targetUser.role === 'admin' && (
+    (role && role !== 'admin') || is_active === false
+  );
+
+  // Self-demotion/self-deactivation is blocked outright, regardless of how
+  // many other admins exist — requireAuth re-checks role from the DB on
+  // every request (see middleware/auth.js), so this would take effect on
+  // this admin's own very next request, an easy way to accidentally lock
+  // yourself out mid-session with no warning.
+  if (isSelf && losingAdminAccess) {
+    throw new ApiError(400, 'You cannot remove your own admin access. Have another admin make this change.');
+  }
+
+  // Separately, demoting or deactivating any OTHER admin is blocked if they're
+  // the last one standing — otherwise the app can end up with zero active
+  // admins and no way to create or restore one short of a direct DB edit.
+  if (losingAdminAccess) {
+    const otherActiveAdmins = await pool.query(
+      `SELECT COUNT(*)::int AS count FROM users WHERE role = 'admin' AND is_active = true AND id != $1`,
+      [id]
+    );
+    if (otherActiveAdmins.rows[0].count === 0) {
+      throw new ApiError(400, 'Cannot remove admin access from the last remaining active admin.');
+    }
+  }
 
   let passwordHash = null;
   if (password) {
