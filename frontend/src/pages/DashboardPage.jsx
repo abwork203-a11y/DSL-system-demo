@@ -22,16 +22,7 @@ export default function DashboardPage() {
   const [recentOrders, setRecentOrders] = useState([]);
   const [loading, setLoading] = useState(true);
   
-  const [currentDateTime, setCurrentDateTime] = useState(new Date());
-
-useEffect(() => {
-  const timer = setInterval(() => {
-    setCurrentDateTime(new Date());
-  }, 1000);
-
-  return () => clearInterval(timer);
-}, []);
-
+  
   const load = useCallback(async () => {
     try {
       const [summaryRes, ordersRes] = await Promise.all([

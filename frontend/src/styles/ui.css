@@ -677,43 +677,61 @@ textarea:focus-visible {
   outline-offset: 2px;
 }
 
-/* ── Dashboard date & time ─────────────────────────────── */
+/* ── Global topbar ───────────────────────────────────────── */
 
-.header-actions {
+.topbar {
+  height: 60px;
   display: flex;
   align-items: center;
-  gap: 16px;
+  justify-content: space-between;
+  padding: 0 28px;
+  border-bottom: 1px solid var(--rule);
+  background: var(--surface);
+  flex-shrink: 0;
 }
 
-.date-time {
-  text-align: right;
-  padding: 7px 14px;
-  border-right: 1px solid var(--rule);
-}
-
-.current-date {
-  font-size: 12px;
-  color: var(--ink-muted);
-  margin-bottom: 3px;
-}
-
-.current-time {
-  font-family: var(--font-mono);
+.topbar-title {
+  font-family: var(--font-display);
   font-size: 15px;
+  font-weight: 600;
+  color: var(--ink);
+}
+
+.topbar-date-time {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 13px;
+  white-space: nowrap;
+}
+
+.topbar-date {
+  color: var(--ink-muted);
+}
+
+.topbar-divider {
+  color: var(--ink-muted);
+}
+
+.topbar-time {
+  font-family: var(--font-mono);
   font-weight: 600;
   color: var(--ink);
   font-variant-numeric: tabular-nums;
 }
 
 @media (max-width: 768px) {
-  .header-actions {
-    width: 100%;
-    justify-content: space-between;
+  .topbar {
+    padding: 0 20px;
+    padding-left: 64px;
   }
 
-  .date-time {
-    text-align: left;
-    border-right: none;
-    padding-left: 0;
+  .topbar-title {
+    display: none;
+  }
+
+  .topbar-date-time {
+    margin-left: auto;
+    font-size: 12px;
   }
 }

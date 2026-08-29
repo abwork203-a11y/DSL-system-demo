@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { NavLink, Outlet, useNavigate } from 'react-router-dom';
 import {
   LayoutDashboard, FileText, Factory, Package, Building2,
@@ -25,7 +25,15 @@ export default function Layout() {
   const { user, logout, isAdmin } = useAuth();
   const navigate = useNavigate();
   const [sidebarOpen, setSidebarOpen] = useState(false);
+  const [currentDateTime, setCurrentDateTime] = useState(new Date());
 
+useEffect(() => {
+  const timer = setInterval(() => {
+    setCurrentDateTime(new Date());
+  }, 1000);
+
+  return () => clearInterval(timer);
+}, []);
   const handleLogout = async () => {
     await logout();
     navigate('/login');
@@ -78,9 +86,37 @@ export default function Layout() {
         </div>
       </aside>
       <div className="main-area">
-        <Outlet />
-        <Footer />
-      </div>
+
+  <header className="topbar">
+    <div className="topbar-title">
+      {APP_NAME}
+    </div>
+
+    <div className="topbar-date-time">
+      <span className="topbar-date">
+        {currentDateTime.toLocaleDateString(undefined, {
+          weekday: 'short',
+          month: 'short',
+          day: 'numeric',
+          year: 'numeric',
+        })}
+      </span>
+
+      <span className="topbar-divider">•</span>
+
+      <span className="topbar-time">
+        {currentDateTime.toLocaleTimeString([], {
+          hour: '2-digit',
+          minute: '2-digit',
+        })}
+      </span>
+    </div>
+  </header>
+
+  <Outlet />
+
+  <Footer />
+</div>
     </div>
   );
 }
