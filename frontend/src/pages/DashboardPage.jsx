@@ -8,19 +8,7 @@ import { useLiveOrderEvents } from '../context/SocketContext';
 import StatusBadge from '../components/StatusBadge';
 import { StatSkeleton, TableSkeleton } from '../components/Skeleton';
 
-const [summary, setSummary] = useState(null);
-const [recentOrders, setRecentOrders] = useState([]);
-const [loading, setLoading] = useState(true);
 
-const [currentDateTime, setCurrentDateTime] = useState(new Date());
-
-useEffect(() => {
-  const timer = setInterval(() => {
-    setCurrentDateTime(new Date());
-  }, 1000);
-
-  return () => clearInterval(timer);
-}, []);
 
 
 function money(n) {
@@ -33,6 +21,16 @@ export default function DashboardPage() {
   const [summary, setSummary] = useState(null);
   const [recentOrders, setRecentOrders] = useState([]);
   const [loading, setLoading] = useState(true);
+  
+  const [currentDateTime, setCurrentDateTime] = useState(new Date());
+
+useEffect(() => {
+  const timer = setInterval(() => {
+    setCurrentDateTime(new Date());
+  }, 1000);
+
+  return () => clearInterval(timer);
+}, []);
 
   const load = useCallback(async () => {
     try {
