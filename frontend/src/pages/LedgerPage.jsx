@@ -1,6 +1,6 @@
 import { useEffect, useState, useCallback, useRef } from 'react';
 import { useSearchParams } from 'react-router-dom';
-import { Loader2 } from 'lucide-react';
+import { Loader2, FileSpreadsheet, FileText, X } from 'lucide-react';
 import { ledger as ledgerApi, distributors as distributorsApi, exportApi } from '../api/endpoints';
 import { apiErrorMessage, downloadFile } from '../api/client';
 import { useAuth } from '../context/AuthContext';
@@ -31,7 +31,7 @@ export default function LedgerPage() {
   const [downloadProgress, setDownloadProgress] = useState(null);
   const downloadingRef = useRef(false);
   const [exportMonth, setExportMonth] = useState(''); // 'YYYY-MM', empty = all time
-  const [exportFormat, setExportFormat] = useState('excel');
+  const [showDownloadModal, setShowDownloadModal] = useState(false);
 
   // Converts a 'YYYY-MM' month string into the start_date/end_date pair the
   // backend already accepts (both exportLedgerExcel/Pdf and the distributor
@@ -80,24 +80,24 @@ export default function LedgerPage() {
     else setSearchParams({});
   };
 
-  const handleExport = async () => {
+  const handleExport = async (format) => {
     if (downloadingRef.current) return; // guard against a fast double-click starting two downloads
     downloadingRef.current = true;
+    setShowDownloadModal(false);
     setDownloading(true);
     setDownloadProgress(null);
     try {
       const { startDate, endDate } = monthToDateRange(exportMonth);
       const monthLabel = exportMonth ? `-${exportMonth}` : '';
+      const ext = format === 'pdf' ? 'pdf' : 'xlsx';
       if (distributorId) {
         // The per-distributor "Customer Ledger" statement (header block +
         // Dr/Cr remarks) is a nicer format than the flat bulk export below —
         // use it whenever we're already filtered down to one distributor.
-        const url = exportApi.distributorLedgerUrl(distributorId, exportFormat, { start_date: startDate, end_date: endDate });
-        const ext = exportFormat === 'pdf' ? 'pdf' : 'xlsx';
+        const url = exportApi.distributorLedgerUrl(distributorId, format, { start_date: startDate, end_date: endDate });
         await downloadFile(url, `ledger-${distributor?.name || distributorId}${monthLabel}.${ext}`, setDownloadProgress);
       } else {
-        const url = exportApi.ledgerUrl(exportFormat, { start_date: startDate, end_date: endDate });
-        const ext = exportFormat === 'pdf' ? 'pdf' : 'xlsx';
+        const url = exportApi.ledgerUrl(format, { start_date: startDate, end_date: endDate });
         await downloadFile(url, `ledger${monthLabel}.${ext}`, setDownloadProgress);
       }
       toast.success('Ledger exported.');
@@ -127,17 +127,9 @@ export default function LedgerPage() {
                 aria-label="Export month (leave blank for all time)"
                 title="Leave blank to export all activity"
               />
-              <select
-                value={exportFormat}
-                onChange={(e) => setExportFormat(e.target.value)}
-                aria-label="Export format"
-              >
-                <option value="excel">Excel</option>
-                <option value="pdf">PDF</option>
-              </select>
-              <button className="btn btn-secondary" disabled={downloading} onClick={handleExport}>
+              <button className="btn btn-secondary" disabled={downloading} onClick={() => setShowDownloadModal(true)}>
                 {downloading && <Loader2 size={16} className="spin" />}
-                {downloading ? 'Downloading…' : `Export ${exportFormat === 'pdf' ? 'PDF' : 'Excel'}`}
+                {downloading ? 'Downloading…' : 'Download'}
               </button>
             </div>
             {downloading && (
@@ -153,6 +145,29 @@ export default function LedgerPage() {
           </div>
         )}
       </div>
+
+      {showDownloadModal && (
+        <div className="modal-overlay" onClick={() => setShowDownloadModal(false)}>
+          <div className="modal" style={{ maxWidth: 420 }} onClick={(e) => e.stopPropagation()}>
+            <div className="modal-header">
+              <h2 style={{ margin: 0 }}>Download</h2>
+              <button className="btn-ghost" onClick={() => setShowDownloadModal(false)} aria-label="Close">
+                <X size={20} />
+              </button>
+            </div>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+              <button className="download-option" onClick={() => handleExport('excel')}>
+                <FileSpreadsheet size={20} />
+                Excel (.xlsx)
+              </button>
+              <button className="download-option" onClick={() => handleExport('pdf')}>
+                <FileText size={20} />
+                PDF (.pdf)
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       <div className="card" style={{ display: 'flex', gap: 20, flexWrap: 'wrap', alignItems: 'flex-end' }}>
         <div className="field" style={{ marginBottom: 0, minWidth: 240 }}>

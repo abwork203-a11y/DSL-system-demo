@@ -75,13 +75,23 @@ export const exportApi = {
   productsUrl: () => `/export/products`,
   distributorsUrl: () => `/export/distributors`,
   ordersUrl: () => `/export/orders`,
-  ledgerUrl: (distributorId) => `/export/ledger${distributorId ? `?distributor_id=${distributorId}` : ''}`,
-  distributorLedgerUrl: (distributorId, startDate, endDate) => {
+  // format is 'excel' | 'pdf' — matches the new backend route shape
+  // (/export/ledger/excel, /export/ledger/pdf) instead of the old
+  // single /export/ledger route with no format distinction.
+  ledgerUrl: (format, { distributor_id, start_date, end_date } = {}) => {
     const params = new URLSearchParams();
-    if (startDate) params.set('start_date', startDate);
-    if (endDate) params.set('end_date', endDate);
+    if (distributor_id) params.set('distributor_id', distributor_id);
+    if (start_date) params.set('start_date', start_date);
+    if (end_date) params.set('end_date', end_date);
     const qs = params.toString();
-    return `/export/ledger/distributor/${distributorId}${qs ? `?${qs}` : ''}`;
+    return `/export/ledger/${format}${qs ? `?${qs}` : ''}`;
+  },
+  distributorLedgerUrl: (distributorId, format, { start_date, end_date } = {}) => {
+    const params = new URLSearchParams();
+    if (start_date) params.set('start_date', start_date);
+    if (end_date) params.set('end_date', end_date);
+    const qs = params.toString();
+    return `/export/ledger/distributor/${distributorId}/${format}${qs ? `?${qs}` : ''}`;
   },
 };
 
