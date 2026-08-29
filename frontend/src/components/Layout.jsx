@@ -132,11 +132,6 @@ export default function Layout() {
 
         {/* Global topbar */}
         <header className="topbar">
-
-          <div className="topbar-title">
-            LedgerOne
-          </div>
-
           <div className="topbar-date-time">
 
             <span className="topbar-date">

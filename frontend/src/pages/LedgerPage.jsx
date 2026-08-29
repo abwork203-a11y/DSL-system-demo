@@ -1,7 +1,22 @@
 import { useEffect, useState, useCallback, useRef } from 'react';
 import { useSearchParams } from 'react-router-dom';
-import { Loader2, FileSpreadsheet, FileText, X } from 'lucide-react';
-import { ledger as ledgerApi, distributors as distributorsApi, exportApi } from '../api/endpoints';
+import {
+  Loader2,
+  FileSpreadsheet,
+  FileText,
+  X,
+  ChevronLeft,
+  ChevronRight,
+  CalendarDays,
+  Download,
+} from 'lucide-react';
+
+import {
+  ledger as ledgerApi,
+  distributors as distributorsApi,
+  exportApi,
+} from '../api/endpoints';
+
 import { apiErrorMessage, downloadFile } from '../api/client';
 import { useAuth } from '../context/AuthContext';
 import { useToast } from '../context/ToastContext';
@@ -9,15 +24,48 @@ import StatusBadge from '../components/StatusBadge';
 import Pagination from '../components/Pagination';
 import { TableSkeleton } from '../components/Skeleton';
 
+
 const PAGE_SIZE = 50;
 
+const MONTHS = [
+  'January',
+  'February',
+  'March',
+  'April',
+  'May',
+  'June',
+  'July',
+  'August',
+  'September',
+  'October',
+  'November',
+  'December',
+];
+
+
 function money(n) {
-  return Number(n || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+  return Number(n || 0).toLocaleString(undefined, {
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2,
+  });
 }
+
+
+function formatMonth(monthStr) {
+  if (!monthStr) return 'All activity';
+
+  const [year, month] = monthStr.split('-').map(Number);
+
+  if (!year || !month) return 'All activity';
+
+  return `${MONTHS[month - 1]} ${year}`;
+}
+
 
 export default function LedgerPage() {
   const { isAdmin } = useAuth();
   const toast = useToast();
+
   const [searchParams, setSearchParams] = useSearchParams();
   const distributorId = searchParams.get('distributor_id') || '';
 
@@ -26,40 +74,124 @@ export default function LedgerPage() {
   const [pagination, setPagination] = useState(null);
   const [page, setPage] = useState(1);
   const [distributor, setDistributor] = useState(null);
+
   const [loading, setLoading] = useState(true);
+
   const [downloading, setDownloading] = useState(false);
   const [downloadProgress, setDownloadProgress] = useState(null);
+
   const downloadingRef = useRef(false);
-  const [exportMonth, setExportMonth] = useState(''); // 'YYYY-MM', empty = all time
+
+  /*
+   * Selected export month.
+   *
+   * Format:
+   * YYYY-MM
+   *
+   * Empty string = all activity.
+   */
+  const [exportMonth, setExportMonth] = useState('');
+
+  /*
+   * Custom Year → Month picker
+   */
+  const [showMonthPicker, setShowMonthPicker] = useState(false);
+
+  const [pickerYear, setPickerYear] = useState(
+    new Date().getFullYear()
+  );
+
+  const monthPickerRef = useRef(null);
+
   const [showDownloadModal, setShowDownloadModal] = useState(false);
 
-  // Converts a 'YYYY-MM' month string into the start_date/end_date pair the
-  // backend already accepts (both exportLedgerExcel/Pdf and the distributor
-  // versions filter on these two params) — no new backend date format needed.
+
+  /*
+   * Close month picker when clicking outside.
+   */
+  useEffect(() => {
+    const handleClickOutside = (event) => {
+      if (
+        monthPickerRef.current &&
+        !monthPickerRef.current.contains(event.target)
+      ) {
+        setShowMonthPicker(false);
+      }
+    };
+
+    if (showMonthPicker) {
+      document.addEventListener('mousedown', handleClickOutside);
+    }
+
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside);
+    };
+  }, [showMonthPicker]);
+
+
+  /*
+   * Converts YYYY-MM into the start_date/end_date pair
+   * accepted by the existing backend export endpoints.
+   */
   function monthToDateRange(monthStr) {
-    if (!monthStr) return { startDate: undefined, endDate: undefined };
+    if (!monthStr) {
+      return {
+        startDate: undefined,
+        endDate: undefined,
+      };
+    }
+
     const [year, month] = monthStr.split('-').map(Number);
+
     const startDate = `${monthStr}-01`;
-    const lastDay = new Date(year, month, 0).getDate(); // day 0 of next month = last day of this month
-    const endDate = `${monthStr}-${String(lastDay).padStart(2, '0')}`;
-    return { startDate, endDate };
+
+    // Day 0 of the next month = last day of selected month.
+    const lastDay = new Date(year, month, 0).getDate();
+
+    const endDate =
+      `${monthStr}-${String(lastDay).padStart(2, '0')}`;
+
+    return {
+      startDate,
+      endDate,
+    };
   }
 
-  useEffect(() => { distributorsApi.list().then((res) => setDistributorsList(res.data)).catch(() => {}); }, []);
 
+  /*
+   * Load distributors.
+   */
+  useEffect(() => {
+    distributorsApi
+      .list()
+      .then((res) => setDistributorsList(res.data))
+      .catch(() => {});
+  }, []);
+
+
+  /*
+   * Load ledger.
+   */
   const load = useCallback(async () => {
     setLoading(true);
+
     try {
       if (distributorId) {
-        // A single distributor's full history — not paginated (see
-        // ledgerController.js for why: naturally bounded to one business
-        // relationship rather than the whole company's activity).
-        const res = await ledgerApi.distributorSummary(distributorId);
+        /*
+         * A single distributor's full history.
+         */
+        const res =
+          await ledgerApi.distributorSummary(distributorId);
+
         setDistributor(res.data.distributor);
         setEntries(res.data.entries);
         setPagination(null);
       } else {
-        const res = await ledgerApi.list({ page, pageSize: PAGE_SIZE });
+        const res = await ledgerApi.list({
+          page,
+          pageSize: PAGE_SIZE,
+        });
+
         setDistributor(null);
         setEntries(res.data.data);
         setPagination(res.data.pagination);
@@ -69,37 +201,161 @@ export default function LedgerPage() {
     } finally {
       setLoading(false);
     }
+
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [distributorId, page]);
 
-  useEffect(() => { load(); }, [load]);
 
+  useEffect(() => {
+    load();
+  }, [load]);
+
+
+  /*
+   * Distributor filter.
+   */
   const handleDistributorChange = (val) => {
     setPage(1);
-    if (val) setSearchParams({ distributor_id: val });
-    else setSearchParams({});
+
+    if (val) {
+      setSearchParams({
+        distributor_id: val,
+      });
+    } else {
+      setSearchParams({});
+    }
   };
 
+
+  /*
+   * Open month picker.
+   */
+  const openMonthPicker = () => {
+    if (exportMonth) {
+      const [year] = exportMonth.split('-').map(Number);
+      setPickerYear(year);
+    } else {
+      setPickerYear(new Date().getFullYear());
+    }
+
+    setShowMonthPicker((current) => !current);
+  };
+
+
+  /*
+   * Select a month.
+   */
+  const handleMonthSelect = (monthIndex) => {
+    const month = String(monthIndex + 1).padStart(2, '0');
+
+    setExportMonth(`${pickerYear}-${month}`);
+    setShowMonthPicker(false);
+  };
+
+
+  /*
+   * Clear selected month.
+   */
+  const handleClearMonth = () => {
+    setExportMonth('');
+    setShowMonthPicker(false);
+  };
+
+
+  /*
+   * Select current month.
+   */
+  const handleCurrentMonth = () => {
+    const now = new Date();
+
+    const month = String(
+      now.getMonth() + 1
+    ).padStart(2, '0');
+
+    setExportMonth(
+      `${now.getFullYear()}-${month}`
+    );
+
+    setPickerYear(now.getFullYear());
+    setShowMonthPicker(false);
+  };
+
+
+  /*
+   * Change picker year.
+   */
+  const changePickerYear = (amount) => {
+    setPickerYear((year) => year + amount);
+  };
+
+
+  /*
+   * Export ledger.
+   */
   const handleExport = async (format) => {
-    if (downloadingRef.current) return; // guard against a fast double-click starting two downloads
+    if (downloadingRef.current) return;
+
     downloadingRef.current = true;
+
     setShowDownloadModal(false);
     setDownloading(true);
     setDownloadProgress(null);
+
     try {
-      const { startDate, endDate } = monthToDateRange(exportMonth);
-      const monthLabel = exportMonth ? `-${exportMonth}` : '';
-      const ext = format === 'pdf' ? 'pdf' : 'xlsx';
+      const {
+        startDate,
+        endDate,
+      } = monthToDateRange(exportMonth);
+
+      const monthLabel =
+        exportMonth
+          ? `-${exportMonth}`
+          : '';
+
+      const ext =
+        format === 'pdf'
+          ? 'pdf'
+          : 'xlsx';
+
       if (distributorId) {
-        // The per-distributor "Customer Ledger" statement (header block +
-        // Dr/Cr remarks) is a nicer format than the flat bulk export below —
-        // use it whenever we're already filtered down to one distributor.
-        const url = exportApi.distributorLedgerUrl(distributorId, format, { start_date: startDate, end_date: endDate });
-        await downloadFile(url, `ledger-${distributor?.name || distributorId}${monthLabel}.${ext}`, setDownloadProgress);
+        /*
+         * Distributor-specific Customer Ledger.
+         */
+        const url =
+          exportApi.distributorLedgerUrl(
+            distributorId,
+            format,
+            {
+              start_date: startDate,
+              end_date: endDate,
+            }
+          );
+
+        await downloadFile(
+          url,
+          `ledger-${distributor?.name || distributorId}${monthLabel}.${ext}`,
+          setDownloadProgress
+        );
       } else {
-        const url = exportApi.ledgerUrl(format, { start_date: startDate, end_date: endDate });
-        await downloadFile(url, `ledger${monthLabel}.${ext}`, setDownloadProgress);
+        /*
+         * Full ledger export.
+         */
+        const url =
+          exportApi.ledgerUrl(
+            format,
+            {
+              start_date: startDate,
+              end_date: endDate,
+            }
+          );
+
+        await downloadFile(
+          url,
+          `ledger${monthLabel}.${ext}`,
+          setDownloadProgress
+        );
       }
+
       toast.success('Ledger exported.');
     } catch (err) {
       toast.error(apiErrorMessage(err));
@@ -110,121 +366,591 @@ export default function LedgerPage() {
     }
   };
 
+
   return (
     <div className="content">
+
+      {/* =====================================================
+          PAGE HEADER
+      ====================================================== */}
+
       <div className="page-header">
+
         <div>
           <h1>Ledger</h1>
-          <p>{distributor ? `${distributor.name} — running balance` : `All distributors${pagination ? ` · ${pagination.total} entries` : ''}`}</p>
+
+          <p>
+            {distributor
+              ? `${distributor.name} — running balance`
+              : `All distributors${
+                  pagination
+                    ? ` · ${pagination.total} entries`
+                    : ''
+                }`}
+          </p>
         </div>
+
+
+        {/* =================================================
+            ADMIN ACTIONS
+        ================================================== */}
+
         {isAdmin && (
-          <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 8 }}>
-            <div className="export-toolbar">
-              <input
-                type="month"
-                value={exportMonth}
-                onChange={(e) => setExportMonth(e.target.value)}
-                aria-label="Export month (leave blank for all time)"
-                title="Leave blank to export all activity"
-              />
-              <button className="btn btn-secondary" disabled={downloading} onClick={() => setShowDownloadModal(true)}>
-                {downloading && <Loader2 size={16} className="spin" />}
-                {downloading ? 'Downloading…' : 'Download'}
+          <div className="ledger-header-actions">
+
+            {/* ---------------------------------------------
+                ACCOUNTING PERIOD
+            ---------------------------------------------- */}
+
+            <div
+              className="ledger-period-picker"
+              ref={monthPickerRef}
+            >
+
+              <label className="ledger-period-label">
+                ACCOUNTING PERIOD
+              </label>
+
+
+              <button
+                type="button"
+                className={`ledger-period-trigger${
+                  showMonthPicker
+                    ? ' is-open'
+                    : ''
+                }`}
+                onClick={openMonthPicker}
+                aria-haspopup="dialog"
+                aria-expanded={showMonthPicker}
+              >
+
+                <CalendarDays
+                  size={16}
+                  strokeWidth={1.8}
+                />
+
+                <span>
+                  {formatMonth(exportMonth)}
+                </span>
+
+                <ChevronRight
+                  size={15}
+                  strokeWidth={1.8}
+                  className={`ledger-period-chevron${
+                    showMonthPicker
+                      ? ' rotate'
+                      : ''
+                  }`}
+                />
+
               </button>
-            </div>
-            {downloading && (
-              <div style={{ width: 180 }}>
-                <div className="progress-track">
-                  <div
-                    className={`progress-fill${downloadProgress == null ? ' indeterminate' : ''}`}
-                    style={downloadProgress != null ? { width: `${downloadProgress}%` } : undefined}
-                  />
+
+
+              {/* -------------------------------------------
+                  YEAR → MONTH POPUP
+              -------------------------------------------- */}
+
+              {showMonthPicker && (
+                <div
+                  className="ledger-month-picker"
+                  role="dialog"
+                  aria-label="Select accounting period"
+                >
+
+                  {/* Header */}
+
+                  <div className="ledger-month-picker-header">
+
+                    <div>
+                      <div className="ledger-month-picker-caption">
+                        SELECT ACCOUNTING PERIOD
+                      </div>
+
+                      <div className="ledger-month-picker-year">
+                        {pickerYear}
+                      </div>
+                    </div>
+
+
+                    <div className="ledger-year-controls">
+
+                      <button
+                        type="button"
+                        className="ledger-year-button"
+                        onClick={() =>
+                          changePickerYear(-1)
+                        }
+                        aria-label="Previous year"
+                      >
+                        <ChevronLeft
+                          size={17}
+                        />
+                      </button>
+
+                      <button
+                        type="button"
+                        className="ledger-year-button"
+                        onClick={() =>
+                          changePickerYear(1)
+                        }
+                        aria-label="Next year"
+                      >
+                        <ChevronRight
+                          size={17}
+                        />
+                      </button>
+
+                    </div>
+
+                  </div>
+
+
+                  {/* Month grid */}
+
+                  <div className="ledger-month-grid">
+
+                    {MONTHS.map((month, index) => {
+                      const monthValue =
+                        `${pickerYear}-${String(
+                          index + 1
+                        ).padStart(2, '0')}`;
+
+                      const isSelected =
+                        exportMonth === monthValue;
+
+                      const now = new Date();
+
+                      const currentValue =
+                        `${now.getFullYear()}-${String(
+                          now.getMonth() + 1
+                        ).padStart(2, '0')}`;
+
+                      const isCurrent =
+                        currentValue === monthValue;
+
+                      return (
+                        <button
+                          key={month}
+                          type="button"
+                          className={`ledger-month-option${
+                            isSelected
+                              ? ' selected'
+                              : ''
+                          }${
+                            isCurrent
+                              ? ' current'
+                              : ''
+                          }`}
+                          onClick={() =>
+                            handleMonthSelect(index)
+                          }
+                        >
+                          <span>
+                            {month.slice(0, 3)}
+                          </span>
+
+                          {isCurrent && !isSelected && (
+                            <small>Current</small>
+                          )}
+                        </button>
+                      );
+                    })}
+
+                  </div>
+
+
+                  {/* Footer */}
+
+                  <div className="ledger-month-picker-footer">
+
+                    <button
+                      type="button"
+                      className="ledger-picker-secondary"
+                      onClick={handleClearMonth}
+                    >
+                      Clear
+                    </button>
+
+                    <button
+                      type="button"
+                      className="ledger-picker-primary"
+                      onClick={handleCurrentMonth}
+                    >
+                      Current Month
+                    </button>
+
+                  </div>
+
                 </div>
+              )}
+
+            </div>
+
+
+            {/* ---------------------------------------------
+                DOWNLOAD
+            ---------------------------------------------- */}
+
+            <button
+              type="button"
+              className="btn btn-secondary ledger-download-btn"
+              disabled={downloading}
+              onClick={() =>
+                setShowDownloadModal(true)
+              }
+            >
+
+              {downloading ? (
+                <Loader2
+                  size={16}
+                  className="spin"
+                />
+              ) : (
+                <Download
+                  size={16}
+                  strokeWidth={1.8}
+                />
+              )}
+
+              {downloading
+                ? 'Downloading…'
+                : 'Download'}
+
+            </button>
+
+
+            {/* Download progress */}
+
+            {downloading && (
+              <div className="ledger-download-progress">
+
+                <div className="progress-track">
+
+                  <div
+                    className={`progress-fill${
+                      downloadProgress == null
+                        ? ' indeterminate'
+                        : ''
+                    }`}
+                    style={
+                      downloadProgress != null
+                        ? {
+                            width: `${downloadProgress}%`,
+                          }
+                        : undefined
+                    }
+                  />
+
+                </div>
+
               </div>
             )}
+
           </div>
         )}
+
       </div>
 
+
+      {/* =====================================================
+          DOWNLOAD MODAL
+      ====================================================== */}
+
       {showDownloadModal && (
-        <div className="modal-overlay" onClick={() => setShowDownloadModal(false)}>
-          <div className="modal" style={{ maxWidth: 420 }} onClick={(e) => e.stopPropagation()}>
+        <div
+          className="modal-overlay"
+          onClick={() =>
+            setShowDownloadModal(false)
+          }
+        >
+
+          <div
+            className="modal"
+            style={{ maxWidth: 420 }}
+            onClick={(e) =>
+              e.stopPropagation()
+            }
+          >
+
             <div className="modal-header">
-              <h2 style={{ margin: 0 }}>Download</h2>
-              <button className="btn-ghost" onClick={() => setShowDownloadModal(false)} aria-label="Close">
+
+              <h2 style={{ margin: 0 }}>
+                Download
+              </h2>
+
+              <button
+                className="btn-ghost"
+                onClick={() =>
+                  setShowDownloadModal(false)
+                }
+                aria-label="Close"
+              >
                 <X size={20} />
               </button>
+
             </div>
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-              <button className="download-option" onClick={() => handleExport('excel')}>
+
+
+            <div
+              style={{
+                display: 'flex',
+                flexDirection: 'column',
+                gap: 10,
+              }}
+            >
+
+              <button
+                className="download-option"
+                onClick={() =>
+                  handleExport('excel')
+                }
+              >
                 <FileSpreadsheet size={20} />
                 Excel (.xlsx)
               </button>
-              <button className="download-option" onClick={() => handleExport('pdf')}>
+
+
+              <button
+                className="download-option"
+                onClick={() =>
+                  handleExport('pdf')
+                }
+              >
                 <FileText size={20} />
                 PDF (.pdf)
               </button>
+
             </div>
+
           </div>
+
         </div>
       )}
 
-      <div className="card" style={{ display: 'flex', gap: 20, flexWrap: 'wrap', alignItems: 'flex-end' }}>
-        <div className="field" style={{ marginBottom: 0, minWidth: 240 }}>
-          <label>Distributor</label>
-          <select value={distributorId} onChange={(e) => handleDistributorChange(e.target.value)}>
-            <option value="">All distributors</option>
-            {distributorsList.map((d) => <option key={d.id} value={d.id}>{d.name}</option>)}
+
+      {/* =====================================================
+          FILTER BAR
+      ====================================================== */}
+
+      <div className="card ledger-filter-bar">
+
+        <div className="field ledger-distributor-field">
+
+          <label>
+            DISTRIBUTOR
+          </label>
+
+          <select
+            value={distributorId}
+            onChange={(e) =>
+              handleDistributorChange(
+                e.target.value
+              )
+            }
+          >
+
+            <option value="">
+              All distributors
+            </option>
+
+            {distributorsList.map((d) => (
+              <option
+                key={d.id}
+                value={d.id}
+              >
+                {d.name}
+              </option>
+            ))}
+
           </select>
+
         </div>
+
+
         {distributor && (
-          <div>
-            <div className="stat-label">Current Balance</div>
-            <div className="stat-value num">{money(distributor.balance)}</div>
+          <div className="ledger-current-balance">
+
+            <div className="stat-label">
+              Current Balance
+            </div>
+
+            <div className="stat-value num">
+              {money(distributor.balance)}
+            </div>
+
           </div>
         )}
+
       </div>
 
+
+      {/* =====================================================
+          LEDGER TABLE
+      ====================================================== */}
+
       <div className="card">
+
         {loading ? (
-          <TableSkeleton columns={distributor ? 7 : 8} rows={6} />
+
+          <TableSkeleton
+            columns={
+              distributor
+                ? 7
+                : 8
+            }
+            rows={6}
+          />
+
         ) : (
+
           <div className="table-wrap">
+
             <table className="data-table">
+
               <thead>
+
                 <tr>
-                  {!distributor && <th>Distributor</th>}
-                  <th>Date</th>
-                  <th>Order</th>
-                  <th>Payment Term</th>
-                  <th>Type</th>
-                  <th className="num">Amount</th>
-                  <th className="num">Running Balance</th>
-                  <th>Note</th>
+
+                  {!distributor && (
+                    <th>
+                      Distributor
+                    </th>
+                  )}
+
+                  <th>
+                    Date
+                  </th>
+
+                  <th>
+                    Order
+                  </th>
+
+                  <th>
+                    Payment Term
+                  </th>
+
+                  <th>
+                    Type
+                  </th>
+
+                  <th className="num">
+                    Amount
+                  </th>
+
+                  <th className="num">
+                    Running Balance
+                  </th>
+
+                  <th>
+                    Note
+                  </th>
+
                 </tr>
+
               </thead>
+
+
               <tbody>
+
                 {entries.map((e) => (
+
                   <tr key={e.id}>
-                    {!distributor && <td>{e.distributor_name}</td>}
-                    <td>{new Date(e.entry_date).toLocaleDateString()}</td>
-                    <td>{e.order_number || '—'}</td>
-                    <td style={{ textTransform: 'capitalize' }}>{e.payment_term || '—'}</td>
-                    <td><StatusBadge value={e.type} /></td>
-                    <td className="num">{e.type === 'debit' ? '+' : '−'}{money(e.amount)}</td>
-                    <td className="num">{money(e.running_balance)}</td>
-                    <td style={{ color: 'var(--ink-muted)' }}>{e.note || '—'}</td>
+
+                    {!distributor && (
+                      <td>
+                        {e.distributor_name}
+                      </td>
+                    )}
+
+                    <td>
+                      {new Date(
+                        e.entry_date
+                      ).toLocaleDateString()}
+                    </td>
+
+                    <td>
+                      {e.order_number || '—'}
+                    </td>
+
+                    <td
+                      style={{
+                        textTransform:
+                          'capitalize',
+                      }}
+                    >
+                      {e.payment_term || '—'}
+                    </td>
+
+                    <td>
+                      <StatusBadge
+                        value={e.type}
+                      />
+                    </td>
+
+                    <td className="num">
+                      {e.type === 'debit'
+                        ? '+'
+                        : '−'}
+                      {money(e.amount)}
+                    </td>
+
+                    <td className="num">
+                      {money(
+                        e.running_balance
+                      )}
+                    </td>
+
+                    <td
+                      style={{
+                        color:
+                          'var(--ink-muted)',
+                      }}
+                    >
+                      {e.note || '—'}
+                    </td>
+
                   </tr>
+
                 ))}
+
+
                 {entries.length === 0 && (
-                  <tr><td colSpan={distributor ? 7 : 8}><div className="empty-state">No ledger entries yet.</div></td></tr>
+                  <tr>
+
+                    <td
+                      colSpan={
+                        distributor
+                          ? 7
+                          : 8
+                      }
+                    >
+
+                      <div className="empty-state">
+                        No ledger entries yet.
+                      </div>
+
+                    </td>
+
+                  </tr>
                 )}
+
               </tbody>
+
             </table>
+
           </div>
+
         )}
-        {!distributor && <Pagination pagination={pagination} onPageChange={setPage} />}
+
+        {!distributor && (
+          <Pagination
+            pagination={pagination}
+            onPageChange={setPage}
+          />
+        )}
+
       </div>
+
     </div>
   );
 }

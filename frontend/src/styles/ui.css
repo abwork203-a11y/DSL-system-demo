@@ -525,33 +525,405 @@ table.data-table { width: 100%; border-collapse: collapse; font-size: 13.5px; ba
   flex-shrink: 0;
 }
 
-/* ── Ledger export toolbar (month + format + button) ───────
-   All three controls share one height/border/radius/font so they
-   read as one cohesive group, not three separately-styled pieces. */
-.export-toolbar {
+/* ── Ledger filter / accounting period ───────────────────── */
+
+.ledger-filter-bar {
   display: flex;
-  align-items: stretch;
-  gap: 8px;
+  align-items: flex-end;
+  gap: 28px;
+  margin-bottom: 16px;
 }
-.export-toolbar input[type='month'],
-.export-toolbar select {
+
+.ledger-distributor-field {
+  width: 280px;
+  margin-bottom: 0;
+}
+
+.ledger-distributor-field select {
+  width: 100%;
+}
+
+
+/* ── Ledger header actions ───────────────────────────────── */
+
+.ledger-header-actions {
+  display: flex;
+  align-items: flex-end;
+  gap: 10px;
+  position: relative;
+}
+
+.ledger-period-picker {
+  position: relative;
+  min-width: 190px;
+}
+
+.ledger-period-label {
+  display: block;
+  margin-bottom: 5px;
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--ink-muted);
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+
+/* ── Accounting period trigger ───────────────────────────── */
+
+.ledger-period-trigger {
+  width: 100%;
   height: 36px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+
   padding: 0 10px;
+
   border: 1px solid var(--rule);
   border-radius: var(--radius-sm);
+
+  background: var(--surface);
+  color: var(--ink);
+
   font-family: var(--font-body);
   font-size: 13px;
-  color: var(--ink);
-  background: var(--surface);
+  font-weight: 500;
+
+  cursor: pointer;
+
+  transition:
+    border-color 0.12s,
+    background 0.12s,
+    box-shadow 0.12s;
 }
-.export-toolbar input[type='month']:focus,
-.export-toolbar select:focus {
+
+.ledger-period-trigger:hover {
+  background: var(--surface-sunken);
+  border-color: var(--rule-strong);
+}
+
+.ledger-period-trigger.is-open {
   border-color: var(--brass);
-  outline: 2px solid rgba(150, 116, 42, 0.25);
-  outline-offset: 0;
+  box-shadow: 0 0 0 2px rgba(150, 116, 42, 0.12);
 }
-.export-toolbar .btn {
+
+.ledger-period-trigger svg:first-child {
+  color: var(--ink-muted);
+  flex-shrink: 0;
+}
+
+.ledger-period-trigger span {
+  flex: 1;
+  text-align: left;
+}
+
+.ledger-period-chevron {
+  color: var(--ink-muted);
+  transition: transform 0.15s ease;
+}
+
+.ledger-period-chevron.rotate {
+  transform: rotate(90deg);
+}
+
+
+/* ── Year → Month picker ─────────────────────────────────── */
+
+.ledger-month-picker {
+  position: absolute;
+  top: calc(100% + 8px);
+  right: 0;
+  z-index: 20;
+
+  width: 330px;
+
+  background: var(--surface);
+  border: 1px solid var(--rule);
+  border-radius: var(--radius);
+
+  box-shadow: var(--shadow-md);
+
+  overflow: hidden;
+}
+
+
+/* ── Picker header ────────────────────────────────────────── */
+
+.ledger-month-picker-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+
+  padding: 16px 18px;
+
+  border-bottom: 1px solid var(--rule);
+}
+
+.ledger-month-picker-caption {
+  margin-bottom: 3px;
+
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.07em;
+  text-transform: uppercase;
+
+  color: var(--ink-muted);
+}
+
+.ledger-month-picker-year {
+  font-family: var(--font-display);
+  font-size: 20px;
+  font-weight: 600;
+  line-height: 1.2;
+  color: var(--ink);
+}
+
+
+/* ── Previous / next year ────────────────────────────────── */
+
+.ledger-year-controls {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.ledger-year-button {
+  width: 30px;
+  height: 30px;
+
+  display: flex;
+  align-items: center;
+  justify-content: center;
+
+  padding: 0;
+
+  border: 1px solid var(--rule);
+  border-radius: var(--radius-sm);
+
+  background: var(--surface);
+  color: var(--ink-muted);
+
+  cursor: pointer;
+
+  transition:
+    background 0.12s,
+    color 0.12s,
+    border-color 0.12s;
+}
+
+.ledger-year-button:hover {
+  background: var(--surface-sunken);
+  color: var(--ink);
+  border-color: var(--rule-strong);
+}
+
+
+/* ── Month grid ───────────────────────────────────────────── */
+
+.ledger-month-grid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 6px;
+
+  padding: 16px;
+}
+
+.ledger-month-option {
+  position: relative;
+
+  min-height: 42px;
+
+  display: flex;
+  align-items: center;
+  justify-content: center;
+
+  border: 1px solid transparent;
+  border-radius: var(--radius-sm);
+
+  background: transparent;
+  color: var(--ink);
+
+  font-family: var(--font-body);
+  font-size: 13px;
+  font-weight: 500;
+
+  cursor: pointer;
+
+  transition:
+    background 0.12s,
+    color 0.12s,
+    border-color 0.12s;
+}
+
+.ledger-month-option:hover {
+  background: var(--surface-sunken);
+  border-color: var(--rule);
+}
+
+.ledger-month-option.selected {
+  background: var(--green);
+  border-color: var(--green);
+  color: #fff;
+  font-weight: 600;
+}
+
+.ledger-month-option.current:not(.selected) {
+  border-color: var(--brass);
+  color: var(--ink);
+  font-weight: 600;
+}
+
+.ledger-month-option small {
+  position: absolute;
+
+  bottom: 3px;
+
+  font-size: 8px;
+  font-weight: 600;
+  line-height: 1;
+
+  color: var(--brass);
+}
+
+
+/* ── Picker footer ────────────────────────────────────────── */
+
+.ledger-month-picker-footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+
+  padding: 10px 16px;
+
+  border-top: 1px solid var(--rule);
+  background: var(--surface-sunken);
+}
+
+.ledger-picker-secondary,
+.ledger-picker-primary {
+  border: 0;
+  background: transparent;
+
+  font-family: var(--font-body);
+  font-size: 12.5px;
+  font-weight: 600;
+
+  cursor: pointer;
+}
+
+.ledger-picker-secondary {
+  color: var(--ink-muted);
+}
+
+.ledger-picker-secondary:hover {
+  color: var(--ink);
+}
+
+.ledger-picker-primary {
+  color: var(--green);
+}
+
+.ledger-picker-primary:hover {
+  text-decoration: underline;
+}
+
+
+/* ── Download button ──────────────────────────────────────── */
+
+.ledger-download-btn {
   height: 36px;
+  white-space: nowrap;
+}
+
+
+/* ── Current balance ──────────────────────────────────────── */
+
+.ledger-current-balance {
+  margin-left: auto;
+  padding: 0 4px 2px 0;
+}
+
+.ledger-current-balance .stat-label {
+  margin-bottom: 2px;
+}
+
+.ledger-current-balance .stat-value {
+  font-size: 19px;
+}
+
+
+/* ── Download progress ────────────────────────────────────── */
+
+.ledger-download-progress {
+  position: absolute;
+  right: 0;
+  bottom: -7px;
+  width: 190px;
+}
+
+.ledger-download-progress .progress-track {
+  width: 100%;
+  height: 2px;
+  overflow: hidden;
+  background: var(--rule);
+}
+
+.ledger-download-progress .progress-fill {
+  height: 100%;
+  background: var(--green);
+  transition: width 0.15s ease;
+}
+
+.ledger-download-progress .progress-fill.indeterminate {
+  width: 40%;
+  animation: ledger-progress 1.2s ease-in-out infinite;
+}
+
+@keyframes ledger-progress {
+  0% {
+    transform: translateX(-100%);
+  }
+
+  100% {
+    transform: translateX(350%);
+  }
+}
+
+
+/* ── Mobile ───────────────────────────────────────────────── */
+
+@media (max-width: 768px) {
+
+  .ledger-header-actions {
+    width: 100%;
+    align-items: flex-end;
+  }
+
+  .ledger-period-picker {
+    flex: 1;
+    min-width: 0;
+  }
+
+  .ledger-month-picker {
+    right: auto;
+    left: 0;
+    width: min(330px, calc(100vw - 40px));
+  }
+
+  .ledger-filter-bar {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 8px;
+  }
+
+  .ledger-distributor-field {
+    width: 100%;
+  }
+
+  .ledger-current-balance {
+    margin-left: 0;
+  }
 }
 
 /* Explicit re-assertion — if .btn-secondary's text or background is ever
