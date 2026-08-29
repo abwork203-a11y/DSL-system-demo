@@ -39,6 +39,7 @@ body {
 .app-shell {
   display: flex;
   min-height: 100vh;
+  width: 100%;
 }
 
 .main-area {
@@ -57,7 +58,11 @@ body {
 
 .sidebar {
   width: 232px;
-  flex-shrink: 0;
+  flex: 0 0 232px;
+
+  position: sticky;
+  top: 0;
+  height: 100vh;
 
   background: var(--sidebar-bg);
   color: var(--sidebar-ink);
@@ -67,14 +72,13 @@ body {
 
   padding: 20px 14px;
 
-  position: sticky;
-  top: 0;
-
-  height: 100vh;
   overflow-y: auto;
+  overflow-x: hidden;
 
-  box-shadow:
-    inset -1px 0 0 rgba(255, 255, 255, 0.05);
+  box-shadow: inset -1px 0 0 rgba(255, 255, 255, 0.05);
+
+  /* Keeps the sidebar above page content */
+  z-index: 20;
 }
 
 .sidebar-brand {
@@ -164,14 +168,18 @@ body {
 
   display: flex;
   align-items: center;
-  justify-content: flex-end;
+  justify-content: space-between;
 
   padding: 0 28px;
 
-  border-bottom: 1px solid var(--rule);
   background: var(--surface);
+  border-bottom: 1px solid var(--rule);
 
   flex-shrink: 0;
+
+  position: sticky;
+  top: 0;
+  z-index: 10;
 }
 
 .topbar-title {
@@ -209,12 +217,9 @@ body {
    ============================================================== */
 
 .content {
-  padding: 28px;
-
   flex: 1;
+  padding: 28px;
   min-width: 0;
-
-  overflow-y: auto;
 }
 
 .page-header {
