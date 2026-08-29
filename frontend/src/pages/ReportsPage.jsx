@@ -1,5 +1,6 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { LineChart, Line, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid, BarChart, Bar } from 'recharts';
+import { Loader2 } from 'lucide-react';
 import { reports, exportApi } from '../api/endpoints';
 import { apiErrorMessage, downloadFile } from '../api/client';
 import { useToast } from '../context/ToastContext';
@@ -16,6 +17,9 @@ export default function ReportsPage() {
   const [byRep, setByRep] = useState([]);
   const [topProducts, setTopProducts] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [exporting, setExporting] = useState(''); // '' | 'orders' | 'distributors' | 'products'
+  const [exportProgress, setExportProgress] = useState(null);
+  const exportingRef = useRef(false);
 
   useEffect(() => {
     Promise.all([
@@ -36,12 +40,20 @@ export default function ReportsPage() {
   }, []);
 
   const handleExport = async (which) => {
+    if (exportingRef.current) return; // one export at a time — all three buttons are disabled while this is true, but a fast double-click on the same button could still slip through without this
+    exportingRef.current = true;
+    setExporting(which);
+    setExportProgress(null);
     try {
       const url = which === 'orders' ? exportApi.ordersUrl() : which === 'distributors' ? exportApi.distributorsUrl() : exportApi.productsUrl();
-      await downloadFile(url, `${which}.xlsx`);
+      await downloadFile(url, `${which}.xlsx`, setExportProgress);
       toast.success(`${which[0].toUpperCase()}${which.slice(1)} exported.`);
     } catch (err) {
       toast.error(apiErrorMessage(err));
+    } finally {
+      exportingRef.current = false;
+      setExporting('');
+      setExportProgress(null);
     }
   };
 
@@ -52,10 +64,31 @@ export default function ReportsPage() {
           <h1>Reports</h1>
           <p>Sales performance and export tools.</p>
         </div>
-        <div style={{ display: 'flex', gap: 8 }}>
-          <button className="btn btn-secondary btn-sm" onClick={() => handleExport('orders')}>Export Orders</button>
-          <button className="btn btn-secondary btn-sm" onClick={() => handleExport('distributors')}>Export Distributors</button>
-          <button className="btn btn-secondary btn-sm" onClick={() => handleExport('products')}>Export Products</button>
+        <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 8 }}>
+          <div style={{ display: 'flex', gap: 8 }}>
+            <button className="btn btn-secondary btn-sm" disabled={!!exporting} onClick={() => handleExport('orders')}>
+              {exporting === 'orders' && <Loader2 size={14} className="spin" />} Export Orders
+            </button>
+            <button className="btn btn-secondary btn-sm" disabled={!!exporting} onClick={() => handleExport('distributors')}>
+              {exporting === 'distributors' && <Loader2 size={14} className="spin" />} Export Distributors
+            </button>
+            <button className="btn btn-secondary btn-sm" disabled={!!exporting} onClick={() => handleExport('products')}>
+              {exporting === 'products' && <Loader2 size={14} className="spin" />} Export Products
+            </button>
+          </div>
+          {exporting && (
+            <div style={{ width: 220 }}>
+              <div className="progress-track">
+                <div
+                  className={`progress-fill${exportProgress == null ? ' indeterminate' : ''}`}
+                  style={exportProgress != null ? { width: `${exportProgress}%` } : undefined}
+                />
+              </div>
+              <p style={{ color: 'var(--ink-muted)', fontSize: 11.5, marginTop: 4, marginBottom: 0, textAlign: 'right' }}>
+                Downloading your file{exportProgress != null ? `… ${exportProgress}%` : '…'}
+              </p>
+            </div>
+          )}
         </div>
       </div>
 

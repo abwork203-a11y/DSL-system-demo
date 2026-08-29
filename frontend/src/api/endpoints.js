@@ -46,6 +46,8 @@ export const orders = {
   create: (data) => client.post('/orders', data),
   updateStatus: (id, order_status) => client.patch(`/orders/${id}/status`, { order_status }),
   pay: (id, amount, note) => client.post(`/orders/${id}/pay`, { amount, note }),
+  cancel: (id) => client.patch(`/orders/${id}/cancel`),
+  remove: (id) => client.delete(`/orders/${id}`),
 };
 
 export const ledger = {
@@ -74,6 +76,13 @@ export const exportApi = {
   distributorsUrl: () => `/export/distributors`,
   ordersUrl: () => `/export/orders`,
   ledgerUrl: (distributorId) => `/export/ledger${distributorId ? `?distributor_id=${distributorId}` : ''}`,
+  distributorLedgerUrl: (distributorId, startDate, endDate) => {
+    const params = new URLSearchParams();
+    if (startDate) params.set('start_date', startDate);
+    if (endDate) params.set('end_date', endDate);
+    const qs = params.toString();
+    return `/export/ledger/distributor/${distributorId}${qs ? `?${qs}` : ''}`;
+  },
 };
 
 export const audit = {

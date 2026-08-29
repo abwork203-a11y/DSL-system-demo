@@ -1,4 +1,4 @@
-import { useEffect, useState, useCallback } from 'react';
+import { useEffect, useState, useCallback, useRef } from 'react';
 import { useParams, useNavigate, Link } from 'react-router-dom';
 import { orders as ordersApi, exportApi } from '../api/endpoints';
 import { apiErrorMessage, downloadFile } from '../api/client';
@@ -24,7 +24,13 @@ export default function OrderDetailPage() {
   const [payAmount, setPayAmount] = useState('');
   const [paying, setPaying] = useState(false);
   const [downloading, setDownloading] = useState('');
+  const [downloadProgress, setDownloadProgress] = useState(null);
   const [downloadOpen, setDownloadOpen] = useState(false);
+  // Same rationale as CreateOrderPage's submittingRef: the disabled attribute
+  // on the format buttons already blocks a second click in the normal case,
+  // but that only takes effect after a re-render, and a ref closes that gap
+  // deterministically regardless of render timing.
+  const downloadingRef = useRef(false);
   const [cancelOpen, setCancelOpen] = useState(false);
   const [cancelling, setCancelling] = useState(false);
   const [deleteOpen, setDeleteOpen] = useState(false);
@@ -45,15 +51,24 @@ export default function OrderDetailPage() {
   useEffect(() => { load(); }, [load]);
 
   const handleDownload = async (format) => {
+    if (downloadingRef.current) return; // guard against a fast double-click starting two downloads
+    downloadingRef.current = true;
     setDownloading(format);
+    setDownloadProgress(null);
     try {
-      await downloadFile(exportApi.invoiceUrl(id, format), `invoice-${order.order_number}.${format === 'excel' ? 'xlsx' : 'pdf'}`);
+      await downloadFile(
+        exportApi.invoiceUrl(id, format),
+        `invoice-${order.order_number}.${format === 'excel' ? 'xlsx' : 'pdf'}`,
+        setDownloadProgress
+      );
       toast.success('Invoice downloaded.');
       setDownloadOpen(false);
     } catch (err) {
       toast.error(apiErrorMessage(err));
     } finally {
+      downloadingRef.current = false;
       setDownloading('');
+      setDownloadProgress(null);
     }
   };
 
@@ -239,8 +254,8 @@ export default function OrderDetailPage() {
         </div>
         <div style={{ marginTop: 16, marginLeft: 'auto', width: 260, fontSize: 14, lineHeight: 1.9 }}>
           <div>Subtotal <span className="num" style={{ float: 'right' }}>{money(order.subtotal)}</span></div>
-          <div>Discount <span className="num" style={{ float: 'right' }}>{money(order.discount)}</span></div>
-          <div>Freight <span className="num" style={{ float: 'right' }}>{money(order.freight_cost)}</span></div>
+          <div>Discount <span className="num" style={{ float: 'right' }}>−{money(order.discount)}</span></div>
+          <div>Freight <span className="num" style={{ float: 'right' }}>+{money(order.freight_cost)}</span></div>
           <div style={{ borderTop: '1px solid var(--border)', paddingTop: 6, fontWeight: 600 }}>
             Total <span className="num" style={{ float: 'right' }}>{money(order.total)}</span>
           </div>
@@ -262,6 +277,7 @@ export default function OrderDetailPage() {
           onClose={() => setDownloadOpen(false)}
           onSelect={handleDownload}
           downloading={downloading}
+          progress={downloadProgress}
         />
       )}
 

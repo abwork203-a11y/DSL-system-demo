@@ -100,7 +100,7 @@ export default function ProductsPage() {
         {loading ? (
           <TableSkeleton columns={7} rows={5} />
         ) : (
-          <div className="table-wrap">
+          <div className="table-wrap page-table-scroll">
             <table className="data-table">
               <thead>
                 <tr>

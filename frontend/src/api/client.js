@@ -64,8 +64,24 @@ export function apiErrorMessage(err) {
 // with withCredentials), so this no longer needs to attach anything manually —
 // still fetched as a blob so we can control the downloaded filename and
 // trigger the browser's save dialog ourselves.
-export async function downloadFile(url, filename) {
-  const res = await client.get(url, { responseType: 'blob' });
+//
+// `onProgress(percent)` is optional. `percent` is a 0-100 integer when the
+// server sends a Content-Length header, or `null` when it doesn't (e.g. the
+// export endpoints stream their response without one) — callers should show
+// an indeterminate progress indicator in the `null` case rather than a fake
+// percentage.
+export async function downloadFile(url, filename, onProgress) {
+  const res = await client.get(url, {
+    responseType: 'blob',
+    onDownloadProgress: onProgress
+      ? (progressEvent) => {
+          const percent = progressEvent.total
+            ? Math.min(100, Math.round((progressEvent.loaded / progressEvent.total) * 100))
+            : null;
+          onProgress(percent);
+        }
+      : undefined,
+  });
   const blobUrl = window.URL.createObjectURL(new Blob([res.data]));
   const link = document.createElement('a');
   link.href = blobUrl;

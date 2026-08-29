@@ -113,7 +113,7 @@ export default function DistributorsPage() {
         {loading ? (
           <TableSkeleton columns={6} rows={6} />
         ) : (
-          <div className="table-wrap">
+          <div className="table-wrap page-table-scroll">
             <table className="data-table">
               <thead>
                 <tr>
