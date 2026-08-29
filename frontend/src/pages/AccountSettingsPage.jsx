@@ -21,7 +21,7 @@ const FONTS = [
 ];
 
 export default function AccountSettingsPage() {
-  const { user } = useAuth();
+  const { user, isAdmin } = useAuth();
   const toast = useToast();
   const [mfaEnabled, setMfaEnabled] = useState(null);
 
@@ -39,7 +39,7 @@ export default function AccountSettingsPage() {
       </div>
 
       <PasswordCard toast={toast} />
-      <AppearanceCard />
+      {isAdmin && <AppearanceCard />}
       <MfaCard mfaEnabled={mfaEnabled} setMfaEnabled={setMfaEnabled} toast={toast} />
       <SessionsCard toast={toast} />
     </div>

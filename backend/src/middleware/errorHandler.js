@@ -9,8 +9,17 @@ function errorHandler(err, req, res, next) {
     });
   }
 
-  // Postgres unique_violation
+  // Postgres unique_violation — called out by constraint name where it's
+  // worth a more specific message than the generic fallback below. Carries
+  // the same `details` shape as validate.js's field errors so the frontend
+  // can highlight the specific field either way, not just show a toast.
   if (err.code === '23505') {
+    if (err.constraint === 'users_email_key') {
+      return res.status(409).json({
+        error: 'An account with that email already exists.',
+        details: [{ field: 'email', message: 'An account with that email already exists.' }],
+      });
+    }
     return res.status(409).json({ error: 'A record with that value already exists.' });
   }
   // Postgres foreign_key_violation

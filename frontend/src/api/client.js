@@ -50,14 +50,42 @@ export default client;
 
 export function apiErrorMessage(err) {
   const raw = err.response?.data?.error;
+  const details = err.response?.data?.details;
   // Our own backend always sends `error` as a plain string. If it's ever
   // anything else — e.g. a platform-level error page (Vercel/Render) whose
   // JSON body happens to also use an `error` key, but nests an object like
   // {code, message} under it — treat that as "no usable message" rather
   // than risk handing an object to a component that renders it directly.
-  if (typeof raw === 'string' && raw.trim()) return raw;
+  const hasUsableTopLevel = typeof raw === 'string' && raw.trim();
+
+  // Validation failures (validate.js) send a generic top-level message
+  // ("Invalid input.") with the actually-useful, field-specific messages in
+  // `details` — surface those instead of the generic one whenever present.
+  if (Array.isArray(details) && details.length > 0) {
+    const messages = details.map((d) => d.message).filter(Boolean);
+    if (messages.length === 1) return messages[0];
+    if (messages.length > 1) return messages.join(' ');
+  }
+
+  if (hasUsableTopLevel) return raw;
   if (typeof err.message === 'string' && err.message.trim()) return err.message;
   return 'Something went wrong.';
+}
+
+// Same underlying data as apiErrorMessage, but as a { field: message } map
+// instead of one combined string — for forms that want to highlight the
+// specific field(s) a validation error applies to, not just show one toast.
+// Returns null when the error isn't a field-validation failure (e.g. a 404,
+// a 409 conflict, a generic 500) — callers should fall back to
+// apiErrorMessage()'s single message in that case.
+export function apiErrorFields(err) {
+  const details = err.response?.data?.details;
+  if (!Array.isArray(details) || details.length === 0) return null;
+  const fields = {};
+  for (const d of details) {
+    if (d.field && d.message && !fields[d.field]) fields[d.field] = d.message;
+  }
+  return Object.keys(fields).length > 0 ? fields : null;
 }
 
 // Export/invoice routes now rely on the session cookie (sent automatically

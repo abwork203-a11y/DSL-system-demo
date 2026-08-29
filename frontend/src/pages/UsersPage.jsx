@@ -1,11 +1,12 @@
 import { useEffect, useState, useCallback } from 'react';
 import { Plus, Pencil, Trash2 } from 'lucide-react';
-import { usersApi } from '../api/endpoints';
-import { apiErrorMessage } from '../api/client';
+import { usersApi, distributors as distributorsApi } from '../api/endpoints';
+import { apiErrorMessage, apiErrorFields } from '../api/client';
 import { useAuth } from '../context/AuthContext';
 import { useToast } from '../context/ToastContext';
 import Modal from '../components/Modal';
 import PasswordInput from '../components/PasswordInput';
+import PasswordStrengthMeter from '../components/PasswordStrengthMeter';
 import { TableSkeleton } from '../components/Skeleton';
 
 const EMPTY_FORM = { name: '', email: '', password: '', role: 'sales_rep', assigned_zone: '' };
@@ -14,9 +15,11 @@ export default function UsersPage() {
   const { user: currentUser } = useAuth();
   const toast = useToast();
   const [rows, setRows] = useState([]);
+  const [zones, setZones] = useState([]);
   const [loading, setLoading] = useState(true);
   const [editing, setEditing] = useState(null);
   const [form, setForm] = useState(EMPTY_FORM);
+  const [fieldErrors, setFieldErrors] = useState({});
   const [saving, setSaving] = useState(false);
 
   const load = useCallback(async () => {
@@ -33,12 +36,34 @@ export default function UsersPage() {
 
   useEffect(() => { load(); }, [load]);
 
-  const openNew = () => { setForm(EMPTY_FORM); setEditing({}); };
-  const openEdit = (u) => { setForm({ ...EMPTY_FORM, ...u, password: '' }); setEditing(u); };
+  // Zone options come from whatever zones distributors are actually using —
+  // keeps a sales rep's assigned zone consistent with real zone names
+  // instead of free text that could drift (typos, casing, abbreviations).
+  useEffect(() => {
+    distributorsApi.list()
+      .then((res) => {
+        const distinctZones = Array.from(new Set(res.data.map((d) => d.zone).filter(Boolean))).sort();
+        setZones(distinctZones);
+      })
+      .catch(() => {});
+  }, []);
+
+  const openNew = () => { setForm(EMPTY_FORM); setFieldErrors({}); setEditing({}); };
+  const openEdit = (u) => { setForm({ ...EMPTY_FORM, ...u, password: '' }); setFieldErrors({}); setEditing(u); };
+
+  // Updates one form field and clears that field's error as soon as the
+  // user starts changing it — otherwise a stale "Password must be at least
+  // 8 characters" would keep showing under a field they've already fixed,
+  // until the next full submit attempt re-validates everything.
+  const setField = (key, value) => {
+    setForm((f) => ({ ...f, [key]: value }));
+    setFieldErrors((errs) => (errs[key] ? { ...errs, [key]: undefined } : errs));
+  };
 
   const handleSave = async (e) => {
     e.preventDefault();
     setSaving(true);
+    setFieldErrors({});
     try {
       if (editing?.id) {
         const payload = { ...form };
@@ -52,6 +77,12 @@ export default function UsersPage() {
       setEditing(null);
       load();
     } catch (err) {
+      // Field-specific validation errors (bad email format, short password,
+      // etc.) get highlighted right under the field that caused them, in
+      // addition to the toast — a single toast alone doesn't tell you WHICH
+      // field to fix on a form with five inputs.
+      const fields = apiErrorFields(err);
+      if (fields) setFieldErrors(fields);
       toast.error(apiErrorMessage(err));
     } finally {
       setSaving(false);
@@ -134,31 +165,62 @@ export default function UsersPage() {
           <form onSubmit={handleSave}>
             <div className="field">
               <label>Name</label>
-              <input value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} required />
+              <input
+                value={form.name}
+                onChange={(e) => setField('name', e.target.value)}
+                required
+                style={fieldErrors.name ? { borderColor: 'var(--status-negative)' } : undefined}
+              />
+              {fieldErrors.name && <FieldError message={fieldErrors.name} />}
             </div>
             <div className="field">
               <label>Email</label>
-              <input type="email" value={form.email} onChange={(e) => setForm({ ...form, email: e.target.value })} required disabled={!!editing.id} />
+              <input
+                type="email"
+                value={form.email}
+                onChange={(e) => setField('email', e.target.value)}
+                required
+                disabled={!!editing.id}
+                style={fieldErrors.email ? { borderColor: 'var(--status-negative)' } : undefined}
+              />
+              {fieldErrors.email && <FieldError message={fieldErrors.email} />}
             </div>
             <div className="field">
               <label>{editing.id ? 'New Password (leave blank to keep current)' : 'Password'}</label>
-              <PasswordInput value={form.password} onChange={(e) => setForm({ ...form, password: e.target.value })} required={!editing.id} />
+              <PasswordInput
+                value={form.password}
+                onChange={(e) => setField('password', e.target.value)}
+                required={!editing.id}
+                style={fieldErrors.password ? { outline: '1px solid var(--status-negative)', borderRadius: 6 } : undefined}
+              />
+              {fieldErrors.password ? <FieldError message={fieldErrors.password} /> : <PasswordStrengthMeter password={form.password} />}
             </div>
             <div className="field-row">
               <div className="field">
                 <label>Role{editing.id === currentUser.id ? ' (you can\'t change your own role)' : ''}</label>
                 <select
                   value={form.role}
-                  onChange={(e) => setForm({ ...form, role: e.target.value })}
+                  onChange={(e) => setField('role', e.target.value)}
                   disabled={editing.id === currentUser.id}
                 >
                   <option value="sales_rep">Sales Rep</option>
                   <option value="admin">Admin</option>
                 </select>
+                {fieldErrors.role && <FieldError message={fieldErrors.role} />}
               </div>
               <div className="field">
                 <label>Assigned Zone (optional)</label>
-                <input value={form.assigned_zone} onChange={(e) => setForm({ ...form, assigned_zone: e.target.value })} />
+                <select value={form.assigned_zone} onChange={(e) => setField('assigned_zone', e.target.value)}>
+                  <option value="">— None —</option>
+                  {zones.map((z) => <option key={z} value={z}>{z}</option>)}
+                  {/* If this account already has a zone that no distributor currently uses
+                      (e.g. that distributor was later reassigned or deleted), keep it
+                      selectable so saving the form doesn't silently wipe it out. */}
+                  {form.assigned_zone && !zones.includes(form.assigned_zone) && (
+                    <option value={form.assigned_zone}>{form.assigned_zone}</option>
+                  )}
+                </select>
+                {fieldErrors.assigned_zone && <FieldError message={fieldErrors.assigned_zone} />}
               </div>
             </div>
             <button className="btn" type="submit" disabled={saving} style={{ width: '100%', justifyContent: 'center' }}>
@@ -168,5 +230,13 @@ export default function UsersPage() {
         </Modal>
       )}
     </div>
+  );
+}
+
+function FieldError({ message }) {
+  return (
+    <p style={{ color: 'var(--status-negative)', fontSize: 12, marginTop: 4, marginBottom: 0 }}>
+      {message}
+    </p>
   );
 }
