@@ -119,20 +119,18 @@ export default function LedgerPage() {
         </div>
         {isAdmin && (
           <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 8 }}>
-            <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+            <div className="export-toolbar">
               <input
                 type="month"
                 value={exportMonth}
                 onChange={(e) => setExportMonth(e.target.value)}
                 aria-label="Export month (leave blank for all time)"
                 title="Leave blank to export all activity"
-                style={{ padding: '7px 8px', border: '1px solid var(--rule)', borderRadius: 'var(--radius-sm)', fontSize: 13 }}
               />
               <select
                 value={exportFormat}
                 onChange={(e) => setExportFormat(e.target.value)}
                 aria-label="Export format"
-                style={{ padding: '7px 8px', border: '1px solid var(--rule)', borderRadius: 'var(--radius-sm)', fontSize: 13 }}
               >
                 <option value="excel">Excel</option>
                 <option value="pdf">PDF</option>
