@@ -58,23 +58,18 @@ body {
 .sidebar {
   width: 232px;
   flex-shrink: 0;
-
   background: var(--sidebar-bg);
   color: var(--sidebar-ink);
-
   display: flex;
   flex-direction: column;
-
   padding: 20px 14px;
-
-  position:fixed;
+  box-shadow: inset -1px 0 0 rgba(255, 255, 255, 0.05);
+ 
+  /* Sticky sidebar — stays in view while .content scrolls beside it */
+  position: sticky;
   top: 0;
-
   height: 100vh;
   overflow-y: auto;
-
-  box-shadow:
-    inset -1px 0 0 rgba(255, 255, 255, 0.05);
 }
 
 .sidebar-brand {
