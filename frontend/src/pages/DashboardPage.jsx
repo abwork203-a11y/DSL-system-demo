@@ -8,6 +8,18 @@ import { useLiveOrderEvents } from '../context/SocketContext';
 import StatusBadge from '../components/StatusBadge';
 import { StatSkeleton, TableSkeleton } from '../components/Skeleton';
 
+const [currentDateTime, setCurrentDateTime] = useState(new Date());
+
+useEffect(() => {
+  const timer = setInterval(() => {
+    setCurrentDateTime(new Date());
+  }, 1000);
+
+  return () => clearInterval(timer);
+}, []);
+
+
+
 function money(n) {
   return Number(n || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 }
@@ -45,13 +57,32 @@ export default function DashboardPage() {
   return (
     <div className="content">
       <div className="page-header">
-        <div>
-          <h1>Good day, {user?.name?.split(' ')[0]}</h1>
-          <p>Here's what's happening across your distribution network.</p>
-        </div>
-        <Link to="/orders/new" className="btn">+ New Order</Link>
+  <div>
+    <h1>Good day, {user?.name?.split(' ')[0]}</h1>
+    <p>Here's what's happening across your distribution network.</p>
+  </div>
+
+  <div className="header-actions">
+    <div className="date-time">
+      <div className="current-date">
+        {currentDateTime.toLocaleDateString(undefined, {
+          weekday: 'long',
+          year: 'numeric',
+          month: 'long',
+          day: 'numeric',
+        })}
       </div>
 
+      <div className="current-time">
+        {currentDateTime.toLocaleTimeString()}
+      </div>
+    </div>
+
+    <Link to="/orders/new" className="btn">
+      + New Order
+    </Link>
+  </div>
+</div>
       {loading ? (
         <StatSkeleton count={5} />
       ) : (
