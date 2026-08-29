@@ -202,8 +202,11 @@ body {
    CONTENT
    ============================================================== */
 
-content { padding: 28px; flex: 1; overflow-y: auto; }
-
+.content {
+  padding: 28px;
+  flex: 1;
+  min-width: 0;
+}
 .page-header {
   display: flex;
   align-items: flex-end;
