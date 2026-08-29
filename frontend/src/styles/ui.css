@@ -38,17 +38,17 @@ body {
 
 .app-shell {
   display: flex;
-  min-height: 100vh;
+  height: 100vh;        /* was: min-height: 100vh */
+  overflow: hidden;      /* NEW — the page itself never scrolls */
 }
-
 .main-area {
   flex: 1;
   min-width: 0;
+  height: 100vh;         /* was: min-height: 100vh */
   display: flex;
   flex-direction: column;
-  min-height: 100vh;
+  overflow-y: auto;      /* NEW — this is the only thing that scrolls now */
 }
-
 
 /* ==============================================================
    SIDEBAR
@@ -63,14 +63,11 @@ body {
   flex-direction: column;
   padding: 20px 14px;
   box-shadow: inset -1px 0 0 rgba(255, 255, 255, 0.05);
- 
-  /* Sticky sidebar — stays in view while .content scrolls beside it */
-  position: sticky;
-  top: 0;
-  height: 100vh;
-  overflow-y: auto;
-}
 
+  height: 100vh;
+  overflow-y: auto;      /* only scrolls internally if nav items overflow */
+  /* REMOVE: position: sticky; top: 0; — no longer needed */
+}
 .sidebar-brand {
   font-family: var(--font-display);
   font-size: 19px;
