@@ -1,12 +1,24 @@
 import { useEffect, useState } from 'react';
 import { NavLink, Outlet, useNavigate } from 'react-router-dom';
 import {
-  LayoutDashboard, FileText, Factory, Package, Building2,
-  BookOpen, BarChart3, Users, LogOut, CloudUpload, Menu, Settings,
+  LayoutDashboard,
+  FileText,
+  Factory,
+  Package,
+  Building2,
+  BookOpen,
+  BarChart3,
+  Users,
+  LogOut,
+  CloudUpload,
+  Menu,
+  Settings,
 } from 'lucide-react';
+
 import { useAuth } from '../context/AuthContext';
 import Footer from './Footer';
 import { APP_NAME } from '../config';
+
 
 const NAV_ITEMS = [
   { to: '/', label: 'Dashboard', icon: LayoutDashboard, end: true },
@@ -21,30 +33,41 @@ const NAV_ITEMS = [
   { to: '/account', label: 'Account Settings', icon: Settings },
 ];
 
+
 export default function Layout() {
   const { user, logout, isAdmin } = useAuth();
   const navigate = useNavigate();
+
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [currentDateTime, setCurrentDateTime] = useState(new Date());
 
-useEffect(() => {
-  const timer = setInterval(() => {
-    setCurrentDateTime(new Date());
-  }, 1000);
 
-  return () => clearInterval(timer);
-}, []);
+  // Update the time every second
+  useEffect(() => {
+    const timer = setInterval(() => {
+      setCurrentDateTime(new Date());
+    }, 1000);
+
+    return () => clearInterval(timer);
+  }, []);
+
+
   const handleLogout = async () => {
     await logout();
     navigate('/login');
   };
 
-  // Close the mobile sidebar automatically whenever a nav link is clicked,
-  // so it doesn't stay open covering the page after navigating.
-  const closeSidebar = () => setSidebarOpen(false);
+
+  // Close mobile sidebar after clicking a navigation link
+  const closeSidebar = () => {
+    setSidebarOpen(false);
+  };
+
 
   return (
     <div className="app-shell">
+
+      {/* Mobile hamburger button */}
       <button
         className={`hamburger-btn${sidebarOpen ? ' is-hidden' : ''}`}
         onClick={() => setSidebarOpen(!sidebarOpen)}
@@ -53,70 +76,130 @@ useEffect(() => {
         <Menu size={22} strokeWidth={2} />
       </button>
 
+
+      {/* Mobile sidebar overlay */}
       {sidebarOpen && (
-        <div className="sidebar-scrim" onClick={closeSidebar} />
-        
+        <div
+          className="sidebar-scrim"
+          onClick={closeSidebar}
+        />
       )}
 
+
+      {/* Sidebar */}
       <aside className={`sidebar${sidebarOpen ? ' sidebar-open' : ''}`}>
-        <div className="sidebar-brand">{APP_NAME}<span>.</span></div>
+
+        {/* Logo / App name */}
+        <div className="sidebar-brand">
+          {APP_NAME}
+          <span>.</span>
+        </div>
+
+
+        {/* Navigation */}
         <nav className="sidebar-nav">
-          {NAV_ITEMS.filter((item) => !item.adminOnly || isAdmin).map(({ to, label, icon: Icon, end }) => (
-            <NavLink
-              key={to}
-              to={to}
-              end={end}
-              onClick={closeSidebar}
-              className={({ isActive }) => `sidebar-link${isActive ? ' active' : ''}`}
-            >
-              <Icon size={16} strokeWidth={2} />
-              {label}
-            </NavLink>
-          ))}
+          {NAV_ITEMS
+            .filter((item) => !item.adminOnly || isAdmin)
+            .map(({ to, label, icon: Icon, end }) => (
+
+              <NavLink
+                key={to}
+                to={to}
+                end={end}
+                onClick={closeSidebar}
+                className={({ isActive }) =>
+                  `sidebar-link${isActive ? ' active' : ''}`
+                }
+              >
+                <Icon size={16} strokeWidth={2} />
+                {label}
+              </NavLink>
+
+            ))}
         </nav>
+
+
+        {/* Sidebar footer */}
         <div className="sidebar-footer">
+
           <div className="sidebar-user">
             <strong>{user?.name}</strong>
-            {user?.role === 'admin' ? 'Admin' : 'Sales Rep'}
+
+            {user?.role === 'admin'
+              ? 'Admin'
+              : 'Sales Rep'}
           </div>
-          <button className="sidebar-link" style={{ width: '100%', background: 'none', border: 'none' }} onClick={handleLogout}>
+
+
+          <button
+            className="sidebar-link"
+            style={{
+              width: '100%',
+              background: 'none',
+              border: 'none',
+            }}
+            onClick={handleLogout}
+          >
             <LogOut size={16} strokeWidth={2} />
             Log out
           </button>
+
         </div>
+
       </aside>
+
+
+      {/* Main application area */}
       <div className="main-area">
 
-  <header className="topbar">
-    <div className="topbar-title">
-      {APP_NAME}
-    </div>
+        {/* Global topbar */}
+        <header className="topbar">
 
-    <div className="topbar-date-time">
-      <span className="topbar-date">
-        {currentDateTime.toLocaleDateString(undefined, {
-          weekday: 'short',
-          month: 'short',
-          day: 'numeric',
-          year: 'numeric',
-        })}
-      </span>
+          {/* You can later replace this with the current page name */}
+          <div className="topbar-title">
+            Dashboard
+          </div>
 
-      <span className="topbar-divider">•</span>
 
-      <span className="topbar-time">
-        {currentDateTime.toLocaleTimeString([], {
-          hour: '2-digit',
-          minute: '2-digit',
-        })}
-      </span>
-    </div>
-  </header>
+          {/* Live date and time */}
+          <div className="topbar-date-time">
 
-  <Outlet />
+            <span className="topbar-date">
+              {currentDateTime.toLocaleDateString(undefined, {
+                weekday: 'short',
+                month: 'short',
+                day: 'numeric',
+                year: 'numeric',
+              })}
+            </span>
 
-  <Footer />
-</div>
+
+            <span className="topbar-divider">
+              •
+            </span>
+
+
+            <span className="topbar-time">
+              {currentDateTime.toLocaleTimeString([], {
+                hour: '2-digit',
+                minute: '2-digit',
+              })}
+            </span>
+
+          </div>
+
+        </header>
+
+
+        {/* Current page */}
+        <Outlet />
+
+
+        {/* Footer */}
+        <Footer />
+
+      </div>
+
     </div>
   );
 }
