@@ -153,19 +153,50 @@ body {
 
  /* ── Topbar ───────────────────────────────────── */
 
-  .topbar {
-    height: 60px;
 
-    padding:
-      0 20px 0 64px;
+.topbar {
+  height: 60px;
 
-    justify-content:
-      flex-end;
-  }
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
 
-  .topbar-date-time {
-    font-size: 12px;
-  }
+  padding: 0 28px;
+
+  border-bottom: 1px solid var(--rule);
+  background: var(--surface);
+
+  flex-shrink: 0;
+}
+
+.topbar-title {
+  display: none;
+}
+
+.topbar-date-time {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+
+  font-size: 13px;
+  white-space: nowrap;
+}
+
+.topbar-date {
+  color: var(--ink-muted);
+}
+
+.topbar-divider {
+  color: var(--ink-muted);
+}
+
+.topbar-time {
+  font-family: var(--font-mono);
+  font-weight: 600;
+  color: var(--ink);
+
+  font-variant-numeric: tabular-nums;
+}
 
 
 
@@ -1422,6 +1453,21 @@ input[type='password']::-ms-clear {
 
   .hamburger-btn {
     display: flex;
+  }
+
+  
+  .topbar {
+    height: 60px;
+
+    padding:
+      0 20px 0 64px;
+
+    justify-content:
+      flex-end;
+  }
+
+  .topbar-date-time {
+    font-size: 12px;
   }
 
   .sidebar {
