@@ -123,11 +123,6 @@ export default function DashboardPage() {
           <h1>
             Dashboard
           </h1>
-
-          <p>
-            Here's what's happening across your
-            distribution network.
-          </p>
         </div>
 
 
