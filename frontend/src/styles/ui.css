@@ -1639,6 +1639,11 @@ input[type='password']::-ms-clear {
   box-shadow: var(--shadow-sm);
 }
 
+.dashboard-metric-card-narrow {
+  max-width: 280px;
+  margin-bottom: 20px;
+}
+
 .dashboard-metric-top {
   display: flex;
   align-items: center;
@@ -1655,13 +1660,13 @@ input[type='password']::-ms-clear {
 }
 
 .dashboard-metric-icon {
-  width: 30px;
-  height: 30px;
+  width: 42px;
+  height: 42px;
   flex-shrink: 0;
   display: flex;
   align-items: center;
   justify-content: center;
-  border-radius: var(--radius-sm);
+  border-radius: 50%;
 }
 
 .dashboard-metric-value {
@@ -1694,6 +1699,12 @@ input[type='password']::-ms-clear {
 .icon-amber { color: var(--status-pending);  background: var(--status-pending-bg); }
 .icon-green { color: var(--status-positive); background: var(--status-positive-bg); }
 .icon-blue  { color: var(--blue, var(--accent)); background: var(--blue-light, rgba(37, 99, 235, 0.12)); }
+/* NOTE: unlike the four above, --purple/--purple-light aren't defined in
+   tokens.css (wasn't part of this file), so this falls back to a fixed
+   color under every theme preset instead of adapting per-theme like the
+   others do. Add --purple/--purple-light to each [data-theme] block in
+   tokens.css to bring it in line with the rest. */
+.icon-purple { color: var(--purple, #7C3AED); background: var(--purple-light, rgba(124, 58, 237, 0.12)); }
 
 
 /* ── Two-column grid — reused for both the chart/aging row and

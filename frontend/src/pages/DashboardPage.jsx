@@ -4,7 +4,6 @@ import {
   AlertCircle,
   ArrowRight,
   BarChart3,
-  Calendar,
   CheckCircle2,
   ChevronDown,
   DollarSign,
@@ -18,6 +17,7 @@ import {
 
 import { reports, orders as ordersApi } from '../api/endpoints';
 import { apiErrorMessage } from '../api/client';
+import { useAuth } from '../context/AuthContext';
 import { useToast } from '../context/ToastContext';
 import { useLiveOrderEvents } from '../context/SocketContext';
 
@@ -47,24 +47,6 @@ function formatDate(value) {
     day: 'numeric',
     year: 'numeric',
   });
-}
-
-
-// Last N calendar months, most recent first — used for the period filter.
-function getPeriodOptions(count) {
-  const now = new Date();
-  const options = [];
-
-  for (let i = 0; i < count; i++) {
-    const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
-
-    options.push({
-      value: `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`,
-      label: d.toLocaleDateString(undefined, { month: 'long', year: 'numeric' }),
-    });
-  }
-
-  return options;
 }
 
 
@@ -128,15 +110,14 @@ function formatAxisLabel(value) {
 
 
 export default function DashboardPage() {
+  const { user } = useAuth();
   const toast = useToast();
 
-  const periodOptions = getPeriodOptions(12);
   const monthLabels = getLast12MonthLabels();
 
   const [summary, setSummary] = useState(null);
   const [recentOrders, setRecentOrders] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [period, setPeriod] = useState(periodOptions[0]?.value);
   const [chartRange, setChartRange] = useState('monthly');
 
 
@@ -176,6 +157,15 @@ export default function DashboardPage() {
     summary?.ordersByStatus?.find(
       (s) => s.order_status === 'pending'
     )?.count || 0;
+
+
+  const currentOrdersCount =
+    summary?.ordersByStatus?.find(
+      (s) => s.order_status === 'current'
+    )?.count || 0;
+
+
+  const firstName = (user?.name || '').trim().split(/\s+/)[0] || 'there';
 
 
   const activeDistributors =
@@ -231,34 +221,12 @@ export default function DashboardPage() {
       <div className="dashboard-header">
 
         <div>
-          <h1>Dashboard</h1>
-          <p>Overview of your distribution operations.</p>
+          <h1>Good day, {firstName} 👋</h1>
+          <p>Here's what's happening across your distribution network.</p>
         </div>
 
 
         <div className="dashboard-header-actions">
-
-          <div className="dashboard-period">
-            <label htmlFor="dashboard-period-select">Period</label>
-
-            <div className="dashboard-period-control">
-              <Calendar size={15} strokeWidth={1.8} />
-
-              <select
-                id="dashboard-period-select"
-                value={period}
-                onChange={(e) => setPeriod(e.target.value)}
-              >
-                {periodOptions.map((opt) => (
-                  <option key={opt.value} value={opt.value}>
-                    {opt.label}
-                  </option>
-                ))}
-              </select>
-
-              <ChevronDown size={14} strokeWidth={2} />
-            </div>
-          </div>
 
           <Link
             to="/orders/new"
@@ -283,6 +251,8 @@ export default function DashboardPage() {
 
       ) : (
 
+        <>
+
         <div className="dashboard-metrics">
 
           {/* SALES */}
@@ -294,7 +264,7 @@ export default function DashboardPage() {
                 <DollarSign size={17} strokeWidth={1.8} />
               </div>
               <span className="dashboard-metric-label">
-                Monthly Sales
+                This Month's Sales
               </span>
             </div>
 
@@ -324,7 +294,7 @@ export default function DashboardPage() {
                 <ShoppingCart size={17} strokeWidth={1.8} />
               </div>
               <span className="dashboard-metric-label">
-                Orders
+                Orders This Month
               </span>
             </div>
 
@@ -368,7 +338,7 @@ export default function DashboardPage() {
           <div className="dashboard-metric-card">
 
             <div className="dashboard-metric-top">
-              <div className="dashboard-metric-icon icon-green">
+              <div className="dashboard-metric-icon icon-purple">
                 <Users size={17} strokeWidth={1.8} />
               </div>
               <span className="dashboard-metric-label">
@@ -387,6 +357,23 @@ export default function DashboardPage() {
           </div>
 
         </div>
+
+
+          <div className="dashboard-metric-card dashboard-metric-card-narrow">
+
+            <div className="dashboard-metric-top">
+              <span className="dashboard-metric-label">
+                Pending / Current Orders
+              </span>
+            </div>
+
+            <div className="dashboard-metric-value">
+              {pendingCount} / {currentOrdersCount}
+            </div>
+
+          </div>
+
+        </>
 
       )}
 
@@ -568,11 +555,7 @@ export default function DashboardPage() {
                             <FileText size={21} strokeWidth={1.7} />
                           </div>
 
-                          <strong>No orders yet.</strong>
-
-                          <span>
-                            Create your first order to get started.
-                          </span>
+                          <strong>No orders yet. Create your first one to get started.</strong>
 
                         </div>
 
