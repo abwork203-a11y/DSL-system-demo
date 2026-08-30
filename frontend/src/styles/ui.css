@@ -151,16 +151,24 @@ body {
    date/time widget, since current Layout.jsx doesn't render one)
    ============================================================== */
 
-.topbar {
-  height: 60px;
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  padding: 0 28px;
-  border-bottom: 1px solid var(--rule);
-  background: var(--surface);
-  flex-shrink: 0;
-}
+ /* ── Topbar ───────────────────────────────────── */
+
+  .topbar {
+    height: 60px;
+
+    padding:
+      0 20px 0 64px;
+
+    justify-content:
+      flex-end;
+  }
+
+  .topbar-date-time {
+    font-size: 12px;
+  }
+
+
+
 
 
 /* ==============================================================
