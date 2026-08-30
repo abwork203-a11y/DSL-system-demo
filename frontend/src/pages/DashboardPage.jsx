@@ -6,13 +6,9 @@ import {
   BarChart3,
   CheckCircle2,
   ChevronDown,
-  DollarSign,
   FileText,
   Info,
   Plus,
-  ShoppingCart,
-  Users,
-  Wallet,
 } from 'lucide-react';
 
 import { reports, orders as ordersApi } from '../api/endpoints';
@@ -26,7 +22,7 @@ import { StatSkeleton, TableSkeleton } from '../components/Skeleton';
 
 
 function money(n) {
-  return `$${Number(n || 0).toLocaleString(undefined, {
+  return `PKR ${Number(n || 0).toLocaleString(undefined, {
     minimumFractionDigits: 2,
     maximumFractionDigits: 2,
   })}`;
@@ -64,26 +60,26 @@ function getLast12MonthLabels() {
 }
 
 
-function formatMonthlyChange(current, previous) {
+function formatChange(current, previous) {
   const currentValue = Number(current) || 0;
   const previousValue = Number(previous) || 0;
 
   if (!previousValue) {
-    return { text: '— 0% vs last month', direction: 'flat' };
+    return { text: 'vs last month 0%', direction: 'flat' };
   }
 
   const delta = ((currentValue - previousValue) / previousValue) * 100;
   const rounded = Math.round(delta * 10) / 10;
 
   if (rounded > 0) {
-    return { text: `+${rounded}% vs last month`, direction: 'up' };
+    return { text: `vs last month +${rounded}%`, direction: 'up' };
   }
 
   if (rounded < 0) {
-    return { text: `${rounded}% vs last month`, direction: 'down' };
+    return { text: `vs last month ${rounded}%`, direction: 'down' };
   }
 
-  return { text: '— 0% vs last month', direction: 'flat' };
+  return { text: 'vs last month 0%', direction: 'flat' };
 }
 
 
@@ -104,8 +100,8 @@ function buildAxisScale(values) {
 
 
 function formatAxisLabel(value) {
-  if (!value) return '$0';
-  return `$${Math.round(value / 1000)}k`;
+  if (!value) return '0';
+  return `${Math.round(value / 1000)}k`;
 }
 
 
@@ -149,8 +145,8 @@ export default function DashboardPage() {
     load();
   });
 
-  // NOTE: `period` is presentational for now — wire it into `load()` once
-  // the dashboard report endpoint accepts a date-range parameter.
+
+  const firstName = user?.name?.split(' ')[0] || 'there';
 
 
   const pendingCount =
@@ -159,13 +155,10 @@ export default function DashboardPage() {
     )?.count || 0;
 
 
-  const currentOrdersCount =
+  const currentCount =
     summary?.ordersByStatus?.find(
       (s) => s.order_status === 'current'
     )?.count || 0;
-
-
-  const firstName = (user?.name || '').trim().split(/\s+/)[0] || 'there';
 
 
   const activeDistributors =
@@ -174,9 +167,14 @@ export default function DashboardPage() {
     )?.count || 0;
 
 
-  const monthlyChange = formatMonthlyChange(
+  const salesChange = formatChange(
     summary?.currentMonth?.totalSales,
     summary?.previousMonth?.totalSales
+  );
+
+  const ordersChange = formatChange(
+    summary?.currentMonth?.orderCount,
+    summary?.previousMonth?.orderCount
   );
 
 
@@ -185,7 +183,6 @@ export default function DashboardPage() {
   const aging = summary?.receivablesAging || {};
   const overdueReceivablesCount = summary?.overdueReceivablesCount ?? 0;
   const accountsNeedReviewCount = summary?.accountsNeedReviewCount ?? 0;
-  const distributorsAddedThisMonth = summary?.distributorsAddedThisMonth ?? 0;
   const lastBackupAt = summary?.lastBackupAt || null;
 
 
@@ -225,18 +222,13 @@ export default function DashboardPage() {
           <p>Here's what's happening across your distribution network.</p>
         </div>
 
-
-        <div className="dashboard-header-actions">
-
-          <Link
-            to="/orders/new"
-            className="btn dashboard-new-order"
-          >
-            <Plus size={17} strokeWidth={2} />
-            New Order
-          </Link>
-
-        </div>
+        <Link
+          to="/orders/new"
+          className="btn dashboard-new-order"
+        >
+          <Plus size={17} strokeWidth={2} />
+          New Order
+        </Link>
 
       </div>
 
@@ -247,133 +239,68 @@ export default function DashboardPage() {
 
       {loading ? (
 
-        <StatSkeleton count={4} />
+        <StatSkeleton count={5} />
 
       ) : (
 
-        <>
+        <div className="stat-grid dashboard-stat-grid">
 
-        <div className="dashboard-metrics">
-
-          {/* SALES */}
-
-          <div className="dashboard-metric-card">
-
-            <div className="dashboard-metric-top">
-              <div className="dashboard-metric-icon icon-green">
-                <DollarSign size={17} strokeWidth={1.8} />
-              </div>
-              <span className="dashboard-metric-label">
-                This Month's Sales
-              </span>
-            </div>
-
-            <div className="dashboard-metric-value">
+          <div className="stat-card">
+            <div className="stat-label">This Month's Sales</div>
+            <div className="stat-value">
               {money(summary?.currentMonth?.totalSales)}
             </div>
-
             <div
               className={
-                monthlyChange.direction === 'flat'
-                  ? 'dashboard-metric-note'
-                  : `dashboard-metric-note ${monthlyChange.direction}`
+                salesChange.direction === 'flat'
+                  ? 'stat-note'
+                  : `stat-note ${salesChange.direction}`
               }
             >
-              {monthlyChange.text}
+              {salesChange.text}
             </div>
-
           </div>
 
-
-          {/* ORDERS */}
-
-          <div className="dashboard-metric-card">
-
-            <div className="dashboard-metric-top">
-              <div className="dashboard-metric-icon icon-blue">
-                <ShoppingCart size={17} strokeWidth={1.8} />
-              </div>
-              <span className="dashboard-metric-label">
-                Orders This Month
-              </span>
-            </div>
-
-            <div className="dashboard-metric-value">
+          <div className="stat-card">
+            <div className="stat-label">Orders This Month</div>
+            <div className="stat-value">
               {summary?.currentMonth?.orderCount ?? 0}
             </div>
-
-            <div className="dashboard-metric-note">
-              {pendingCount} pending
+            <div
+              className={
+                ordersChange.direction === 'flat'
+                  ? 'stat-note'
+                  : `stat-note ${ordersChange.direction}`
+              }
+            >
+              {ordersChange.text}
             </div>
-
           </div>
 
-
-          {/* RECEIVABLES */}
-
-          <div className="dashboard-metric-card">
-
-            <div className="dashboard-metric-top">
-              <div className="dashboard-metric-icon icon-amber">
-                <Wallet size={17} strokeWidth={1.8} />
-              </div>
-              <span className="dashboard-metric-label">
-                Outstanding Receivables
-              </span>
-            </div>
-
-            <div className="dashboard-metric-value">
+          <div className="stat-card">
+            <div className="stat-label">Outstanding Receivables</div>
+            <div className="stat-value">
               {money(summary?.totalOutstanding)}
             </div>
-
-            <div className="dashboard-metric-note amber">
-              {overdueReceivablesCount} invoices overdue
-            </div>
-
+            <div className="stat-note">vs last month 0%</div>
           </div>
 
-
-          {/* DISTRIBUTORS */}
-
-          <div className="dashboard-metric-card">
-
-            <div className="dashboard-metric-top">
-              <div className="dashboard-metric-icon icon-purple">
-                <Users size={17} strokeWidth={1.8} />
-              </div>
-              <span className="dashboard-metric-label">
-                Active Distributors
-              </span>
-            </div>
-
-            <div className="dashboard-metric-value">
+          <div className="stat-card">
+            <div className="stat-label">Active Distributors</div>
+            <div className="stat-value violet">
               {activeDistributors}
             </div>
+            <div className="stat-note">vs last month 0%</div>
+          </div>
 
-            <div className="dashboard-metric-note green">
-              {distributorsAddedThisMonth} added this month
+          <div className="stat-card">
+            <div className="stat-label">Pending / Current Orders</div>
+            <div className="stat-value">
+              {pendingCount} / {currentCount}
             </div>
-
           </div>
 
         </div>
-
-
-          <div className="dashboard-metric-card dashboard-metric-card-narrow">
-
-            <div className="dashboard-metric-top">
-              <span className="dashboard-metric-label">
-                Pending / Current Orders
-              </span>
-            </div>
-
-            <div className="dashboard-metric-value">
-              {pendingCount} / {currentOrdersCount}
-            </div>
-
-          </div>
-
-        </>
 
       )}
 
@@ -555,7 +482,11 @@ export default function DashboardPage() {
                             <FileText size={21} strokeWidth={1.7} />
                           </div>
 
-                          <strong>No orders yet. Create your first one to get started.</strong>
+                          <strong>No orders yet.</strong>
+
+                          <span>
+                            Create your first order to get started.
+                          </span>
 
                         </div>
 

@@ -24,13 +24,21 @@ export default function AccountSettingsPage() {
   const { user, isAdmin } = useAuth();
   const toast = useToast();
   const [mfaEnabled, setMfaEnabled] = useState(null);
+  const [activeTab, setActiveTab] = useState('profile');
 
   useEffect(() => {
     accountApi.mfaStatus().then((res) => setMfaEnabled(res.data.mfaEnabled)).catch(() => {});
   }, []);
 
+  const TABS = [
+    { key: 'profile', label: 'Profile' },
+    { key: 'password', label: 'Change Password' },
+    { key: 'security', label: 'Security' },
+    ...(isAdmin ? [{ key: 'preferences', label: 'Preferences' }] : []),
+  ];
+
   return (
-    <div className="content" style={{ maxWidth: 640 }}>
+    <div className="content" style={{ maxWidth: 780 }}>
       <div className="page-header">
         <div>
           <h1>Account Settings</h1>
@@ -38,10 +46,127 @@ export default function AccountSettingsPage() {
         </div>
       </div>
 
-      <PasswordCard toast={toast} />
-      {isAdmin && <AppearanceCard />}
-      <MfaCard mfaEnabled={mfaEnabled} setMfaEnabled={setMfaEnabled} toast={toast} />
-      <SessionsCard toast={toast} />
+      <div className="settings-layout">
+        <nav className="settings-tabs">
+          {TABS.map((tab) => (
+            <button
+              key={tab.key}
+              type="button"
+              className={`settings-tab${activeTab === tab.key ? ' active' : ''}`}
+              onClick={() => setActiveTab(tab.key)}
+            >
+              {tab.label}
+            </button>
+          ))}
+        </nav>
+
+        <div className="settings-panel">
+          {activeTab === 'profile' && <ProfileTab user={user} toast={toast} />}
+
+          {activeTab === 'password' && <PasswordCard toast={toast} />}
+
+          {activeTab === 'security' && (
+            <>
+              <MfaCard mfaEnabled={mfaEnabled} setMfaEnabled={setMfaEnabled} toast={toast} />
+              <SessionsCard toast={toast} />
+            </>
+          )}
+
+          {activeTab === 'preferences' && isAdmin && <AppearanceCard />}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// New tab — the mockup asks for an editable profile (name/email/phone) plus
+// an avatar uploader, neither of which the API supports yet. Both actions
+// below call account endpoints (updateProfile / uploadAvatar) that need to be
+// added server-side; until then they'll surface as a normal toast error
+// rather than silently doing nothing, so the gap is obvious rather than
+// hidden. Role is shown read-only on purpose — a user shouldn't be able to
+// promote themselves by editing their own form.
+function ProfileTab({ user, toast }) {
+  const [name, setName] = useState(user?.name || '');
+  const [email, setEmail] = useState(user?.email || '');
+  const [phone, setPhone] = useState(user?.phone || '');
+  const [saving, setSaving] = useState(false);
+
+  const [avatarPreview, setAvatarPreview] = useState(user?.avatarUrl || null);
+  const [uploadingAvatar, setUploadingAvatar] = useState(false);
+
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+    setSaving(true);
+    try {
+      await accountApi.updateProfile({ name, email, phone });
+      toast.success('Profile updated.');
+    } catch (err) {
+      toast.error(apiErrorMessage(err));
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const handleAvatarChange = async (e) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    const previousPreview = avatarPreview;
+    setAvatarPreview(URL.createObjectURL(file)); // optimistic local preview
+    setUploadingAvatar(true);
+    try {
+      await accountApi.uploadAvatar(file);
+      toast.success('Profile picture updated.');
+    } catch (err) {
+      setAvatarPreview(previousPreview); // roll back
+      toast.error(apiErrorMessage(err));
+    } finally {
+      setUploadingAvatar(false);
+      e.target.value = ''; // allow re-selecting the same file next time
+    }
+  };
+
+  const initial = (user?.name || '?').trim().charAt(0).toUpperCase();
+
+  return (
+    <div className="settings-profile-grid">
+      <div className="card">
+        <h2>Profile Information</h2>
+        <form onSubmit={handleSubmit}>
+          <div className="field">
+            <label>Full Name</label>
+            <input value={name} onChange={(e) => setName(e.target.value)} required />
+          </div>
+          <div className="field">
+            <label>Email Address</label>
+            <input type="email" value={email} onChange={(e) => setEmail(e.target.value)} required />
+          </div>
+          <div className="field">
+            <label>Phone Number</label>
+            <input value={phone} onChange={(e) => setPhone(e.target.value)} />
+          </div>
+          <div className="field">
+            <label>Role</label>
+            <input value={user?.role === 'admin' ? 'Admin' : 'Sales Rep'} disabled />
+          </div>
+          <button className="btn" type="submit" disabled={saving}>
+            {saving ? 'Saving…' : 'Save Changes'}
+          </button>
+        </form>
+      </div>
+
+      <div className="card settings-avatar-card">
+        <h2>Profile Picture</h2>
+        <div className="settings-avatar">
+          {avatarPreview ? <img src={avatarPreview} alt="Profile" /> : initial}
+        </div>
+        <label className="btn btn-secondary settings-avatar-btn">
+          {uploadingAvatar ? 'Uploading…' : 'Change Picture'}
+          <input type="file" accept="image/*" hidden disabled={uploadingAvatar} onChange={handleAvatarChange} />
+        </label>
+        <p className="settings-avatar-hint">JPG or PNG, up to 2MB</p>
+      </div>
     </div>
   );
 }
@@ -274,7 +399,7 @@ function MfaCard({ mfaEnabled, setMfaEnabled, toast }) {
       ) : setupData ? (
         <form onSubmit={confirmSetup} style={{ marginTop: 16 }}>
           <p style={{ fontSize: 13.5, marginBottom: 10 }}>Scan this QR code with your authenticator app:</p>
-          <img src={setupData.qrDataUrl} alt="MFA QR code" style={{ width: 180, height: 180, borderRadius: 8, border: '1px solid var(--border)' }} />
+          <img src={setupData.qrDataUrl} alt="MFA QR code" style={{ width: 180, height: 180, borderRadius: 8, border: '1px solid var(--rule)' }} />
           <p style={{ fontSize: 12, color: 'var(--ink-muted)', marginTop: 8 }}>
             Can't scan it? Enter this code manually: <span className="num">{setupData.secret}</span>
           </p>
