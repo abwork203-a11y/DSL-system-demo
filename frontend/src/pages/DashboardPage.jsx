@@ -121,7 +121,7 @@ export default function DashboardPage() {
           </div>
 
           <h1>
-            Good day, {firstName}
+            Dashboard
           </h1>
 
           <p>
