@@ -182,7 +182,7 @@ export default function OrderDetailPage() {
             {order.created_by_name ? ` · created by ${order.created_by_name}` : ''}
           </p>
         </div>
-        <div style={{ display: 'flex', gap: 8 }}>
+        <div className="page-header-actions">
           <button className="btn btn-secondary" onClick={() => setDownloadOpen(true)}>Download</button>
           {order.order_status !== 'cancelled' && (
             <button className="btn btn-secondary" onClick={() => setCancelOpen(true)}>Cancel Order</button>
@@ -193,40 +193,44 @@ export default function OrderDetailPage() {
         </div>
       </div>
 
-      <div className="card" style={{ display: 'flex', gap: 28, flexWrap: 'wrap' }}>
-        <div>
-          <div className="stat-label">Order Status</div>
-          {isAdmin && order.order_status !== 'cancelled' ? (
-            <select value={order.order_status} onChange={(e) => handleStatusChange(e.target.value)} style={{ marginTop: 6, border: '1px solid var(--border)', borderRadius: 6, padding: '6px 8px' }}>
-              <option value="pending">Pending</option>
-              <option value="current">Current</option>
-              <option value="completed">Completed</option>
-            </select>
-          ) : (
-            <div style={{ marginTop: 6 }}><StatusBadge value={order.order_status} /></div>
-          )}
-        </div>
-        <div>
-          <div className="stat-label">Payment Status</div>
-          <div style={{ marginTop: 6 }}><StatusBadge value={order.payment_status} /></div>
-        </div>
-        <div>
-          <div className="stat-label">Payment Term</div>
-          <div style={{ marginTop: 6, textTransform: 'capitalize' }}>{order.payment_term}</div>
-        </div>
-        <div>
-          <div className="stat-label">Balance Remaining</div>
-          <div className="num" style={{ marginTop: 6 }}>{money(balanceRemaining)}</div>
+      <div className="card order-detail-summary">
+        <div className="stat-grid order-detail-stat-grid">
+          <div className="stat-card">
+            <div className="stat-label">Order Status</div>
+            {isAdmin && order.order_status !== 'cancelled' ? (
+              <select
+                value={order.order_status}
+                onChange={(e) => handleStatusChange(e.target.value)}
+                className="stat-card-value"
+              >
+                <option value="pending">Pending</option>
+                <option value="current">Current</option>
+                <option value="completed">Completed</option>
+              </select>
+            ) : (
+              <div className="stat-card-value"><StatusBadge value={order.order_status} /></div>
+            )}
+          </div>
+          <div className="stat-card">
+            <div className="stat-label">Payment Status</div>
+            <div className="stat-card-value"><StatusBadge value={order.payment_status} /></div>
+          </div>
+          <div className="stat-card">
+            <div className="stat-label">Payment Term</div>
+            <div className="stat-card-value stat-card-text">{order.payment_term}</div>
+          </div>
+          <div className="stat-card">
+            <div className="stat-label">Balance Remaining</div>
+            <div className="stat-card-value stat-value num">{money(balanceRemaining)}</div>
+          </div>
         </div>
         {balanceRemaining > 0 && order.order_status !== 'cancelled' && (
-          <div style={{ marginLeft: 'auto', alignSelf: 'center' }}>
-            <button className="btn" onClick={() => { setPayAmount(String(balanceRemaining)); setPayOpen(true); }}>Record Payment</button>
-          </div>
+          <button className="btn order-detail-pay-btn" onClick={() => { setPayAmount(String(balanceRemaining)); setPayOpen(true); }}>Record Payment</button>
         )}
       </div>
 
       <div className="card">
-        <h2 style={{ marginBottom: 14 }}>Line Items</h2>
+        <h2>Line Items</h2>
         <div className="table-wrap">
           <table className="data-table">
             <thead>
@@ -251,22 +255,33 @@ export default function OrderDetailPage() {
             </tbody>
           </table>
         </div>
-        <div style={{ marginTop: 16, marginLeft: 'auto', width: 260, fontSize: 14, lineHeight: 1.9 }}>
-          <div>Subtotal <span className="num" style={{ float: 'right' }}>{money(order.subtotal)}</span></div>
-          <div>Discount <span className="num" style={{ float: 'right' }}>−{money(order.discount)}</span></div>
-          <div>Freight <span className="num" style={{ float: 'right' }}>+{money(order.freight_cost)}</span></div>
-          <div style={{ borderTop: '1px solid var(--border)', paddingTop: 6, fontWeight: 600 }}>
-            Total <span className="num" style={{ float: 'right' }}>{money(order.total)}</span>
+        <div className="order-summary">
+          <div className="order-summary-row">
+            <span>Subtotal</span>
+            <span className="num">{money(order.subtotal)}</span>
           </div>
-          <div style={{ color: 'var(--ink-muted)' }}>
-            Paid <span className="num" style={{ float: 'right' }}>{money(order.amount_paid)}</span>
+          <div className="order-summary-row">
+            <span>Discount</span>
+            <span className="num">−{money(order.discount)}</span>
+          </div>
+          <div className="order-summary-row">
+            <span>Freight</span>
+            <span className="num">+{money(order.freight_cost)}</span>
+          </div>
+          <div className="order-summary-row order-summary-total">
+            <span>Total</span>
+            <span className="num">{money(order.total)}</span>
+          </div>
+          <div className="order-summary-row muted">
+            <span>Paid</span>
+            <span className="num">{money(order.amount_paid)}</span>
           </div>
         </div>
       </div>
 
       {order.notes && (
         <div className="card">
-          <h3 style={{ marginBottom: 8 }}>Notes</h3>
+          <h3>Notes</h3>
           <p style={{ color: 'var(--ink-muted)' }}>{order.notes}</p>
         </div>
       )}
@@ -300,7 +315,7 @@ export default function OrderDetailPage() {
             This will reverse this order's effect on the distributor's ledger balance.
             The order record itself is kept for history, just marked cancelled.
           </p>
-          <div style={{ display: 'flex', gap: 10, justifyContent: 'flex-end' }}>
+          <div className="modal-actions">
             <button className="btn btn-secondary" onClick={() => setCancelOpen(false)} disabled={cancelling}>Keep Order</button>
             <button className="btn btn-danger" onClick={handleCancelOrder} disabled={cancelling}>
               {cancelling ? 'Cancelling…' : 'Cancel Order'}
@@ -315,7 +330,7 @@ export default function OrderDetailPage() {
             This is permanent and cannot be undone — unlike Cancel, the order record itself
             will be removed entirely.
           </p>
-          <div style={{ display: 'flex', gap: 10, justifyContent: 'flex-end' }}>
+          <div className="modal-actions">
             <button className="btn btn-secondary" onClick={() => setDeleteOpen(false)} disabled={deleting}>Keep Order</button>
             <button className="btn btn-danger" onClick={handleDeleteOrder} disabled={deleting}>
               {deleting ? 'Deleting…' : 'Delete Order'}

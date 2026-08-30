@@ -136,7 +136,7 @@ export default function Layout() {
 
             <span className="topbar-date">
               {currentDateTime.toLocaleDateString(undefined, {
-                weekday: 'short',
+                weekday: 'long',
                 month: 'short',
                 day: 'numeric',
                 year: 'numeric',
@@ -147,7 +147,7 @@ export default function Layout() {
 
             <span className="topbar-time">
               {currentDateTime.toLocaleTimeString([], {
-                hour: '2-digit',
+                hour: 'numeric',
                 minute: '2-digit',
               })}
             </span>

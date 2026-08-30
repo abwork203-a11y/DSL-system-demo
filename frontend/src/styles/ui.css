@@ -187,11 +187,7 @@ body {
 }
 
 .topbar-time {
-  font-family: var(--font-mono);
-  font-weight: 600;
-  color: var(--ink);
-
-  font-variant-numeric: tabular-nums;
+  color: var(--ink-muted);
 }
 
 
@@ -229,6 +225,13 @@ body {
   font-size: 13.5px;
 }
 
+.page-header-actions {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
 .ledger-page-header {
   margin-bottom: 20px;
 }
@@ -253,6 +256,23 @@ body {
 
 .card + .card {
   margin-top: 16px;
+}
+
+.card h2,
+.card h3 {
+  margin: 0 0 14px;
+
+  font-family: var(--font-display);
+  font-weight: 600;
+  color: var(--ink);
+}
+
+.card h2 {
+  font-size: 18px;
+}
+
+.card h3 {
+  font-size: 15px;
 }
 
 
@@ -1219,6 +1239,45 @@ table.data-table {
   color: var(--ink);
 }
 
+.stat-card-value {
+  margin-top: 7px;
+}
+
+.stat-card-text {
+  font-size: 14px;
+  color: var(--ink);
+  text-transform: capitalize;
+}
+
+select.stat-card-value {
+  display: block;
+  width: 100%;
+
+  border: 1px solid var(--rule);
+  border-radius: var(--radius-sm);
+
+  padding: 7px 9px;
+
+  background: var(--surface);
+  color: var(--ink);
+
+  font-family: var(--font-body);
+  font-size: 13px;
+
+  cursor: pointer;
+}
+
+select.stat-card-value:focus {
+  border-color: var(--brass);
+  outline: 2px solid rgba(150, 116, 42, 0.20);
+  outline-offset: 0;
+}
+
+.num {
+  font-family: var(--font-mono);
+  font-variant-numeric: tabular-nums;
+}
+
 
 /* ==============================================================
    BADGES
@@ -1263,6 +1322,55 @@ table.data-table {
   background: var(--status-neutral-bg);
 
   border: 1px solid var(--rule);
+}
+
+
+/* ==============================================================
+   INLINE TEXT LINKS
+   ============================================================== */
+
+.link-btn {
+  color: var(--green);
+  text-decoration: none;
+  font-weight: 600;
+}
+
+.link-btn:hover {
+  text-decoration: underline;
+}
+
+
+/* ==============================================================
+   INLINE BANNERS
+   ============================================================== */
+
+.error-banner {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+
+  margin-bottom: 16px;
+  padding: 12px 14px;
+
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--status-pending-bg);
+
+  background: var(--status-pending-bg);
+  color: var(--status-pending);
+
+  font-size: 13px;
+  line-height: 1.6;
+}
+
+
+/* ==============================================================
+   MODAL ACTION ROWS
+   ============================================================== */
+
+.modal-actions {
+  display: flex;
+  gap: 10px;
+  justify-content: flex-end;
 }
 
 
@@ -2555,6 +2663,80 @@ input[type='password']::-ms-clear {
 
   .dashboard-chart-yaxis {
     font-size: 9.5px;
+  }
+
+}
+
+
+/* ============================================================
+   ORDER DETAIL PAGE
+   ============================================================ */
+
+.order-detail-summary {
+  display: flex;
+  align-items: center;
+  gap: 22px;
+}
+
+.order-detail-stat-grid {
+  flex: 1;
+  margin-bottom: 0;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+}
+
+.order-detail-pay-btn {
+  flex-shrink: 0;
+}
+
+.order-summary {
+  margin-top: 18px;
+  margin-left: auto;
+  width: 280px;
+}
+
+.order-summary-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+
+  padding: 5px 0;
+
+  font-size: 13.5px;
+  color: var(--ink);
+}
+
+.order-summary-row.muted {
+  color: var(--ink-muted);
+}
+
+.order-summary-total {
+  margin-top: 4px;
+  padding-top: 10px;
+
+  border-top: 1px solid var(--rule);
+
+  font-weight: 650;
+}
+
+
+@media (max-width: 640px) {
+
+  .order-detail-summary {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .order-detail-stat-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .order-detail-pay-btn {
+    justify-content: center;
+  }
+
+  .order-summary {
+    width: 100%;
   }
 
 }
