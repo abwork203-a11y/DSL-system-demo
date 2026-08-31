@@ -2016,72 +2016,6 @@ input[type='password']::-ms-clear {
   font-size: 14px;
 }
 
-.dashboard-header-actions {
-  display: flex;
-  align-items: flex-end;
-  gap: 14px;
-}
-
-.dashboard-period {
-  display: flex;
-  flex-direction: column;
-  gap: 6px;
-}
-
-.dashboard-period > label {
-  font-size: 10.5px;
-  font-weight: 700;
-  letter-spacing: 0.08em;
-  text-transform: uppercase;
-  color: var(--ink-muted);
-}
-
-.dashboard-period-control {
-  position: relative;
-  display: flex;
-  align-items: center;
-  height: 40px;
-  min-width: 190px;
-  border: 1px solid var(--rule);
-  border-radius: var(--radius-sm);
-  background: var(--surface);
-}
-
-.dashboard-period-control > svg {
-  position: absolute;
-  color: var(--ink-muted);
-  pointer-events: none;
-}
-
-.dashboard-period-control > svg:first-child {
-  left: 12px;
-}
-
-.dashboard-period-control > svg:last-child {
-  right: 12px;
-}
-
-.dashboard-period-control select {
-  appearance: none;
-  -webkit-appearance: none;
-  width: 100%;
-  height: 100%;
-  border: none;
-  background: transparent;
-  padding: 0 32px 0 36px;
-  font-family: var(--font-body);
-  font-size: 13px;
-  font-weight: 500;
-  color: var(--ink);
-  cursor: pointer;
-}
-
-.dashboard-period-control select:focus {
-  outline: 2px solid rgba(150, 116, 42, 0.20);
-  outline-offset: 0;
-  border-radius: var(--radius-sm);
-}
-
 .dashboard-new-order {
   min-height: 40px;
   padding: 0 16px;
@@ -2167,58 +2101,17 @@ input[type='password']::-ms-clear {
 
 
 /* ───────────────────────────────────────────────────────────
-   ICON COLOR MODIFIERS
-   Shared between KPI card icons and Action Required icons.
+   RECENT ORDERS CARD
    ─────────────────────────────────────────────────────────── */
 
-.icon-green {
-  color: var(--status-positive);
-  background: var(--status-positive-bg);
-}
-
-.icon-blue {
-  color: var(--blue);
-  background: rgba(37, 99, 235, 0.12);
-}
-
-.icon-amber {
-  color: var(--status-pending);
-  background: var(--status-pending-bg);
-}
-
-.icon-red {
-  color: var(--status-negative);
-  background: var(--status-negative-bg);
-}
-
-
-/* ───────────────────────────────────────────────────────────
-   2-COLUMN GRID
-   Shared layout for both content rows below the KPIs.
-   ─────────────────────────────────────────────────────────── */
-
-.dashboard-grid {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) 340px;
-  gap: 14px;
-  align-items: stretch;
-  margin-bottom: 20px;
-}
-
-.dashboard-grid:last-child {
-  margin-bottom: 0;
-}
-
-.dashboard-chart-card,
-.dashboard-aging-card,
-.dashboard-orders-card,
-.dashboard-action-card {
+.dashboard-orders-card {
   min-width: 0;
   padding: 0;
   overflow: hidden;
   display: flex;
   flex-direction: column;
   border-top: 1px solid var(--rule);
+  margin-bottom: 20px;
 }
 
 .dashboard-card-header {
@@ -2236,172 +2129,6 @@ input[type='password']::-ms-clear {
   font-size: 16px;
   font-weight: 600;
   color: var(--ink);
-}
-
-
-/* ───────────────────────────────────────────────────────────
-   SALES PERFORMANCE CHART
-   ─────────────────────────────────────────────────────────── */
-
-.dashboard-chart-card {
-  --chart-pad-x: 24px;
-  --chart-yaxis-w: 38px;
-  --chart-gap: 10px;
-}
-
-.dashboard-chart-period {
-  position: relative;
-  display: flex;
-  align-items: center;
-  height: 32px;
-  min-width: 108px;
-  border: 1px solid var(--rule);
-  border-radius: var(--radius-sm);
-  background: var(--surface);
-}
-
-.dashboard-chart-period select {
-  appearance: none;
-  -webkit-appearance: none;
-  width: 100%;
-  height: 100%;
-  border: none;
-  background: transparent;
-  padding: 0 28px 0 12px;
-  font-family: var(--font-body);
-  font-size: 12.5px;
-  font-weight: 500;
-  color: var(--ink);
-  cursor: pointer;
-}
-
-.dashboard-chart-period svg {
-  position: absolute;
-  right: 9px;
-  color: var(--ink-muted);
-  pointer-events: none;
-}
-
-.dashboard-chart-body {
-  flex: 1;
-  display: flex;
-  gap: var(--chart-gap);
-  padding: 22px var(--chart-pad-x) 8px;
-  min-height: 260px;
-}
-
-.dashboard-chart-yaxis {
-  flex-shrink: 0;
-  width: var(--chart-yaxis-w);
-  display: flex;
-  flex-direction: column;
-  justify-content: space-between;
-  padding-bottom: 2px;
-  font-size: 11px;
-  color: var(--ink-muted);
-  text-align: right;
-}
-
-.dashboard-chart-plot {
-  position: relative;
-  flex: 1;
-  min-width: 0;
-}
-
-.dashboard-chart-gridlines {
-  position: absolute;
-  inset: 0;
-  display: flex;
-  flex-direction: column;
-  justify-content: space-between;
-}
-
-.dashboard-chart-gridlines span {
-  display: block;
-  height: 0;
-  border-top: 1px dashed var(--rule);
-}
-
-.dashboard-chart-gridlines span:last-child {
-  border-top: 1px solid var(--rule-strong);
-}
-
-.dashboard-chart-svg {
-  position: absolute;
-  inset: 0;
-  width: 100%;
-  height: 100%;
-}
-
-.dashboard-chart-empty {
-  position: absolute;
-  top: 50%;
-  left: 50%;
-  transform: translate(-50%, -50%);
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 10px;
-  font-size: 12.5px;
-  color: var(--ink-muted);
-  white-space: nowrap;
-}
-
-.dashboard-chart-xaxis {
-  display: flex;
-  justify-content: space-between;
-  margin: 6px var(--chart-pad-x) 18px
-    calc(var(--chart-pad-x) + var(--chart-yaxis-w) + var(--chart-gap));
-  font-size: 11px;
-  color: var(--ink-muted);
-}
-
-
-/* ───────────────────────────────────────────────────────────
-   RECEIVABLES AGING
-   ─────────────────────────────────────────────────────────── */
-
-.dashboard-aging-list {
-  padding: 6px 20px 2px;
-}
-
-.dashboard-aging-row {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 12px;
-  padding: 13px 0;
-  border-bottom: 1px solid var(--rule);
-  font-size: 12.5px;
-  color: var(--ink);
-}
-
-.dashboard-aging-row:last-of-type {
-  border-bottom: none;
-}
-
-.dashboard-aging-row strong {
-  font-family: var(--font-mono);
-  font-weight: 500;
-  font-variant-numeric: tabular-nums;
-}
-
-.dashboard-aging-total {
-  margin-top: 3px;
-  padding-top: 15px;
-  border-top: 1px solid var(--rule-strong);
-  font-weight: 650;
-}
-
-.dashboard-aging-total strong {
-  font-size: 15px;
-  font-weight: 650;
-}
-
-.dashboard-aging-footer {
-  margin-top: auto;
-  padding: 14px 20px 18px;
-  border-top: 1px solid var(--rule);
 }
 
 
@@ -2436,7 +2163,7 @@ input[type='password']::-ms-clear {
 
 /* ───────────────────────────────────────────────────────────
    EMPTY STATE
-   Shared by the chart panel and the Recent Orders table.
+   Recent Orders' empty table state.
    ─────────────────────────────────────────────────────────── */
 
 .dashboard-empty-row > td {
@@ -2480,108 +2207,14 @@ input[type='password']::-ms-clear {
 
 
 /* ───────────────────────────────────────────────────────────
-   ACTION REQUIRED
-   ─────────────────────────────────────────────────────────── */
-
-.dashboard-action-list {
-  padding: 2px 20px 6px;
-}
-
-.dashboard-action-row {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  padding: 14px 0;
-  border-bottom: 1px solid var(--rule);
-}
-
-.dashboard-action-row:last-child {
-  border-bottom: none;
-}
-
-.dashboard-action-icon {
-  width: 30px;
-  height: 30px;
-  flex-shrink: 0;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  border-radius: 50%;
-}
-
-.dashboard-action-label,
-.dashboard-action-label-group {
-  flex: 1;
-  min-width: 0;
-  font-size: 12.5px;
-  color: var(--ink);
-}
-
-.dashboard-action-label-group {
-  display: flex;
-  flex-direction: column;
-  gap: 2px;
-}
-
-.dashboard-action-sublabel {
-  font-size: 11px;
-  color: var(--ink-muted);
-}
-
-.dashboard-action-link {
-  display: inline-flex;
-  align-items: center;
-  gap: 4px;
-  flex-shrink: 0;
-  font-size: 12px;
-  font-weight: 600;
-  text-decoration: none;
-}
-
-.dashboard-action-link:hover {
-  text-decoration: underline;
-}
-
-.dashboard-action-link.red {
-  color: var(--status-negative);
-}
-
-.dashboard-action-link.amber {
-  color: var(--status-pending);
-}
-
-.dashboard-action-link.blue {
-  color: var(--blue);
-}
-
-.dashboard-action-link.green {
-  color: var(--status-positive);
-}
-
-
-/* ───────────────────────────────────────────────────────────
    RESPONSIVE
    ─────────────────────────────────────────────────────────── */
-
-@media (max-width: 1100px) {
-
-  .dashboard-grid {
-    grid-template-columns: 1fr;
-  }
-
-}
-
 
 @media (max-width: 800px) {
 
   .dashboard-header {
     align-items: flex-start;
     flex-direction: column;
-  }
-
-  .dashboard-header-actions {
-    align-self: stretch;
-    justify-content: space-between;
   }
 
 }
@@ -2595,34 +2228,6 @@ input[type='password']::-ms-clear {
 
   .dashboard-header h1 {
     font-size: 31px;
-  }
-
-  .dashboard-header-actions {
-    flex-direction: column;
-    align-items: stretch;
-    gap: 12px;
-  }
-
-  .dashboard-period-control {
-    min-width: 0;
-    width: 100%;
-  }
-
-  .dashboard-chart-card {
-    --chart-pad-x: 16px;
-    --chart-yaxis-w: 30px;
-  }
-
-  .dashboard-chart-body {
-    min-height: 220px;
-  }
-
-  .dashboard-chart-xaxis {
-    font-size: 9.5px;
-  }
-
-  .dashboard-chart-yaxis {
-    font-size: 9.5px;
   }
 
 }
