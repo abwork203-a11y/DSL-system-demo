@@ -144,7 +144,7 @@ export default function DashboardPage() {
       <div className="dashboard-header">
 
         <div>
-          <h1>Good day, {firstName} 👋</h1>
+          <h1>Dashboard</h1>
           <p>Here's what's happening across your distribution network.</p>
         </div>
 
