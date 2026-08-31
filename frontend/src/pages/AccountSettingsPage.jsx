@@ -131,34 +131,56 @@ function ProfileTab({ user, toast }) {
 
   return (
     <div className="settings-profile-grid">
-      <div className="card">
-        <h2>Profile Information</h2>
-        <form onSubmit={handleSubmit}>
-          <div className="field-row">
-            <div className="field">
-              <label>Full Name</label>
-              <input value={name} onChange={(e) => setName(e.target.value)} required />
-            </div>
-            <div className="field">
-              <label>Email Address</label>
-              <input type="email" value={email} onChange={(e) => setEmail(e.target.value)} required />
-            </div>
-          </div>
-          <div className="field-row">
-            <div className="field">
-              <label>Phone Number</label>
-              <input value={phone} onChange={(e) => setPhone(e.target.value)} />
-            </div>
-            <div className="field">
-              <label>Role</label>
-              <input value={user?.role === 'admin' ? 'Admin' : 'Sales Rep'} disabled />
-            </div>
-          </div>
-          <button className="btn" type="submit" disabled={saving}>
-            {saving ? 'Saving…' : 'Save Changes'}
-          </button>
-        </form>
-      </div>
+  <div className="card settings-profile-card">
+  <h2>Profile Information</h2>
+
+  <form className="settings-profile-form" onSubmit={handleSubmit}>
+    <div className="field">
+      <label>Full Name</label>
+      <input
+        value={name}
+        onChange={(e) => setName(e.target.value)}
+        required
+      />
+    </div>
+
+    <div className="field">
+      <label>Email Address</label>
+      <input
+        type="email"
+        value={email}
+        onChange={(e) => setEmail(e.target.value)}
+        required
+      />
+    </div>
+
+    <div className="field">
+      <label>Phone Number</label>
+      <input
+        value={phone}
+        onChange={(e) => setPhone(e.target.value)}
+      />
+    </div>
+
+    <div className="field">
+      <label>Role</label>
+      <input
+        value={user?.role === 'admin' ? 'Admin' : 'Sales Rep'}
+        disabled
+      />
+    </div>
+
+    <div className="settings-profile-actions">
+      <button
+        className="btn"
+        type="submit"
+        disabled={saving}
+      >
+        {saving ? 'Saving…' : 'Save Changes'}
+      </button>
+    </div>
+  </form>
+</div>
 
       <div className="card settings-avatar-card">
         <h2>Profile Picture</h2>
