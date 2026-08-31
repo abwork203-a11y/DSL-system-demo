@@ -2110,34 +2110,45 @@ input[type='password']::-ms-clear {
   overflow: hidden;
   display: flex;
   flex-direction: column;
+  border-top: 1px solid var(--rule);
   margin-bottom: 20px;
 }
 
 .dashboard-card-header {
-  padding: 18px 24px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 17px 20px;
+  border-bottom: 1px solid var(--rule);
 }
 
 .dashboard-card-header h3 {
-  font-size: 17px;
+  margin: 0;
+  font-family: var(--font-display);
+  font-size: 16px;
+  font-weight: 600;
+  color: var(--ink);
 }
 
-.dashboard-orders-table {
-  font-size: 13px;
-}
 
-.dashboard-orders-table th {
-  padding: 11px 18px;
-  font-size: 10.5px;
-}
-
-.dashboard-orders-table td {
-  padding: 15px 18px;
-}
 /* ───────────────────────────────────────────────────────────
    RECENT ORDERS TABLE
    ─────────────────────────────────────────────────────────── */
 
-   
+.dashboard-orders-table {
+  font-size: 12.5px;
+}
+
+.dashboard-orders-table th {
+  padding: 9px 12px;
+  font-size: 10px;
+}
+
+.dashboard-orders-table td {
+  padding: 11px 12px;
+}
+
 .dashboard-order-number {
   color: var(--green);
   text-decoration: none;
