@@ -2759,7 +2759,7 @@ input[type='password']::-ms-clear {
 
 .settings-profile-grid {
   display: grid;
-  grid-template-columns: 1fr 220px;
+  grid-template-columns: minmax(0, 1fr) minmax(240px, 300px);
   gap: 16px;
   align-items: start;
 }

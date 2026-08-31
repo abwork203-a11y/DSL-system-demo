@@ -38,7 +38,7 @@ export default function AccountSettingsPage() {
   ];
 
   return (
-    <div className="content" style={{ maxWidth: 780 }}>
+    <div className="content">
       <div className="page-header">
         <div>
           <h1>Account Settings</h1>
@@ -134,21 +134,25 @@ function ProfileTab({ user, toast }) {
       <div className="card">
         <h2>Profile Information</h2>
         <form onSubmit={handleSubmit}>
-          <div className="field">
-            <label>Full Name</label>
-            <input value={name} onChange={(e) => setName(e.target.value)} required />
+          <div className="field-row">
+            <div className="field">
+              <label>Full Name</label>
+              <input value={name} onChange={(e) => setName(e.target.value)} required />
+            </div>
+            <div className="field">
+              <label>Email Address</label>
+              <input type="email" value={email} onChange={(e) => setEmail(e.target.value)} required />
+            </div>
           </div>
-          <div className="field">
-            <label>Email Address</label>
-            <input type="email" value={email} onChange={(e) => setEmail(e.target.value)} required />
-          </div>
-          <div className="field">
-            <label>Phone Number</label>
-            <input value={phone} onChange={(e) => setPhone(e.target.value)} />
-          </div>
-          <div className="field">
-            <label>Role</label>
-            <input value={user?.role === 'admin' ? 'Admin' : 'Sales Rep'} disabled />
+          <div className="field-row">
+            <div className="field">
+              <label>Phone Number</label>
+              <input value={phone} onChange={(e) => setPhone(e.target.value)} />
+            </div>
+            <div className="field">
+              <label>Role</label>
+              <input value={user?.role === 'admin' ? 'Admin' : 'Sales Rep'} disabled />
+            </div>
           </div>
           <button className="btn" type="submit" disabled={saving}>
             {saving ? 'Saving…' : 'Save Changes'}
