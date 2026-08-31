@@ -1,21 +1,19 @@
-
-Ui · CSS
 /* ═══════════════════════════════════════════════════════════════
    LEDGERONE — UI STYLES
    Import tokens.css BEFORE this file.
    ═══════════════════════════════════════════════════════════════ */
- 
- 
+
+
 /* ==============================================================
    GLOBAL RESET
    ============================================================== */
- 
+
 *,
 *::before,
 *::after {
   box-sizing: border-box;
 }
- 
+
 html,
 body,
 #root {
@@ -25,19 +23,19 @@ body,
   min-height: 100%;
   overflow-x: hidden;
 }
- 
+
 body {
   font-family: var(--font-body);
   color: var(--ink);
   background: var(--paper);
   -webkit-font-smoothing: antialiased;
 }
- 
- 
+
+
 /* ==============================================================
    APPLICATION LAYOUT
    ============================================================== */
- 
+
 .app-shell {
   display: flex;
   height: 100vh;        /* was: min-height: 100vh */
@@ -51,11 +49,11 @@ body {
   flex-direction: column;
   overflow-y: auto;      /* NEW — this is the only thing that scrolls now */
 }
- 
+
 /* ==============================================================
    SIDEBAR
    ============================================================== */
- 
+
 .sidebar {
   width: 232px;
   flex-shrink: 0;
@@ -65,7 +63,7 @@ body {
   flex-direction: column;
   padding: 20px 14px;
   box-shadow: inset -1px 0 0 rgba(255, 255, 255, 0.05);
- 
+
   height: 100vh;
   overflow-y: auto;      /* only scrolls internally if nav items overflow */
   /* REMOVE: position: sticky; top: 0; — no longer needed */
@@ -75,128 +73,128 @@ body {
   font-size: 19px;
   font-weight: 600;
   color: #fff;
- 
+
   padding: 4px 10px 22px;
- 
+
   letter-spacing: 0.01em;
 }
- 
+
 .sidebar-brand span {
   color: var(--brass);
 }
- 
+
 .sidebar-nav {
   display: flex;
   flex-direction: column;
   gap: 2px;
   flex: 1;
 }
- 
+
 .sidebar-link {
   display: flex;
   align-items: center;
   gap: 10px;
- 
+
   padding: 9px 12px;
- 
+
   border-radius: var(--radius-sm);
   border-left: 2px solid transparent;
- 
+
   color: var(--sidebar-muted);
   text-decoration: none;
- 
+
   font-size: 13.5px;
   font-weight: 500;
- 
+
   transition:
     background 0.12s,
     color 0.12s,
     border-color 0.12s;
 }
- 
+
 .sidebar-link:hover {
   background: rgba(255, 255, 255, 0.06);
   color: var(--sidebar-ink);
 }
- 
+
 .sidebar-link.active {
   background: rgba(37, 99, 235, 0.16);
   color: #fff;
   border-left-color: var(--blue);
 }
- 
+
 .sidebar-footer {
   border-top: 1px solid rgba(255, 255, 255, 0.1);
- 
+
   padding-top: 12px;
   margin-top: 12px;
 }
- 
+
 .sidebar-user {
   padding: 6px 12px;
- 
+
   font-size: 12.5px;
   color: var(--sidebar-muted);
 }
- 
+
 .sidebar-user strong {
   display: block;
- 
+
   color: var(--sidebar-ink);
   font-size: 13.5px;
 }
- 
- 
+
+
 /* ==============================================================
    TOPBAR
    Date/time intentionally aligned RIGHT.
    ============================================================== */
- 
+
 .topbar {
   height: 60px;
- 
+
   display: flex;
   align-items: center;
   justify-content: flex-end;
- 
+
   padding: 0 28px;
- 
+
   border-bottom: 1px solid var(--rule);
   background: var(--surface);
- 
+
   flex-shrink: 0;
 }
- 
+
 .topbar-title {
   display: none;
 }
- 
+
 .topbar-date-time {
   display: flex;
   align-items: center;
   gap: 8px;
- 
+
   font-size: 13px;
   white-space: nowrap;
 }
- 
+
 .topbar-date {
   color: var(--ink-muted);
 }
- 
+
 .topbar-divider {
   color: var(--ink-muted);
 }
- 
+
 .topbar-time {
   color: var(--ink-muted);
 }
- 
- 
+
+
 /* ==============================================================
    CONTENT
    ============================================================== */
- 
+
 .content {
   padding: 28px;
   flex: 1;
@@ -206,1259 +204,1259 @@ body {
   display: flex;
   align-items: flex-end;
   justify-content: space-between;
- 
+
   gap: 16px;
   margin-bottom: 22px;
- 
+
   flex-wrap: wrap;
 }
- 
+
 .page-header h1 {
   margin: 0;
- 
+
   font-family: var(--font-display);
   font-weight: 600;
 }
- 
+
 .page-header p {
   margin: 4px 0 0;
- 
+
   color: var(--ink-muted);
   font-size: 13.5px;
 }
- 
+
 .page-header-actions {
   display: flex;
   align-items: center;
   flex-wrap: wrap;
   gap: 8px;
 }
- 
+
 .ledger-page-header {
   margin-bottom: 20px;
 }
- 
- 
+
+
 /* ==============================================================
    CARDS
    ============================================================== */
- 
+
 .card {
   background: var(--surface);
- 
+
   border: 1px solid var(--rule);
   border-top: 2px solid var(--brass);
- 
+
   border-radius: var(--radius);
- 
+
   padding: 20px;
- 
+
   box-shadow: var(--shadow-sm);
 }
- 
+
 .card + .card {
   margin-top: 16px;
 }
- 
+
 .card h2,
 .card h3 {
   margin: 0 0 14px;
- 
+
   font-family: var(--font-display);
   font-weight: 600;
   color: var(--ink);
 }
- 
+
 .card h2 {
   font-size: 18px;
 }
- 
+
 .card h3 {
   font-size: 15px;
 }
- 
- 
+
+
 /* ==============================================================
    ERP LEDGER CONTROL BAR
    ============================================================== */
- 
+
 .ledger-control-bar {
   position: relative;
- 
+
   display: flex;
   align-items: flex-end;
- 
+
   gap: 32px;
- 
+
   width: 100%;
- 
+
   margin-bottom: 20px;
   padding: 20px 28px;
- 
+
   background: var(--surface);
- 
+
   border: 1px solid var(--rule);
   border-top: 2px solid var(--brass);
- 
+
   border-radius: var(--radius);
- 
+
   box-shadow: var(--shadow-sm);
 }
- 
- 
+
+
 /* ── Filter group ─────────────────────────────────────────── */
- 
+
 .ledger-control-group {
   display: flex;
   flex-direction: column;
- 
+
   gap: 6px;
- 
+
   margin: 0;
 }
- 
+
 .ledger-control-group > label {
   display: block;
- 
+
   margin: 0;
- 
+
   font-size: 11px;
   font-weight: 700;
- 
+
   color: var(--ink-muted);
- 
+
   text-transform: uppercase;
   letter-spacing: 0.06em;
 }
- 
- 
+
+
 /* ── Distributor ──────────────────────────────────────────── */
- 
+
 .ledger-distributor-group {
   width: 360px;
   flex-shrink: 0;
 }
- 
+
 .ledger-distributor-group select {
   width: 100%;
   height: 38px;
- 
+
   padding: 0 12px;
- 
+
   border: 1px solid var(--rule);
   border-radius: var(--radius-sm);
- 
+
   background: var(--surface);
   color: var(--ink);
- 
+
   font-family: var(--font-body);
   font-size: 13.5px;
- 
+
   cursor: pointer;
 }
- 
+
 .ledger-distributor-group select:hover {
   border-color: var(--rule-strong);
 }
- 
+
 .ledger-distributor-group select:focus {
   border-color: var(--brass);
- 
+
   outline: 2px solid rgba(150, 116, 42, 0.20);
   outline-offset: 0;
 }
- 
- 
+
+
 /* ── Accounting period ────────────────────────────────────── */
- 
+
 .ledger-period-group {
   position: relative;
- 
+
   flex: 1;
   min-width: 0;
 }
- 
+
 .ledger-period-actions {
   display: flex;
   align-items: center;
- 
+
   gap: 10px;
 }
- 
- 
+
+
 /* ==============================================================
    ACCOUNTING PERIOD BUTTON
    ============================================================== */
- 
+
 .ledger-period-trigger {
   width: 210px;
   height: 38px;
- 
+
   display: flex;
   align-items: center;
- 
+
   gap: 8px;
- 
+
   padding: 0 11px;
- 
+
   border: 1px solid var(--rule);
   border-radius: var(--radius-sm);
- 
+
   background: var(--surface);
   color: var(--ink);
- 
+
   font-family: var(--font-body);
   font-size: 13.5px;
   font-weight: 500;
- 
+
   cursor: pointer;
- 
+
   transition:
     background 0.12s,
     border-color 0.12s,
     box-shadow 0.12s;
 }
- 
+
 .ledger-period-trigger:hover {
   background: var(--surface-sunken);
   border-color: var(--rule-strong);
 }
- 
+
 .ledger-period-trigger.is-open {
   border-color: var(--brass);
- 
+
   box-shadow:
     0 0 0 2px rgba(150, 116, 42, 0.12);
 }
- 
+
 .ledger-period-trigger svg:first-child {
   flex-shrink: 0;
   color: var(--ink-muted);
 }
- 
+
 .ledger-period-trigger span {
   flex: 1;
- 
+
   text-align: left;
 }
- 
+
 .ledger-period-chevron {
   flex-shrink: 0;
- 
+
   color: var(--ink-muted);
- 
+
   transition:
     transform 0.15s ease;
 }
- 
+
 .ledger-period-chevron.rotate {
   transform: rotate(90deg);
 }
- 
- 
+
+
 /* ==============================================================
    DOWNLOAD BUTTON
    ============================================================== */
- 
+
 .ledger-download-btn {
   height: 38px;
- 
+
   flex-shrink: 0;
- 
+
   white-space: nowrap;
 }
- 
- 
+
+
 /* ==============================================================
    CURRENT BALANCE
    ============================================================== */
- 
+
 .ledger-current-balance {
   margin-left: auto;
- 
+
   min-width: 160px;
- 
+
   padding-left: 24px;
- 
+
   border-left: 1px solid var(--rule);
 }
- 
+
 .ledger-current-balance .stat-label {
   margin-bottom: 5px;
 }
- 
+
 .ledger-current-balance .stat-value {
   font-size: 20px;
 }
- 
- 
+
+
 /* ==============================================================
    YEAR → MONTH PICKER
    ============================================================== */
- 
+
 .ledger-month-picker {
   position: absolute;
- 
+
   top: calc(100% + 9px);
   left: 0;
- 
+
   z-index: 40;
- 
+
   width: 340px;
- 
+
   background: var(--surface);
- 
+
   border: 1px solid var(--rule);
   border-radius: var(--radius);
- 
+
   box-shadow: var(--shadow-md);
- 
+
   overflow: hidden;
 }
- 
- 
+
+
 /* ── Picker header ────────────────────────────────────────── */
- 
+
 .ledger-month-picker-header {
   display: flex;
   align-items: center;
   justify-content: space-between;
- 
+
   padding: 16px 18px;
- 
+
   border-bottom: 1px solid var(--rule);
 }
- 
+
 .ledger-month-picker-caption {
   margin-bottom: 3px;
- 
+
   font-size: 10px;
   font-weight: 700;
- 
+
   color: var(--ink-muted);
- 
+
   text-transform: uppercase;
   letter-spacing: 0.07em;
 }
- 
+
 .ledger-month-picker-year {
   font-family: var(--font-display);
- 
+
   font-size: 22px;
   font-weight: 600;
- 
+
   line-height: 1.2;
- 
+
   color: var(--ink);
 }
- 
- 
+
+
 /* ── Year navigation ─────────────────────────────────────── */
- 
+
 .ledger-year-controls {
   display: flex;
   align-items: center;
- 
+
   gap: 4px;
 }
- 
+
 .ledger-year-button {
   width: 32px;
   height: 32px;
- 
+
   display: flex;
   align-items: center;
   justify-content: center;
- 
+
   padding: 0;
- 
+
   border: 1px solid var(--rule);
   border-radius: var(--radius-sm);
- 
+
   background: var(--surface);
   color: var(--ink-muted);
- 
+
   cursor: pointer;
- 
+
   transition:
     background 0.12s,
     color 0.12s,
     border-color 0.12s;
 }
- 
+
 .ledger-year-button:hover {
   background: var(--surface-sunken);
- 
+
   color: var(--ink);
- 
+
   border-color: var(--rule-strong);
 }
- 
- 
+
+
 /* ==============================================================
    MONTH GRID
    ============================================================== */
- 
+
 .ledger-month-grid {
   display: grid;
- 
+
   grid-template-columns:
     repeat(4, 1fr);
- 
+
   gap: 6px;
- 
+
   padding: 16px;
 }
- 
+
 .ledger-month-option {
   position: relative;
- 
+
   min-height: 44px;
- 
+
   display: flex;
   align-items: center;
   justify-content: center;
- 
+
   border: 1px solid transparent;
   border-radius: var(--radius-sm);
- 
+
   background: transparent;
   color: var(--ink);
- 
+
   font-family: var(--font-body);
   font-size: 13px;
   font-weight: 500;
- 
+
   cursor: pointer;
- 
+
   transition:
     background 0.12s,
     color 0.12s,
     border-color 0.12s;
 }
- 
+
 .ledger-month-option:hover {
   background: var(--surface-sunken);
- 
+
   border-color: var(--rule);
 }
- 
+
 .ledger-month-option.selected {
   background: var(--green);
- 
+
   border-color: var(--green);
- 
+
   color: #fff;
- 
+
   font-weight: 600;
 }
- 
+
 .ledger-month-option.current:not(.selected) {
   border-color: var(--brass);
- 
+
   color: var(--ink);
- 
+
   font-weight: 600;
 }
- 
+
 .ledger-month-option small {
   position: absolute;
- 
+
   bottom: 4px;
- 
+
   font-size: 8px;
   font-weight: 600;
- 
+
   line-height: 1;
- 
+
   color: var(--brass);
 }
- 
+
 .ledger-month-option.selected small {
   color: #fff;
 }
- 
- 
+
+
 /* ==============================================================
    MONTH PICKER FOOTER
    ============================================================== */
- 
+
 .ledger-month-picker-footer {
   display: flex;
   align-items: center;
   justify-content: space-between;
- 
+
   padding: 10px 16px;
- 
+
   border-top: 1px solid var(--rule);
- 
+
   background: var(--surface-sunken);
 }
- 
+
 .ledger-picker-secondary,
 .ledger-picker-primary {
   height: 32px;
- 
+
   padding: 0 11px;
- 
+
   border-radius: var(--radius-sm);
- 
+
   font-family: var(--font-body);
   font-size: 12px;
   font-weight: 600;
- 
+
   cursor: pointer;
 }
- 
+
 .ledger-picker-secondary {
   border: 1px solid var(--rule);
- 
+
   background: var(--surface);
   color: var(--ink-muted);
 }
- 
+
 .ledger-picker-secondary:hover {
   background: var(--surface-sunken);
   color: var(--ink);
 }
- 
+
 .ledger-picker-primary {
   border: 1px solid var(--green);
- 
+
   background: var(--green);
   color: #fff;
 }
- 
+
 .ledger-picker-primary:hover {
   background: var(--green-hover);
 }
- 
- 
+
+
 /* ==============================================================
    DOWNLOAD PROGRESS
    ============================================================== */
- 
+
 .ledger-download-progress {
   width: 100%;
- 
+
   margin-top: -12px;
   margin-bottom: 20px;
 }
- 
+
 .progress-track {
   width: 100%;
   height: 3px;
- 
+
   overflow: hidden;
- 
+
   background: var(--surface-sunken);
- 
+
   border-radius: 999px;
 }
- 
+
 .progress-fill {
   height: 100%;
- 
+
   background: var(--green);
- 
+
   transition: width 0.15s ease;
 }
- 
+
 .progress-fill.indeterminate {
   width: 35%;
- 
+
   animation:
     download-progress 1.1s ease-in-out infinite;
 }
- 
+
 @keyframes download-progress {
   0% {
     transform: translateX(-120%);
   }
- 
+
   100% {
     transform: translateX(330%);
   }
 }
- 
- 
+
+
 /* ==============================================================
    TABLE CARD
    ============================================================== */
- 
+
 .ledger-table-card {
   padding: 20px 28px;
- 
+
   overflow: hidden;
 }
- 
+
 .table-wrap {
   width: 100%;
- 
+
   overflow-x: auto;
 }
- 
+
 table.data-table {
   width: 100%;
- 
+
   border-collapse: collapse;
- 
+
   font-size: 13.5px;
- 
+
   background: var(--surface);
 }
- 
+
 .data-table th {
   text-align: left;
- 
+
   padding: 10px 12px;
- 
+
   border-bottom:
     2px solid var(--rule-strong);
- 
+
   background: var(--surface);
- 
+
   color: var(--ink-muted);
- 
+
   font-size: 11px;
   font-weight: 700;
- 
+
   text-transform: uppercase;
   letter-spacing: 0.06em;
- 
+
   white-space: nowrap;
 }
- 
+
 .data-table td {
   padding: 11px 12px;
- 
+
   border-bottom:
     1px solid var(--rule);
- 
+
   vertical-align: middle;
 }
- 
+
 .data-table tbody tr:hover {
   background: var(--surface-sunken);
 }
- 
+
 .data-table td.num,
 .data-table th.num {
   text-align: right;
- 
+
   font-family: var(--font-mono);
- 
+
   font-variant-numeric:
     tabular-nums;
 }
- 
+
 .data-table td:first-child,
 .data-table th:first-child {
   padding-left: 0;
 }
- 
+
 .data-table td:last-child,
 .data-table th:last-child {
   padding-right: 0;
 }
- 
+
 .capitalize {
   text-transform: capitalize;
 }
- 
+
 .ledger-note {
   color: var(--ink-muted);
 }
- 
- 
+
+
 /* ==============================================================
    EMPTY STATE
    ============================================================== */
- 
+
 .empty-state {
   text-align: center;
- 
+
   padding: 56px 20px;
- 
+
   color: var(--ink-muted);
 }
- 
- 
+
+
 /* ==============================================================
    BUTTONS
    ============================================================== */
- 
+
 .btn {
   display: inline-flex;
   align-items: center;
- 
+
   gap: 6px;
- 
+
   border: 1px solid transparent;
   border-radius: var(--radius-sm);
- 
+
   padding: 8px 14px;
- 
+
   font-size: 13.5px;
   font-weight: 500;
- 
+
   background: var(--green);
   color: #fff;
- 
+
   text-decoration: none;
- 
+
   cursor: pointer;
- 
+
   transition:
     background 0.12s,
     border-color 0.12s;
 }
- 
+
 .btn:hover {
   background: var(--green-hover);
 }
- 
+
 .btn:disabled {
   opacity: 0.5;
   cursor: not-allowed;
 }
- 
+
 .btn-secondary {
   background: var(--surface);
- 
+
   color: var(--ink);
- 
+
   border-color: var(--rule);
 }
- 
+
 .btn-secondary:hover {
   background: var(--surface-sunken);
- 
+
   border-color: var(--rule-strong);
 }
- 
+
 .btn-brass {
   background: var(--brass);
   color: #fff;
 }
- 
+
 .btn-brass:hover {
   background: var(--brass-hover);
 }
- 
+
 .btn-danger {
   background: var(--status-negative);
 }
- 
+
 .btn-danger:hover {
   background: #6E251C;
 }
- 
+
 .btn-sm {
   padding: 5px 10px;
   font-size: 12.5px;
 }
- 
+
 .btn-ghost {
   display: inline-flex;
   align-items: center;
   justify-content: center;
- 
+
   background: transparent;
- 
+
   color: var(--ink-muted);
- 
+
   border: none;
- 
+
   padding: 6px;
- 
+
   border-radius: var(--radius-sm);
- 
+
   cursor: pointer;
 }
- 
+
 .btn-ghost:hover {
   color: var(--ink);
- 
+
   background: var(--surface-sunken);
 }
- 
- 
+
+
 /* ==============================================================
    DOWNLOAD MODAL
    ============================================================== */
- 
+
 .ledger-download-modal {
   max-width: 440px;
 }
- 
+
 .ledger-download-modal .modal-header {
   align-items: flex-start;
 }
- 
+
 .ledger-download-modal h2 {
   margin: 0;
- 
+
   font-family: var(--font-display);
   font-size: 21px;
   font-weight: 600;
 }
- 
+
 .ledger-download-modal .modal-header p {
   margin: 5px 0 0;
- 
+
   color: var(--ink-muted);
- 
+
   font-size: 12.5px;
 }
- 
+
 .download-options {
   display: flex;
   flex-direction: column;
- 
+
   gap: 10px;
 }
- 
+
 .download-option {
   width: 100%;
- 
+
   display: flex;
   align-items: center;
- 
+
   gap: 13px;
- 
+
   padding: 14px 16px;
- 
+
   border: 1px solid var(--rule);
- 
+
   border-radius: var(--radius-sm);
- 
+
   background: var(--surface);
- 
+
   color: var(--ink);
- 
+
   text-align: left;
- 
+
   cursor: pointer;
- 
+
   transition:
     background 0.12s,
     border-color 0.12s;
 }
- 
+
 .download-option:hover {
   background: var(--surface-sunken);
- 
+
   border-color: var(--brass);
 }
- 
+
 .download-option > svg {
   flex-shrink: 0;
- 
+
   color: var(--ink-muted);
 }
- 
+
 .download-option span {
   display: flex;
   flex-direction: column;
- 
+
   gap: 2px;
 }
- 
+
 .download-option strong {
   font-size: 13.5px;
   font-weight: 600;
 }
- 
+
 .download-option small {
   color: var(--ink-muted);
- 
+
   font-size: 11.5px;
 }
- 
- 
+
+
 /* ==============================================================
    MODAL
    ============================================================== */
- 
+
 .modal-overlay {
   position: fixed;
- 
+
   inset: 0;
- 
+
   z-index: 50;
- 
+
   display: flex;
   align-items: center;
   justify-content: center;
- 
+
   padding: 20px;
- 
+
   background:
     rgba(27, 33, 28, 0.50);
 }
- 
+
 .modal {
   width: 100%;
   max-width: 560px;
- 
+
   max-height: 88vh;
- 
+
   overflow-y: auto;
- 
+
   padding: 24px;
- 
+
   background: var(--surface);
- 
+
   border-radius: 10px;
- 
+
   border-top: 3px solid var(--brass);
- 
+
   box-shadow: var(--shadow-md);
 }
- 
+
 .modal-header {
   display: flex;
   justify-content: space-between;
   align-items: flex-start;
- 
+
   margin-bottom: 18px;
 }
- 
- 
+
+
 /* ==============================================================
    FORMS
    ============================================================== */
- 
+
 .field {
   display: flex;
   flex-direction: column;
- 
+
   gap: 5px;
- 
+
   margin-bottom: 14px;
 }
- 
+
 .field label {
   font-size: 12.5px;
   font-weight: 600;
- 
+
   color: var(--ink-muted);
 }
- 
+
 .field input,
 .field select,
 .field textarea {
   border: 1px solid var(--rule);
- 
+
   border-radius: var(--radius-sm);
- 
+
   padding: 8px 10px;
- 
+
   background: var(--surface);
   color: var(--ink);
- 
+
   font-family: var(--font-body);
   font-size: 13.5px;
 }
- 
+
 .field input:focus,
 .field select:focus,
 .field textarea:focus {
   border-color: var(--brass);
- 
+
   outline:
     2px solid rgba(150, 116, 42, 0.20);
- 
+
   outline-offset: 0;
 }
- 
+
 .field-row {
   display: grid;
- 
+
   grid-template-columns:
     1fr 1fr;
- 
+
   gap: 14px;
 }
- 
+
 .field-error {
   color: var(--status-negative);
- 
+
   font-size: 12.5px;
- 
+
   margin-top: -8px;
   margin-bottom: 12px;
 }
- 
- 
+
+
 /* ==============================================================
    STAT CARDS
    ============================================================== */
- 
+
 .stat-grid {
   display: grid;
- 
+
   grid-template-columns:
     repeat(auto-fit, minmax(180px, 1fr));
- 
+
   gap: 14px;
- 
+
   margin-bottom: 20px;
 }
- 
+
 .stat-card {
   background: var(--surface);
- 
+
   border: 1px solid var(--rule);
- 
+
   border-radius: var(--radius);
- 
+
   padding: 16px 18px;
 }
- 
+
 .stat-label {
   margin-bottom: 6px;
- 
+
   font-size: 11.5px;
   font-weight: 600;
- 
+
   color: var(--ink-muted);
- 
+
   text-transform: uppercase;
   letter-spacing: 0.06em;
 }
- 
+
 .stat-value {
   font-family: var(--font-mono);
- 
+
   font-size: 25px;
   font-weight: 500;
- 
+
   font-variant-numeric:
     tabular-nums;
- 
+
   color: var(--ink);
 }
- 
+
 .stat-card-value {
   margin-top: 7px;
 }
- 
+
 .stat-card-text {
   font-size: 14px;
   color: var(--ink);
   text-transform: capitalize;
 }
- 
+
 select.stat-card-value {
   display: block;
   width: 100%;
- 
+
   border: 1px solid var(--rule);
   border-radius: var(--radius-sm);
- 
+
   padding: 7px 9px;
- 
+
   background: var(--surface);
   color: var(--ink);
- 
+
   font-family: var(--font-body);
   font-size: 13px;
- 
+
   cursor: pointer;
 }
- 
+
 select.stat-card-value:focus {
   border-color: var(--brass);
   outline: 2px solid rgba(150, 116, 42, 0.20);
   outline-offset: 0;
 }
- 
+
 .num {
   font-family: var(--font-mono);
   font-variant-numeric: tabular-nums;
 }
- 
- 
+
+
 /* ==============================================================
    BADGES
    ============================================================== */
- 
+
 .badge {
   display: inline-flex;
   align-items: center;
- 
+
   padding: 3px 11px;
- 
+
   border-radius: var(--radius-sm);
- 
+
   border: 1.5px solid currentColor;
- 
+
   background: transparent;
- 
+
   font-size: 10.5px;
   font-weight: 700;
- 
+
   text-transform: uppercase;
   letter-spacing: 0.06em;
 }
- 
+
 .badge-green {
   color: var(--status-positive);
   background: var(--status-positive-bg);
 }
- 
+
 .badge-amber {
   color: var(--status-pending);
   background: var(--status-pending-bg);
 }
- 
+
 .badge-red {
   color: var(--status-negative);
   background: var(--status-negative-bg);
 }
- 
+
 .badge-neutral {
   color: var(--status-neutral);
   background: var(--status-neutral-bg);
- 
+
   border: 1px solid var(--rule);
 }
- 
- 
+
+
 /* ==============================================================
    INLINE TEXT LINKS
    ============================================================== */
- 
+
 .link-btn {
   color: var(--green);
   text-decoration: none;
   font-weight: 600;
 }
- 
+
 .link-btn:hover {
   text-decoration: underline;
 }
- 
- 
+
+
 /* ==============================================================
    INLINE BANNERS
    ============================================================== */
- 
+
 .error-banner {
   display: flex;
   align-items: center;
   gap: 8px;
- 
+
   margin-bottom: 16px;
   padding: 12px 14px;
- 
+
   border-radius: var(--radius-sm);
   border: 1px solid var(--status-pending-bg);
- 
+
   background: var(--status-pending-bg);
   color: var(--status-pending);
- 
+
   font-size: 13px;
   line-height: 1.6;
 }
- 
- 
+
+
 /* ==============================================================
    MODAL ACTION ROWS
    ============================================================== */
- 
+
 .modal-actions {
   display: flex;
   gap: 10px;
   justify-content: flex-end;
 }
- 
- 
+
+
 /* ==============================================================
    TOASTS
    ============================================================== */
- 
+
 .toast-stack {
   position: fixed;
- 
+
   right: 20px;
   bottom: 20px;
- 
+
   z-index: 100;
- 
+
   display: flex;
   flex-direction: column;
- 
+
   gap: 8px;
- 
+
   max-width: 340px;
 }
- 
+
 .toast {
   padding: 12px 16px;
- 
+
   border-radius: var(--radius-sm);
- 
+
   font-size: 13.5px;
   font-weight: 500;
- 
+
   color: #fff;
- 
+
   box-shadow: var(--shadow-md);
- 
+
   cursor: pointer;
- 
+
   animation:
     toast-in 0.18s ease-out;
 }
- 
+
 .toast-success {
   background: var(--status-positive);
 }
- 
+
 .toast-error {
   background: var(--status-negative);
 }
- 
+
 .toast-info {
   background: var(--ink);
 }
- 
+
 @keyframes toast-in {
   from {
     opacity: 0;
     transform: translateY(6px);
   }
- 
+
   to {
     opacity: 1;
     transform: translateY(0);
   }
 }
- 
- 
+
+
 /* ==============================================================
    SPINNER
    ============================================================== */
- 
+
 .spin {
   animation:
     spin 0.8s linear infinite;
 }
- 
+
 @keyframes spin {
   to {
     transform: rotate(360deg);
   }
 }
- 
- 
+
+
 /* ==============================================================
    SKELETON
    ============================================================== */
- 
+
 .skeleton {
   background:
     linear-gradient(
@@ -1467,510 +1465,510 @@ select.stat-card-value:focus {
       #E2E8F0 37%,
       var(--surface-sunken) 63%
     );
- 
+
   background-size: 400% 100%;
- 
+
   animation:
     skeleton-shine 1.4s ease infinite;
- 
+
   border-radius: var(--radius-sm);
 }
- 
+
 @keyframes skeleton-shine {
   0% {
     background-position: 100% 50%;
   }
- 
+
   100% {
     background-position: 0 50%;
   }
 }
- 
+
 .skeleton-row {
   display: flex;
   align-items: center;
- 
+
   gap: 16px;
- 
+
   padding: 11px 12px;
 }
- 
+
 .skeleton-text {
   height: 13px;
   flex: 1;
 }
- 
+
 .skeleton-stat {
   width: 90px;
   height: 24px;
 }
- 
- 
+
+
 /* ==============================================================
    FOOTER
    ============================================================== */
- 
+
 .site-footer {
   margin-top: auto;
- 
+
   padding: 16px 28px;
- 
+
   display: flex;
   align-items: center;
   justify-content: space-between;
- 
+
   gap: 16px;
- 
+
   flex-wrap: wrap;
- 
+
   font-size: 12.5px;
- 
+
   color: var(--ink-muted);
- 
+
   border-top: 1px solid var(--rule);
 }
- 
+
 .site-footer > *:first-child {
   text-align: left;
 }
- 
+
 .site-footer nav,
 .site-footer > *:last-child {
   display: flex;
- 
+
   gap: 16px;
- 
+
   margin: 0;
 }
- 
+
 .site-footer a {
   color: var(--ink-muted);
- 
+
   text-decoration: underline;
 }
- 
+
 .site-footer a:hover {
   color: var(--green);
 }
- 
- 
+
+
 /* ==============================================================
    HAMBURGER / MOBILE SIDEBAR
    ============================================================== */
- 
+
 .hamburger-btn {
   display: none;
- 
+
   position: fixed;
- 
+
   top: 14px;
   left: 14px;
- 
+
   z-index: 50;
- 
+
   width: 40px;
   height: 40px;
- 
+
   align-items: center;
   justify-content: center;
- 
+
   border: 1px solid var(--rule);
- 
+
   border-radius: var(--radius-sm);
- 
+
   background: var(--surface);
   color: var(--ink);
- 
+
   box-shadow: var(--shadow-sm);
- 
+
   cursor: pointer;
 }
- 
+
 .sidebar-scrim {
   display: none;
 }
- 
- 
+
+
 /* ==============================================================
    ACCESSIBILITY
    ============================================================== */
- 
+
 a:focus-visible,
 button:focus-visible,
 input:focus-visible,
 select:focus-visible,
 textarea:focus-visible {
   outline: 2px solid var(--brass);
- 
+
   outline-offset: 2px;
 }
- 
- 
+
+
 /* ==============================================================
    PASSWORD REVEAL
    ============================================================== */
- 
+
 input[type='password']::-ms-reveal,
 input[type='password']::-ms-clear {
   display: none;
 }
- 
- 
+
+
 /* ==============================================================
    LONG TABLES
    ============================================================== */
- 
+
 .page-table-scroll {
   max-height: 640px;
- 
+
   overflow-y: auto;
- 
+
   border: 1px solid var(--rule);
- 
+
   border-radius: var(--radius);
 }
- 
+
 .page-table-scroll table.data-table thead th {
   position: sticky;
- 
+
   top: 0;
- 
+
   z-index: 1;
- 
+
   background: var(--surface);
 }
- 
- 
+
+
 /* ==============================================================
    QUANTITY INPUT
    ============================================================== */
- 
+
 .qty-input {
   width: 44px;
- 
+
   padding: 5px 4px;
- 
+
   text-align: center;
- 
+
   border: 1px solid var(--rule);
- 
+
   border-radius: var(--radius-sm);
- 
+
   background: var(--surface);
   color: var(--ink);
- 
+
   font-family: var(--font-mono);
   font-size: 13.5px;
- 
+
   font-variant-numeric:
     tabular-nums;
 }
- 
+
 .qty-input:focus {
   border-color: var(--brass);
- 
+
   outline:
     2px solid rgba(150, 116, 42, 0.25);
- 
+
   outline-offset: 0;
 }
- 
+
 .qty-input::-webkit-outer-spin-button,
 .qty-input::-webkit-inner-spin-button {
   -webkit-appearance: none;
   margin: 0;
 }
- 
+
 .qty-input[type='number'] {
   -moz-appearance: textfield;
 }
- 
- 
+
+
 /* ==============================================================
    ORDER BUILDER
    ============================================================== */
- 
+
 .order-builder-divider {
   margin: 24px 0 14px;
- 
+
   padding-top: 18px;
- 
+
   border-top: 2px solid var(--rule-strong);
 }
- 
+
 .order-builder-divider h3 {
   margin: 0;
- 
+
   font-size: 12.5px;
   font-weight: 700;
- 
+
   color: var(--ink-muted);
- 
+
   text-transform: uppercase;
   letter-spacing: 0.05em;
 }
- 
+
 .added-products-list {
   max-height: 320px;
- 
+
   overflow-y: auto;
 }
- 
+
 .added-products-list table.data-table thead th {
   position: sticky;
- 
+
   top: 0;
- 
+
   z-index: 1;
- 
+
   background: var(--surface);
 }
- 
+
 @keyframes row-enter {
   from {
     opacity: 0;
     transform: translateY(-6px);
   }
- 
+
   to {
     opacity: 1;
     transform: translateY(0);
   }
 }
- 
+
 .added-product-row {
   animation:
     row-enter 0.35s ease-out;
 }
- 
- 
+
+
 /* ==============================================================
    AUTH
    ============================================================== */
- 
+
 .auth-shell {
   min-height: 100vh;
   width: 100%;
- 
+
   display: flex;
   flex-direction: column;
- 
+
   background: var(--sidebar-bg);
 }
- 
+
 .auth-center {
   flex: 1;
- 
+
   display: flex;
   align-items: center;
   justify-content: center;
- 
+
   padding: 24px;
 }
- 
+
 .auth-card {
   width: 100%;
   max-width: 420px;
- 
+
   padding: 36px 40px;
- 
+
   background: var(--surface);
- 
+
   border-radius: var(--radius);
- 
+
   border-top: 3px solid var(--brass);
- 
+
   box-shadow: var(--shadow-md);
 }
- 
+
 .auth-shell .site-footer {
   border-top:
     1px solid rgba(255, 255, 255, 0.1);
- 
+
   color: var(--sidebar-muted);
 }
- 
+
 .auth-shell .site-footer a {
   color: var(--sidebar-muted);
 }
- 
+
 .auth-shell .site-footer a:hover {
   color: var(--brass);
 }
- 
- 
+
+
 /* ==============================================================
    MOBILE
    ============================================================== */
- 
+
 @media (max-width: 768px) {
- 
+
   .hamburger-btn {
     display: flex;
   }
- 
+
   .sidebar {
     position: fixed;
- 
+
     left: 0;
     top: 0;
- 
+
     z-index: 40;
- 
+
     transform:
       translateX(-100%);
- 
+
     transition:
       transform 0.2s ease;
   }
- 
+
   .sidebar.sidebar-open {
     transform:
       translateX(0);
   }
- 
+
   .sidebar-scrim {
     display: block;
- 
+
     position: fixed;
- 
+
     inset: 0;
- 
+
     z-index: 30;
- 
+
     background:
       rgba(27, 33, 28, 0.4);
   }
- 
- 
+
+
   /* ── Topbar ───────────────────────────────────── */
- 
+
   .topbar {
     height: 60px;
- 
+
     padding:
       0 20px 0 64px;
- 
+
     justify-content:
       flex-end;
   }
- 
+
   .topbar-date-time {
     font-size: 12px;
   }
- 
- 
+
+
   /* ── Content ──────────────────────────────────── */
- 
+
   .content {
     padding: 20px 16px;
   }
- 
- 
+
+
   /* ── Ledger controls ──────────────────────────── */
- 
+
   .ledger-control-bar {
     flex-direction: column;
- 
+
     align-items: stretch;
- 
+
     gap: 18px;
- 
+
     padding: 18px;
   }
- 
+
   .ledger-distributor-group {
     width: 100%;
   }
- 
+
   .ledger-period-group {
     width: 100%;
   }
- 
+
   .ledger-period-actions {
     width: 100%;
   }
- 
+
   .ledger-period-trigger {
     flex: 1;
- 
+
     width: auto;
   }
- 
+
   .ledger-current-balance {
     width: 100%;
- 
+
     margin-left: 0;
- 
+
     padding-left: 0;
     padding-top: 14px;
- 
+
     border-left: none;
     border-top: 1px solid var(--rule);
   }
- 
- 
+
+
   /* ── Calendar ────────────────────────────────── */
- 
+
   .ledger-month-picker {
     left: 0;
     right: 0;
- 
+
     width: 100%;
   }
- 
- 
+
+
   /* ── Table ───────────────────────────────────── */
- 
+
   .ledger-table-card {
     padding: 16px;
   }
- 
- 
+
+
   /* ── Forms ───────────────────────────────────── */
- 
+
   .field-row {
     grid-template-columns:
       1fr;
   }
- 
- 
+
+
   /* ── Footer ──────────────────────────────────── */
- 
+
   .site-footer {
     padding: 16px;
- 
+
     justify-content:
       center;
- 
+
     text-align: center;
   }
- 
+
   .site-footer > *:first-child {
     text-align: center;
   }
- 
+
   .site-footer nav,
   .site-footer > *:last-child {
     justify-content:
       center;
   }
- 
+
 }
- 
- 
+
+
 /* ==============================================================
    REDUCED MOTION
    ============================================================== */
- 
+
 @media (prefers-reduced-motion: reduce) {
- 
+
   *,
   *::before,
   *::after {
     scroll-behavior: auto !important;
   }
- 
+
   .skeleton,
   .spin,
   .added-product-row,
@@ -1979,21 +1977,21 @@ input[type='password']::-ms-clear {
     animation: none !important;
   }
 }
- 
+
 /* ============================================================
    PROFESSIONAL ERP DASHBOARD
    LedgerOne
    ============================================================ */
- 
+
 .dashboard-page {
   padding-top: 34px;
 }
- 
- 
+
+
 /* ───────────────────────────────────────────────────────────
    HEADER
    ─────────────────────────────────────────────────────────── */
- 
+
 .dashboard-header {
   display: flex;
   align-items: flex-end;
@@ -2001,7 +1999,7 @@ input[type='password']::-ms-clear {
   gap: 24px;
   margin-bottom: 28px;
 }
- 
+
 .dashboard-header h1 {
   margin: 0;
   font-family: var(--font-display);
@@ -2011,79 +2009,13 @@ input[type='password']::-ms-clear {
   letter-spacing: -0.025em;
   color: var(--ink);
 }
- 
+
 .dashboard-header p {
   margin: 8px 0 0;
   color: var(--ink-muted);
   font-size: 14px;
 }
- 
-.dashboard-header-actions {
-  display: flex;
-  align-items: flex-end;
-  gap: 14px;
-}
- 
-.dashboard-period {
-  display: flex;
-  flex-direction: column;
-  gap: 6px;
-}
- 
-.dashboard-period > label {
-  font-size: 10.5px;
-  font-weight: 700;
-  letter-spacing: 0.08em;
-  text-transform: uppercase;
-  color: var(--ink-muted);
-}
- 
-.dashboard-period-control {
-  position: relative;
-  display: flex;
-  align-items: center;
-  height: 40px;
-  min-width: 190px;
-  border: 1px solid var(--rule);
-  border-radius: var(--radius-sm);
-  background: var(--surface);
-}
- 
-.dashboard-period-control > svg {
-  position: absolute;
-  color: var(--ink-muted);
-  pointer-events: none;
-}
- 
-.dashboard-period-control > svg:first-child {
-  left: 12px;
-}
- 
-.dashboard-period-control > svg:last-child {
-  right: 12px;
-}
- 
-.dashboard-period-control select {
-  appearance: none;
-  -webkit-appearance: none;
-  width: 100%;
-  height: 100%;
-  border: none;
-  background: transparent;
-  padding: 0 32px 0 36px;
-  font-family: var(--font-body);
-  font-size: 13px;
-  font-weight: 500;
-  color: var(--ink);
-  cursor: pointer;
-}
- 
-.dashboard-period-control select:focus {
-  outline: 2px solid rgba(150, 116, 42, 0.20);
-  outline-offset: 0;
-  border-radius: var(--radius-sm);
-}
- 
+
 .dashboard-new-order {
   min-height: 40px;
   padding: 0 16px;
@@ -2091,16 +2023,16 @@ input[type='password']::-ms-clear {
   background: var(--sidebar-bg);
   color: #fff;
 }
- 
+
 .dashboard-new-order:hover {
   filter: brightness(1.18);
 }
- 
- 
+
+
 /* ───────────────────────────────────────────────────────────
    SHARED CARD LINKS (brass = primary navigational accent)
    ─────────────────────────────────────────────────────────── */
- 
+
 .dashboard-view-link,
 .dashboard-card-action,
 .dashboard-card-link {
@@ -2112,117 +2044,76 @@ input[type='password']::-ms-clear {
   font-size: 12.5px;
   font-weight: 600;
 }
- 
+
 .dashboard-view-link:hover,
 .dashboard-card-action:hover,
 .dashboard-card-link:hover {
   color: var(--brass-hover);
 }
- 
- 
+
+
 /* ───────────────────────────────────────────────────────────
    KPI CARDS
    Built on the shared .stat-grid / .stat-card pattern (same one
    used on the order detail page) rather than a bespoke component,
    since the reference shows plain flat cards, no icons.
    ─────────────────────────────────────────────────────────── */
- 
+
 .dashboard-stat-grid {
   grid-template-columns: repeat(5, minmax(0, 1fr));
   margin-bottom: 20px;
 }
- 
+
 .stat-note {
   margin-top: 7px;
   font-size: 11.5px;
   color: var(--ink-muted);
 }
- 
+
 .stat-note.up {
   color: var(--status-positive);
 }
- 
+
 .stat-note.down {
   color: var(--status-negative);
 }
- 
+
 .stat-value.violet {
   color: #7c3aed;
 }
- 
- 
+
+
 @media (max-width: 1100px) {
- 
+
   .dashboard-stat-grid {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
- 
+
 }
- 
+
 @media (max-width: 560px) {
- 
+
   .dashboard-stat-grid {
     grid-template-columns: 1fr;
   }
- 
+
 }
- 
- 
+
+
 /* ───────────────────────────────────────────────────────────
-   ICON COLOR MODIFIERS
-   Shared between KPI card icons and Action Required icons.
+   RECENT ORDERS CARD
    ─────────────────────────────────────────────────────────── */
- 
-.icon-green {
-  color: var(--status-positive);
-  background: var(--status-positive-bg);
-}
- 
-.icon-blue {
-  color: var(--blue);
-  background: rgba(37, 99, 235, 0.12);
-}
- 
-.icon-amber {
-  color: var(--status-pending);
-  background: var(--status-pending-bg);
-}
- 
-.icon-red {
-  color: var(--status-negative);
-  background: var(--status-negative-bg);
-}
- 
- 
-/* ───────────────────────────────────────────────────────────
-   2-COLUMN GRID
-   Shared layout for both content rows below the KPIs.
-   ─────────────────────────────────────────────────────────── */
- 
-.dashboard-grid {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) 340px;
-  gap: 14px;
-  align-items: stretch;
-  margin-bottom: 20px;
-}
- 
-.dashboard-grid:last-child {
-  margin-bottom: 0;
-}
- 
-.dashboard-chart-card,
-.dashboard-aging-card,
-.dashboard-orders-card,
-.dashboard-action-card {
+
+.dashboard-orders-card {
   min-width: 0;
   padding: 0;
   overflow: hidden;
   display: flex;
   flex-direction: column;
   border-top: 1px solid var(--rule);
+  margin-bottom: 20px;
 }
- 
+
 .dashboard-card-header {
   display: flex;
   align-items: center;
@@ -2231,7 +2122,7 @@ input[type='password']::-ms-clear {
   padding: 17px 20px;
   border-bottom: 1px solid var(--rule);
 }
- 
+
 .dashboard-card-header h3 {
   margin: 0;
   font-family: var(--font-display);
@@ -2239,213 +2130,47 @@ input[type='password']::-ms-clear {
   font-weight: 600;
   color: var(--ink);
 }
- 
- 
-/* ───────────────────────────────────────────────────────────
-   SALES PERFORMANCE CHART
-   ─────────────────────────────────────────────────────────── */
- 
-.dashboard-chart-card {
-  --chart-pad-x: 24px;
-  --chart-yaxis-w: 38px;
-  --chart-gap: 10px;
-}
- 
-.dashboard-chart-period {
-  position: relative;
-  display: flex;
-  align-items: center;
-  height: 32px;
-  min-width: 108px;
-  border: 1px solid var(--rule);
-  border-radius: var(--radius-sm);
-  background: var(--surface);
-}
- 
-.dashboard-chart-period select {
-  appearance: none;
-  -webkit-appearance: none;
-  width: 100%;
-  height: 100%;
-  border: none;
-  background: transparent;
-  padding: 0 28px 0 12px;
-  font-family: var(--font-body);
-  font-size: 12.5px;
-  font-weight: 500;
-  color: var(--ink);
-  cursor: pointer;
-}
- 
-.dashboard-chart-period svg {
-  position: absolute;
-  right: 9px;
-  color: var(--ink-muted);
-  pointer-events: none;
-}
- 
-.dashboard-chart-body {
-  flex: 1;
-  display: flex;
-  gap: var(--chart-gap);
-  padding: 22px var(--chart-pad-x) 8px;
-  min-height: 260px;
-}
- 
-.dashboard-chart-yaxis {
-  flex-shrink: 0;
-  width: var(--chart-yaxis-w);
-  display: flex;
-  flex-direction: column;
-  justify-content: space-between;
-  padding-bottom: 2px;
-  font-size: 11px;
-  color: var(--ink-muted);
-  text-align: right;
-}
- 
-.dashboard-chart-plot {
-  position: relative;
-  flex: 1;
-  min-width: 0;
-}
- 
-.dashboard-chart-gridlines {
-  position: absolute;
-  inset: 0;
-  display: flex;
-  flex-direction: column;
-  justify-content: space-between;
-}
- 
-.dashboard-chart-gridlines span {
-  display: block;
-  height: 0;
-  border-top: 1px dashed var(--rule);
-}
- 
-.dashboard-chart-gridlines span:last-child {
-  border-top: 1px solid var(--rule-strong);
-}
- 
-.dashboard-chart-svg {
-  position: absolute;
-  inset: 0;
-  width: 100%;
-  height: 100%;
-}
- 
-.dashboard-chart-empty {
-  position: absolute;
-  top: 50%;
-  left: 50%;
-  transform: translate(-50%, -50%);
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 10px;
-  font-size: 12.5px;
-  color: var(--ink-muted);
-  white-space: nowrap;
-}
- 
-.dashboard-chart-xaxis {
-  display: flex;
-  justify-content: space-between;
-  margin: 6px var(--chart-pad-x) 18px
-    calc(var(--chart-pad-x) + var(--chart-yaxis-w) + var(--chart-gap));
-  font-size: 11px;
-  color: var(--ink-muted);
-}
- 
- 
-/* ───────────────────────────────────────────────────────────
-   RECEIVABLES AGING
-   ─────────────────────────────────────────────────────────── */
- 
-.dashboard-aging-list {
-  padding: 6px 20px 2px;
-}
- 
-.dashboard-aging-row {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 12px;
-  padding: 13px 0;
-  border-bottom: 1px solid var(--rule);
-  font-size: 12.5px;
-  color: var(--ink);
-}
- 
-.dashboard-aging-row:last-of-type {
-  border-bottom: none;
-}
- 
-.dashboard-aging-row strong {
-  font-family: var(--font-mono);
-  font-weight: 500;
-  font-variant-numeric: tabular-nums;
-}
- 
-.dashboard-aging-total {
-  margin-top: 3px;
-  padding-top: 15px;
-  border-top: 1px solid var(--rule-strong);
-  font-weight: 650;
-}
- 
-.dashboard-aging-total strong {
-  font-size: 15px;
-  font-weight: 650;
-}
- 
-.dashboard-aging-footer {
-  margin-top: auto;
-  padding: 14px 20px 18px;
-  border-top: 1px solid var(--rule);
-}
- 
- 
+
+
 /* ───────────────────────────────────────────────────────────
    RECENT ORDERS TABLE
    ─────────────────────────────────────────────────────────── */
- 
+
 .dashboard-orders-table {
   font-size: 12.5px;
 }
- 
+
 .dashboard-orders-table th {
   padding: 9px 12px;
   font-size: 10px;
 }
- 
+
 .dashboard-orders-table td {
   padding: 11px 12px;
 }
- 
+
 .dashboard-order-number {
   color: var(--green);
   text-decoration: none;
   font-family: var(--font-mono);
   font-weight: 600;
 }
- 
+
 .dashboard-order-number:hover {
   text-decoration: underline;
 }
- 
- 
+
+
 /* ───────────────────────────────────────────────────────────
    EMPTY STATE
-   Shared by the chart panel and the Recent Orders table.
+   Recent Orders' empty table state.
    ─────────────────────────────────────────────────────────── */
- 
+
 .dashboard-empty-row > td {
   padding: 0;
   border-bottom: none;
 }
- 
+
 .dashboard-empty {
   min-height: 280px;
   display: flex;
@@ -2456,7 +2181,7 @@ input[type='password']::-ms-clear {
   text-align: center;
   color: var(--ink-muted);
 }
- 
+
 .dashboard-empty-icon {
   width: 44px;
   height: 44px;
@@ -2469,363 +2194,245 @@ input[type='password']::-ms-clear {
   color: var(--ink-muted);
   background: var(--surface-sunken);
 }
- 
+
 .dashboard-empty strong {
   font-size: 14px;
   color: var(--ink);
 }
- 
+
 .dashboard-empty span {
   margin-top: 5px;
   font-size: 12px;
 }
- 
- 
-/* ───────────────────────────────────────────────────────────
-   ACTION REQUIRED
-   ─────────────────────────────────────────────────────────── */
- 
-.dashboard-action-list {
-  padding: 2px 20px 6px;
-}
- 
-.dashboard-action-row {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  padding: 14px 0;
-  border-bottom: 1px solid var(--rule);
-}
- 
-.dashboard-action-row:last-child {
-  border-bottom: none;
-}
- 
-.dashboard-action-icon {
-  width: 30px;
-  height: 30px;
-  flex-shrink: 0;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  border-radius: 50%;
-}
- 
-.dashboard-action-label,
-.dashboard-action-label-group {
-  flex: 1;
-  min-width: 0;
-  font-size: 12.5px;
-  color: var(--ink);
-}
- 
-.dashboard-action-label-group {
-  display: flex;
-  flex-direction: column;
-  gap: 2px;
-}
- 
-.dashboard-action-sublabel {
-  font-size: 11px;
-  color: var(--ink-muted);
-}
- 
-.dashboard-action-link {
-  display: inline-flex;
-  align-items: center;
-  gap: 4px;
-  flex-shrink: 0;
-  font-size: 12px;
-  font-weight: 600;
-  text-decoration: none;
-}
- 
-.dashboard-action-link:hover {
-  text-decoration: underline;
-}
- 
-.dashboard-action-link.red {
-  color: var(--status-negative);
-}
- 
-.dashboard-action-link.amber {
-  color: var(--status-pending);
-}
- 
-.dashboard-action-link.blue {
-  color: var(--blue);
-}
- 
-.dashboard-action-link.green {
-  color: var(--status-positive);
-}
- 
- 
+
+
 /* ───────────────────────────────────────────────────────────
    RESPONSIVE
    ─────────────────────────────────────────────────────────── */
- 
-@media (max-width: 1100px) {
- 
-  .dashboard-grid {
-    grid-template-columns: 1fr;
-  }
- 
-}
- 
- 
+
 @media (max-width: 800px) {
- 
+
   .dashboard-header {
     align-items: flex-start;
     flex-direction: column;
   }
- 
-  .dashboard-header-actions {
-    align-self: stretch;
-    justify-content: space-between;
-  }
- 
+
 }
- 
- 
+
+
 @media (max-width: 560px) {
- 
+
   .dashboard-page {
     padding: 22px 16px;
   }
- 
+
   .dashboard-header h1 {
     font-size: 31px;
   }
- 
-  .dashboard-header-actions {
-    flex-direction: column;
-    align-items: stretch;
-    gap: 12px;
-  }
- 
-  .dashboard-period-control {
-    min-width: 0;
-    width: 100%;
-  }
- 
-  .dashboard-chart-card {
-    --chart-pad-x: 16px;
-    --chart-yaxis-w: 30px;
-  }
- 
-  .dashboard-chart-body {
-    min-height: 220px;
-  }
- 
-  .dashboard-chart-xaxis {
-    font-size: 9.5px;
-  }
- 
-  .dashboard-chart-yaxis {
-    font-size: 9.5px;
-  }
- 
+
 }
- 
- 
+
+
 /* ============================================================
    ORDER DETAIL PAGE
    ============================================================ */
- 
+
 .order-detail-summary {
   display: flex;
   align-items: center;
   gap: 22px;
 }
- 
+
 .order-detail-stat-grid {
   flex: 1;
   margin-bottom: 0;
   grid-template-columns: repeat(4, minmax(0, 1fr));
 }
- 
+
 .order-detail-pay-btn {
   flex-shrink: 0;
 }
- 
+
 .order-summary {
   margin-top: 18px;
   margin-left: auto;
   width: 280px;
 }
- 
+
 .order-summary-row {
   display: flex;
   align-items: center;
   justify-content: space-between;
   gap: 12px;
- 
+
   padding: 5px 0;
- 
+
   font-size: 13.5px;
   color: var(--ink);
 }
- 
+
 .order-summary-row.muted {
   color: var(--ink-muted);
 }
- 
+
 .order-summary-total {
   margin-top: 4px;
   padding-top: 10px;
- 
+
   border-top: 1px solid var(--rule);
- 
+
   font-weight: 650;
 }
- 
- 
+
+
 @media (max-width: 640px) {
- 
+
   .order-detail-summary {
     flex-direction: column;
     align-items: stretch;
   }
- 
+
   .order-detail-stat-grid {
     grid-template-columns: 1fr;
   }
- 
+
   .order-detail-pay-btn {
     justify-content: center;
   }
- 
+
   .order-summary {
     width: 100%;
   }
- 
+
 }
- 
- 
+
+
 /* ============================================================
    ACCOUNT SETTINGS — TABBED LAYOUT
    ============================================================ */
- 
+
 .settings-layout {
   display: flex;
   align-items: flex-start;
   gap: 24px;
 }
- 
+
 .settings-tabs {
   display: flex;
   flex-direction: column;
   gap: 2px;
- 
+
   width: 190px;
   flex-shrink: 0;
 }
- 
+
 .settings-tab {
   display: block;
   width: 100%;
   text-align: left;
- 
+
   border: none;
   border-radius: var(--radius-sm);
- 
+
   padding: 10px 14px;
- 
+
   background: transparent;
   color: var(--ink-muted);
- 
+
   font-family: var(--font-body);
   font-size: 13.5px;
   font-weight: 500;
- 
+
   cursor: pointer;
 }
- 
+
 .settings-tab:hover {
   background: var(--surface-sunken);
   color: var(--ink);
 }
- 
+
 .settings-tab.active {
   background: var(--blue);
   color: #fff;
   font-weight: 600;
 }
- 
+
 .settings-panel {
   flex: 1;
   min-width: 0;
 }
- 
+
 .settings-profile-grid {
   display: grid;
   grid-template-columns: minmax(0, 1fr) minmax(240px, 300px);
   gap: 16px;
   align-items: start;
 }
- 
+
+.settings-profile-grid > .card + .card {
+  margin-top: 0;
+}
+
 .settings-avatar-card {
   text-align: center;
 }
- 
+
 .settings-avatar {
   width: 88px;
   height: 88px;
   margin: 4px auto 16px;
- 
+
   display: flex;
   align-items: center;
   justify-content: center;
   overflow: hidden;
- 
+
   border-radius: 50%;
   background: var(--surface-sunken);
   color: var(--ink-muted);
- 
+
   font-family: var(--font-display);
   font-size: 32px;
   font-weight: 600;
 }
- 
+
 .settings-avatar img {
   width: 100%;
   height: 100%;
   object-fit: cover;
 }
- 
+
 .settings-avatar-btn {
   cursor: pointer;
 }
- 
+
 .settings-avatar-hint {
   margin-top: 10px;
   font-size: 11.5px;
   color: var(--ink-muted);
 }
- 
+
 .field input:disabled {
   background: var(--surface-sunken);
   color: var(--ink-muted);
   cursor: not-allowed;
 }
- 
- 
+
+
 @media (max-width: 640px) {
- 
+
   .settings-layout {
     flex-direction: column;
   }
- 
+
   .settings-tabs {
     flex-direction: row;
     width: 100%;
     overflow-x: auto;
   }
- 
+
   .settings-profile-grid {
     grid-template-columns: 1fr;
   }
- 
+
 }
