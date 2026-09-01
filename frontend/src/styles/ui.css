@@ -1693,8 +1693,6 @@ input[type='password']::-ms-clear {
 
   overflow-y: auto;
 
-  border:0.5px solid var(--rule);
-
   border-radius: var(--radius);
 }
 
