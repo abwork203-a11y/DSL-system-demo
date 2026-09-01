@@ -104,9 +104,9 @@ export default function ManufacturersPage() {
                     <td>{m.contact_name || '—'}{m.contact_phone ? ` · ${m.contact_phone}` : ''}</td>
                     <td className="num">{money(m.balance)}</td>
                     <td>{m.is_active ? <span className="badge badge-green">active</span> : <span className="badge badge-neutral">inactive</span>}</td>
-                    <td style={{ display: 'flex', gap: 6, justifyContent: 'flex-end' }}>
-                      <button className="btn btn-secondary btn-sm" onClick={() => openEdit(m)}><Pencil size={14} /> Edit</button>
-                      <button className="btn btn-danger btn-sm" onClick={() => handleDelete(m)}><Trash2 size={14} /> Delete</button>
+                    <td className="table-actions">
+                      <button className="btn-ghost" onClick={() => openEdit(m)} title="Edit" aria-label="Edit"><Pencil size={15} /></button>
+                      <button className="btn-ghost" onClick={() => handleDelete(m)} title="Delete" aria-label="Delete"><Trash2 size={15} /></button>
                     </td>
                   </tr>
                 ))}
@@ -115,6 +115,12 @@ export default function ManufacturersPage() {
                 )}
               </tbody>
             </table>
+          </div>
+        )}
+
+        {!loading && rows.length > 0 && (
+          <div className="table-footer">
+            Showing 1 to {rows.length} of {rows.length} manufacturer{rows.length === 1 ? '' : 's'}
           </div>
         )}
       </div>

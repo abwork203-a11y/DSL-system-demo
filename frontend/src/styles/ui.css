@@ -781,6 +781,55 @@ body {
 
 
 /* ==============================================================
+   TOOLBAR (search + filter row above a table)
+   Height/border/radius/font match the Ledger control bar exactly,
+   so a select or input here looks identical to one there.
+   ============================================================== */
+
+.toolbar {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+
+  gap: 10px;
+
+  margin-bottom: 16px;
+}
+
+.toolbar input,
+.toolbar select {
+  height: 38px;
+
+  padding: 0 12px;
+
+  border: 1px solid var(--rule);
+  border-radius: var(--radius-sm);
+
+  background: var(--surface);
+  color: var(--ink);
+
+  font-family: var(--font-body);
+  font-size: 13.5px;
+}
+
+.toolbar select {
+  cursor: pointer;
+}
+
+.toolbar input:hover,
+.toolbar select:hover {
+  border-color: var(--rule-strong);
+}
+
+.toolbar input:focus,
+.toolbar select:focus {
+  border-color: var(--brass);
+  outline: 2px solid rgba(150, 116, 42, 0.20);
+  outline-offset: 0;
+}
+
+
+/* ==============================================================
    TABLE CARD
    ============================================================== */
 
@@ -870,6 +919,24 @@ table.data-table {
 
 
 /* ==============================================================
+   TABLE ACTIONS / FOOTER
+   ============================================================== */
+
+.table-actions {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 2px;
+}
+
+.table-footer {
+  padding: 14px 0 4px;
+  color: var(--ink-muted);
+  font-size: 12.5px;
+}
+
+
+/* ==============================================================
    EMPTY STATE
    ============================================================== */
 
@@ -892,10 +959,12 @@ table.data-table {
 
   gap: 6px;
 
+  height: 38px;
+
   border: 1px solid transparent;
   border-radius: var(--radius-sm);
 
-  padding: 8px 14px;
+  padding: 0 14px;
 
   font-size: 13.5px;
   font-weight: 500;
@@ -953,7 +1022,8 @@ table.data-table {
 }
 
 .btn-sm {
-  padding: 5px 10px;
+  height: 30px;
+  padding: 0 10px;
   font-size: 12.5px;
 }
 
@@ -1291,7 +1361,7 @@ select.stat-card-value:focus {
 
   border-radius: var(--radius-sm);
 
-  border: 1.5px solid currentColor;
+  border: none;
 
   background: transparent;
 
@@ -2060,8 +2130,8 @@ input[type='password']::-ms-clear {
    ─────────────────────────────────────────────────────────── */
 
 .dashboard-stat-grid {
-  grid-template-columns: repeat(4, minmax(0, 1fr));
-  margin-bottom: 22px;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  margin-bottom: 20px;
 }
 
 .stat-note {
@@ -2091,7 +2161,7 @@ input[type='password']::-ms-clear {
 
 }
 
-@media (max-width:560px) {
+@media (max-width: 560px) {
 
   .dashboard-stat-grid {
     grid-template-columns: 1fr;
@@ -2435,37 +2505,4 @@ input[type='password']::-ms-clear {
     grid-template-columns: 1fr;
   }
 
-}
-/* ============================================================
-   ACCOUNT SETTINGS — PROFILE FORM
-   ============================================================ */
-
-.settings-profile-card {
-  width: 100%;
-}
-
-.settings-profile-form {
-  display: flex;
-  flex-direction: column;
-
-  gap: 2px;
-
-  max-width: 620px;
-}
-
-.settings-profile-form .field {
-  width: 100%;
-
-  margin-bottom: 14px;
-}
-
-.settings-profile-form .field input {
-  width: 100%;
-}
-
-.settings-profile-actions {
-  margin-top: 4px;
-
-  display: flex;
-  justify-content: flex-start;
 }

@@ -1,6 +1,6 @@
 import { useEffect, useState, useCallback } from 'react';
 import { Link } from 'react-router-dom';
-import { Plus, Pencil, Trash2 } from 'lucide-react';
+import { Plus, Pencil, Trash2, Eye, Ban, RotateCcw } from 'lucide-react';
 import { distributors as distributorsApi } from '../api/endpoints';
 import { apiErrorMessage } from '../api/client';
 import { useAuth } from '../context/AuthContext';
@@ -133,13 +133,13 @@ export default function DistributorsPage() {
                     <td>{d.contact_name || '—'}{d.contact_phone ? ` · ${d.contact_phone}` : ''}</td>
                     <td className="num">{money(d.balance)}</td>
                     <td><StatusBadge value={d.status} /></td>
-                    <td style={{ display: 'flex', gap: 6, justifyContent: 'flex-end' }}>
-                      <Link to={`/ledger?distributor_id=${d.id}`} className="btn btn-secondary btn-sm" onClick={(e) => e.stopPropagation()}>Ledger</Link>
-                      <button className="btn btn-secondary btn-sm" onClick={(e) => { e.stopPropagation(); openEdit(d); }}><Pencil size={14} /> Edit</button>
-                      <button className="btn btn-secondary btn-sm" onClick={(e) => { e.stopPropagation(); toggleStatus(d); }}>
-                        {d.status === 'active' ? 'Mark inactive' : 'Reactivate'}
+                    <td className="table-actions" onClick={(e) => e.stopPropagation()}>
+                      <Link to={`/ledger?distributor_id=${d.id}`} className="btn-ghost" title="View ledger" aria-label="View ledger"><Eye size={15} /></Link>
+                      <button className="btn-ghost" onClick={() => openEdit(d)} title="Edit" aria-label="Edit"><Pencil size={15} /></button>
+                      <button className="btn-ghost" onClick={() => toggleStatus(d)} title={d.status === 'active' ? 'Mark inactive' : 'Reactivate'} aria-label={d.status === 'active' ? 'Mark inactive' : 'Reactivate'}>
+                        {d.status === 'active' ? <Ban size={15} /> : <RotateCcw size={15} />}
                       </button>
-                      {isAdmin && <button className="btn btn-danger btn-sm" onClick={(e) => { e.stopPropagation(); handleDelete(d); }}><Trash2 size={14} /> Delete</button>}
+                      {isAdmin && <button className="btn-ghost" onClick={() => handleDelete(d)} title="Delete" aria-label="Delete"><Trash2 size={15} /></button>}
                     </td>
                   </tr>
                 ))}
@@ -148,6 +148,12 @@ export default function DistributorsPage() {
                 )}
               </tbody>
             </table>
+          </div>
+        )}
+
+        {!loading && rows.length > 0 && (
+          <div className="table-footer">
+            Showing 1 to {rows.length} of {rows.length} distributor{rows.length === 1 ? '' : 's'}
           </div>
         )}
       </div>
