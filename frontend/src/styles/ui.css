@@ -1689,11 +1689,11 @@ input[type='password']::-ms-clear {
    ============================================================== */
 
 .page-table-scroll {
-  max-height: 640px;
+  max-height: 340px;
 
   overflow-y: auto;
 
-  border: 1px solid var(--rule);
+  border: solid var(--rule);
 
   border-radius: var(--radius);
 }
