@@ -245,7 +245,6 @@ body {
   background: var(--surface);
 
   border: 1px solid var(--rule);
-  border-top: 2px solid var(--brass);
 
   border-radius: var(--radius);
 
@@ -642,9 +641,9 @@ body {
 }
 
 .ledger-month-option.selected {
-  background: var(--green);
+  background: var(--sidebar-bg);
 
-  border-color: var(--green);
+  border-color: var(--sidebar-bg);
 
   color: #fff;
 
@@ -721,14 +720,14 @@ body {
 }
 
 .ledger-picker-primary {
-  border: 1px solid var(--green);
+  border: 1px solid var(--sidebar-bg);
 
-  background: var(--green);
+  background: var(--sidebar-bg);
   color: #fff;
 }
 
 .ledger-picker-primary:hover {
-  background: var(--green-hover);
+  filter: brightness(1.18);
 }
 
 
@@ -757,7 +756,7 @@ body {
 .progress-fill {
   height: 100%;
 
-  background: var(--green);
+  background: var(--sidebar-bg);
 
   transition: width 0.15s ease;
 }
@@ -969,7 +968,7 @@ table.data-table {
   font-size: 13.5px;
   font-weight: 500;
 
-  background: var(--green);
+  background: var(--sidebar-bg);
   color: #fff;
 
   text-decoration: none;
@@ -978,11 +977,12 @@ table.data-table {
 
   transition:
     background 0.12s,
-    border-color 0.12s;
+    border-color 0.12s,
+    filter 0.12s;
 }
 
 .btn:hover {
-  background: var(--green-hover);
+  filter: brightness(1.18);
 }
 
 .btn:disabled {
@@ -1400,7 +1400,7 @@ select.stat-card-value:focus {
    ============================================================== */
 
 .link-btn {
-  color: var(--green);
+  color: var(--blue);
   text-decoration: none;
   font-weight: 600;
 }
@@ -1689,9 +1689,11 @@ input[type='password']::-ms-clear {
    ============================================================== */
 
 .page-table-scroll {
-  max-height: 340px;
+  max-height: 640px;
 
   overflow-y: auto;
+
+  border: 1px solid var(--rule);
 
   border-radius: var(--radius);
 }
@@ -1749,6 +1751,100 @@ input[type='password']::-ms-clear {
 
 .qty-input[type='number'] {
   -moz-appearance: textfield;
+}
+
+
+/* ==============================================================
+   STEPPER (multi-step form progress indicator)
+   ============================================================== */
+
+.stepper {
+  display: flex;
+  align-items: flex-start;
+
+  margin-bottom: 20px;
+}
+
+.stepper-item {
+  display: flex;
+  align-items: center;
+
+  gap: 8px;
+
+  color: var(--ink-muted);
+
+  font-family: var(--font-body);
+  font-size: 13px;
+  font-weight: 500;
+}
+
+.stepper-item:not(:last-child) {
+  flex: 1;
+}
+
+.stepper-item:not(:last-child)::after {
+  content: '';
+  flex: 1;
+
+  height: 1px;
+  min-width: 20px;
+
+  margin: 0 12px;
+
+  background: var(--rule);
+}
+
+.stepper-number {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+
+  width: 24px;
+  height: 24px;
+  flex-shrink: 0;
+
+  border: 1.5px solid var(--rule);
+  border-radius: 50%;
+
+  background: var(--surface);
+  color: var(--ink-muted);
+
+  font-size: 11.5px;
+  font-weight: 700;
+}
+
+.stepper-item.active .stepper-number,
+.stepper-item.done .stepper-number {
+  border-color: var(--blue);
+  background: var(--blue);
+  color: #fff;
+}
+
+.stepper-item.active .stepper-label {
+  color: var(--ink);
+  font-weight: 600;
+}
+
+.stepper-item.done .stepper-label {
+  color: var(--ink);
+}
+
+.stepper-item.done:not(:last-child)::after {
+  background: var(--blue);
+}
+
+
+@media (max-width: 640px) {
+
+  .stepper-label {
+    display: none;
+  }
+
+  .stepper-item:not(:last-child)::after {
+    min-width: 12px;
+    margin: 0 6px;
+  }
+
 }
 
 
@@ -2088,17 +2184,11 @@ input[type='password']::-ms-clear {
   min-height: 40px;
   padding: 0 16px;
   gap: 7px;
-  background: var(--sidebar-bg);
-  color: #fff;
-}
-
-.dashboard-new-order:hover {
-  filter: brightness(1.18);
 }
 
 
 /* ───────────────────────────────────────────────────────────
-   SHARED CARD LINKS (brass = primary navigational accent)
+   SHARED CARD LINKS
    ─────────────────────────────────────────────────────────── */
 
 .dashboard-view-link,
@@ -2107,7 +2197,7 @@ input[type='password']::-ms-clear {
   display: inline-flex;
   align-items: center;
   gap: 5px;
-  color: var(--brass);
+  color: var(--blue);
   text-decoration: none;
   font-size: 12.5px;
   font-weight: 600;
@@ -2116,7 +2206,7 @@ input[type='password']::-ms-clear {
 .dashboard-view-link:hover,
 .dashboard-card-action:hover,
 .dashboard-card-link:hover {
-  color: var(--brass-hover);
+  text-decoration: underline;
 }
 
 
@@ -2128,22 +2218,8 @@ input[type='password']::-ms-clear {
    ─────────────────────────────────────────────────────────── */
 
 .dashboard-stat-grid {
-  grid-template-columns: repeat(4, minmax(0, 1fr));
+  grid-template-columns: repeat(5, minmax(0, 1fr));
   margin-bottom: 20px;
-}
-
-.stat-note {
-  margin-top: 7px;
-  font-size: 11.5px;
-  color: var(--ink-muted);
-}
-
-.stat-note.up {
-  color: var(--status-positive);
-}
-
-.stat-note.down {
-  color: var(--status-negative);
 }
 
 .stat-value.violet {
@@ -2218,7 +2294,7 @@ input[type='password']::-ms-clear {
 }
 
 .dashboard-order-number {
-  color: var(--green);
+  color: var(--blue);
   text-decoration: none;
   font-family: var(--font-mono);
   font-weight: 600;
