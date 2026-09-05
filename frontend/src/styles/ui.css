@@ -1756,6 +1756,24 @@ input[type='password']::-ms-clear {
    STEPPER (multi-step form progress indicator)
    ============================================================== */
 
+
+
+.stepper-item {
+  flex: 1;
+  padding: 8px 4px;
+  border-bottom: 3px solid var(--rule);
+  font-family: var(--font-body);
+  font-size: 13px;
+  font-weight: 500;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--ink-muted);
+  text-align: center;
+  transition: border-color 0.15s, color 0.15s;
+}
+.stepper-item.active { border-color: var(--brass); color: var(--ink); }
+.stepper-item.done { border-color: var(--status-positive); color: var(--ink); }
+
 .stepper {
   display: flex;
   align-items: flex-start;
@@ -1763,73 +1781,6 @@ input[type='password']::-ms-clear {
   margin-bottom: 20px;
 }
 
-.stepper-item {
-  display: flex;
-  align-items: center;
-
-  gap: 8px;
-
-  color: var(--ink-muted);
-
-  font-family: var(--font-body);
-  font-size: 13px;
-  font-weight: 500;
-}
-
-.stepper-item:not(:last-child) {
-  flex: 1;
-}
-
-.stepper-item:not(:last-child)::after {
-  content: '';
-  flex: 1;
-
-  height: 1px;
-  min-width: 20px;
-
-  margin: 0 12px;
-
-  background: var(--rule);
-}
-
-.stepper-number {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-
-  width: 24px;
-  height: 24px;
-  flex-shrink: 0;
-
-  border: 1.5px solid var(--rule);
-  border-radius: 50%;
-
-  background: var(--surface);
-  color: var(--ink-muted);
-
-  font-size: 11.5px;
-  font-weight: 700;
-}
-
-.stepper-item.active .stepper-number,
-.stepper-item.done .stepper-number {
-  border-color: var(--blue);
-  background: var(--blue);
-  color: #fff;
-}
-
-.stepper-item.active .stepper-label {
-  color: var(--ink);
-  font-weight: 600;
-}
-
-.stepper-item.done .stepper-label {
-  color: var(--ink);
-}
-
-.stepper-item.done:not(:last-child)::after {
-  background: var(--blue);
-}
 
 
 @media (max-width: 640px) {
