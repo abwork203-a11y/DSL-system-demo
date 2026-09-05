@@ -2,8 +2,13 @@ import { useEffect, useState, useCallback } from 'react';
 import { Link } from 'react-router-dom';
 import {
   ArrowRight,
+  Building2,
+  ClipboardList,
+  DollarSign,
   FileText,
+  Landmark,
   Plus,
+  Users,
 } from 'lucide-react';
 
 import { reports, orders as ordersApi } from '../api/endpoints';
@@ -17,10 +22,10 @@ import { StatSkeleton, TableSkeleton } from '../components/Skeleton';
 
 
 function money(n) {
-  return `PKR ${Number(n || 0).toLocaleString(undefined, {
+  return Number(n || 0).toLocaleString(undefined, {
     minimumFractionDigits: 2,
     maximumFractionDigits: 2,
-  })}`;
+  });
 }
 
 
@@ -38,29 +43,6 @@ function formatDate(value) {
     day: 'numeric',
     year: 'numeric',
   });
-}
-
-
-function formatChange(current, previous) {
-  const currentValue = Number(current) || 0;
-  const previousValue = Number(previous) || 0;
-
-  if (!previousValue) {
-    return { text: 'vs last month 0%', direction: 'flat' };
-  }
-
-  const delta = ((currentValue - previousValue) / previousValue) * 100;
-  const rounded = Math.round(delta * 10) / 10;
-
-  if (rounded > 0) {
-    return { text: `vs last month +${rounded}%`, direction: 'up' };
-  }
-
-  if (rounded < 0) {
-    return { text: `vs last month ${rounded}%`, direction: 'down' };
-  }
-
-  return { text: 'vs last month 0%', direction: 'flat' };
 }
 
 
@@ -102,9 +84,6 @@ export default function DashboardPage() {
   });
 
 
-  const firstName = user?.name?.split(' ')[0] || 'there';
-
-
   const pendingCount =
     summary?.ordersByStatus?.find(
       (s) => s.order_status === 'pending'
@@ -123,15 +102,8 @@ export default function DashboardPage() {
     )?.count || 0;
 
 
-  const salesChange = formatChange(
-    summary?.currentMonth?.totalSales,
-    summary?.previousMonth?.totalSales
-  );
-
-  const ordersChange = formatChange(
-    summary?.currentMonth?.orderCount,
-    summary?.previousMonth?.orderCount
-  );
+  const firstName =
+    user?.name?.split(' ')[0] || 'there';
 
 
   return (
@@ -144,9 +116,20 @@ export default function DashboardPage() {
       <div className="dashboard-header">
 
         <div>
-          <h1>Dashboard</h1>
-          <p>Here's what's happening across your distribution network.</p>
+          <div className="dashboard-eyebrow">
+            OVERVIEW
+          </div>
+
+          <h1>
+            Good day, {firstName}
+          </h1>
+
+          <p>
+            Here's what's happening across your
+            distribution network.
+          </p>
         </div>
+
 
         <Link
           to="/orders/new"
@@ -163,177 +146,473 @@ export default function DashboardPage() {
           KEY METRICS
       ====================================================== */}
 
-      {loading ? (
+      <section className="dashboard-section">
 
-        <StatSkeleton count={5} />
-
-      ) : (
-
-        <div className="stat-grid dashboard-stat-grid">
-
-          <div className="stat-card">
-            <div className="stat-label">This Month's Sales</div>
-            <div className="stat-value">
-              {money(summary?.currentMonth?.totalSales)}
-            </div>
-            <div
-              className={
-                salesChange.direction === 'flat'
-                  ? 'stat-note'
-                  : `stat-note ${salesChange.direction}`
-              }
-            >
-              {salesChange.text}
-            </div>
+        <div className="dashboard-section-heading">
+          <div>
+            <h2>Business Overview</h2>
+            <span>Current month performance</span>
           </div>
-
-          <div className="stat-card">
-            <div className="stat-label">Orders This Month</div>
-            <div className="stat-value">
-              {summary?.currentMonth?.orderCount ?? 0}
-            </div>
-            <div
-              className={
-                ordersChange.direction === 'flat'
-                  ? 'stat-note'
-                  : `stat-note ${ordersChange.direction}`
-              }
-            >
-              {ordersChange.text}
-            </div>
-          </div>
-
-          <div className="stat-card">
-            <div className="stat-label">Outstanding Receivables</div>
-            <div className="stat-value">
-              {money(summary?.totalOutstanding)}
-            </div>
-            <div className="stat-note">vs last month 0%</div>
-          </div>
-
-          <div className="stat-card">
-            <div className="stat-label">Active Distributors</div>
-            <div className="stat-value violet">
-              {activeDistributors}
-            </div>
-            <div className="stat-note">vs last month 0%</div>
-          </div>
-
-          <div className="stat-card">
-            <div className="stat-label">Pending / Current Orders</div>
-            <div className="stat-value">
-              {pendingCount} / {currentCount}
-            </div>
-          </div>
-
         </div>
 
-      )}
-
-
-      {/* =====================================================
-          RECENT ORDERS
-      ====================================================== */}
-
-      <div className="card dashboard-orders-card">
-
-        <div className="dashboard-card-header">
-          <h3>Recent Orders</h3>
-
-          <Link to="/orders" className="dashboard-card-action">
-            View all
-            <ArrowRight size={14} />
-          </Link>
-        </div>
 
         {loading ? (
 
-          <TableSkeleton columns={5} rows={5} />
+          <StatSkeleton count={4} />
 
         ) : (
 
-          <div className="table-wrap">
+          <div className="dashboard-metrics">
 
-            <table className="data-table dashboard-orders-table">
+            {/* SALES */}
 
-              <thead>
-                <tr>
-                  <th>Order</th>
-                  <th>Distributor</th>
-                  <th>Date</th>
-                  <th className="num">Amount</th>
-                  <th>Status</th>
-                </tr>
-              </thead>
+            <div className="dashboard-metric-card">
 
-              <tbody>
+              <div className="dashboard-metric-top">
+                <span className="dashboard-metric-label">
+                  Monthly Sales
+                </span>
 
-                {recentOrders.length === 0 ? (
+                <div className="dashboard-metric-icon">
+                  <DollarSign
+                    size={17}
+                    strokeWidth={1.8}
+                  />
+                </div>
+              </div>
 
-                  <tr className="dashboard-empty-row">
-                    <td colSpan={5}>
+              <div className="dashboard-metric-value">
+                {money(summary?.currentMonth?.totalSales)}
+              </div>
 
-                      <div className="dashboard-empty">
+              <div className="dashboard-metric-note">
+                Total sales this month
+              </div>
 
-                        <div className="dashboard-empty-icon">
-                          <FileText size={21} strokeWidth={1.7} />
-                        </div>
+            </div>
 
-                        <strong>No orders yet.</strong>
 
-                        <span>
-                          Create your first order to get started.
-                        </span>
+            {/* ORDERS */}
 
-                      </div>
+            <div className="dashboard-metric-card">
 
-                    </td>
-                  </tr>
+              <div className="dashboard-metric-top">
+                <span className="dashboard-metric-label">
+                  Orders
+                </span>
 
-                ) : (
+                <div className="dashboard-metric-icon">
+                  <ClipboardList
+                    size={17}
+                    strokeWidth={1.8}
+                  />
+                </div>
+              </div>
 
-                  recentOrders.map((order) => (
-                    <tr key={order.id}>
+              <div className="dashboard-metric-value">
+                {summary?.currentMonth?.orderCount ?? '—'}
+              </div>
 
-                      <td>
-                        <Link
-                          to={`/orders/${order.id}`}
-                          className="dashboard-order-number"
-                        >
-                          {order.order_number}
-                        </Link>
-                      </td>
+              <div className="dashboard-metric-note">
+                Orders created this month
+              </div>
 
-                      <td>
-                        {order.distributor_name || '—'}
-                      </td>
+            </div>
 
-                      <td>
-                        {formatDate(order.order_date)}
-                      </td>
 
-                      <td className="num">
-                        {money(order.total)}
-                      </td>
+            {/* RECEIVABLES */}
 
-                      <td>
-                        <StatusBadge value={order.order_status} />
-                      </td>
+            <div className="dashboard-metric-card">
 
-                    </tr>
-                  ))
+              <div className="dashboard-metric-top">
+                <span className="dashboard-metric-label">
+                  Receivables
+                </span>
 
-                )}
+                <div className="dashboard-metric-icon">
+                  <Landmark
+                    size={17}
+                    strokeWidth={1.8}
+                  />
+                </div>
+              </div>
 
-              </tbody>
+              <div className="dashboard-metric-value">
+                {money(summary?.totalOutstanding)}
+              </div>
 
-            </table>
+              <div className="dashboard-metric-note">
+                Outstanding balance
+              </div>
+
+            </div>
+
+
+            {/* DISTRIBUTORS */}
+
+            <div className="dashboard-metric-card">
+
+              <div className="dashboard-metric-top">
+                <span className="dashboard-metric-label">
+                  Distributors
+                </span>
+
+                <div className="dashboard-metric-icon">
+                  <Building2
+                    size={17}
+                    strokeWidth={1.8}
+                  />
+                </div>
+              </div>
+
+              <div className="dashboard-metric-value">
+                {activeDistributors}
+              </div>
+
+              <div className="dashboard-metric-note">
+                Active distributors
+              </div>
+
+            </div>
 
           </div>
 
         )}
 
-      </div>
+      </section>
+
+
+      {/* =====================================================
+          OPERATIONAL AREA
+      ====================================================== */}
+
+      <section className="dashboard-section">
+
+        <div className="dashboard-section-heading">
+
+          <div>
+            <h2>Order Activity</h2>
+            <span>Recent orders and current workload</span>
+          </div>
+
+          <Link
+            to="/orders"
+            className="dashboard-view-link"
+          >
+            View all orders
+            <ArrowRight size={15} />
+          </Link>
+
+        </div>
+
+
+        <div className="dashboard-operations">
+
+          {/* =================================================
+              RECENT ORDERS
+          ================================================== */}
+
+          <div className="card dashboard-orders-card">
+
+            <div className="dashboard-card-header">
+
+              <div>
+                <h3>Recent Orders</h3>
+                <p>
+                  Latest orders entered into the system
+                </p>
+              </div>
+
+              <Link
+                to="/orders"
+                className="dashboard-card-action"
+              >
+                View all
+                <ArrowRight size={14} />
+              </Link>
+
+            </div>
+
+
+            {loading ? (
+
+              <TableSkeleton
+                columns={6}
+                rows={5}
+              />
+
+            ) : recentOrders.length === 0 ? (
+
+              <div className="dashboard-empty">
+
+                <div className="dashboard-empty-icon">
+                  <FileText
+                    size={21}
+                    strokeWidth={1.7}
+                  />
+                </div>
+
+                <strong>No orders yet</strong>
+
+                <span>
+                  Create your first order to get started.
+                </span>
+
+                <Link
+                  to="/orders/new"
+                  className="btn btn-secondary dashboard-empty-button"
+                >
+                  <Plus size={15} />
+                  Create Order
+                </Link>
+
+              </div>
+
+            ) : (
+
+              <div className="table-wrap">
+
+                <table className="data-table dashboard-orders-table">
+
+                  <thead>
+
+                    <tr>
+                      <th>Order #</th>
+                      <th>Distributor</th>
+                      <th>Date</th>
+                      <th className="num">Total</th>
+                      <th>Payment</th>
+                      <th>Status</th>
+                    </tr>
+
+                  </thead>
+
+
+                  <tbody>
+
+                    {recentOrders.map((order) => (
+
+                      <tr key={order.id}>
+
+                        <td>
+                          <Link
+                            to={`/orders/${order.id}`}
+                            className="dashboard-order-number"
+                          >
+                            {order.order_number}
+                          </Link>
+                        </td>
+
+                        <td>
+                          {order.distributor_name || '—'}
+                        </td>
+
+                        <td>
+                          {formatDate(order.order_date)}
+                        </td>
+
+                        <td className="num">
+                          {money(order.total)}
+                        </td>
+
+                        <td>
+                          <StatusBadge
+                            value={order.payment_status}
+                          />
+                        </td>
+
+                        <td>
+                          <StatusBadge
+                            value={order.order_status}
+                          />
+                        </td>
+
+                      </tr>
+
+                    ))}
+
+                  </tbody>
+
+                </table>
+
+              </div>
+
+            )}
+
+          </div>
+
+
+          {/* =================================================
+              ORDER STATUS
+          ================================================== */}
+
+          <div className="card dashboard-status-card">
+
+            <div className="dashboard-card-header">
+
+              <div>
+                <h3>Order Status</h3>
+                <p>
+                  Current operational workload
+                </p>
+              </div>
+
+            </div>
+
+
+            <div className="dashboard-status-list">
+
+              <div className="dashboard-status-row">
+
+                <div className="dashboard-status-info">
+
+                  <span className="dashboard-status-dot pending" />
+
+                  <span>
+                    Pending orders
+                  </span>
+
+                </div>
+
+                <strong>
+                  {pendingCount}
+                </strong>
+
+              </div>
+
+
+              <div className="dashboard-status-row">
+
+                <div className="dashboard-status-info">
+
+                  <span className="dashboard-status-dot current" />
+
+                  <span>
+                    Current orders
+                  </span>
+
+                </div>
+
+                <strong>
+                  {currentCount}
+                </strong>
+
+              </div>
+
+            </div>
+
+
+            <div className="dashboard-status-footer">
+
+              <Link
+                to="/orders"
+                className="btn btn-secondary dashboard-status-button"
+              >
+                Manage Orders
+                <ArrowRight size={15} />
+              </Link>
+
+            </div>
+
+          </div>
+
+        </div>
+
+      </section>
+
+
+      {/* =====================================================
+          QUICK ACTIONS
+      ====================================================== */}
+
+      <section className="dashboard-section dashboard-quick-section">
+
+        <div className="dashboard-section-heading">
+
+          <div>
+            <h2>Quick Actions</h2>
+            <span>Common tasks</span>
+          </div>
+
+        </div>
+
+
+        <div className="dashboard-quick-grid">
+
+          <Link
+            to="/orders/new"
+            className="dashboard-quick-card"
+          >
+            <div className="dashboard-quick-icon">
+              <Plus size={18} />
+            </div>
+
+            <div>
+              <strong>New Order</strong>
+              <span>Create a customer order</span>
+            </div>
+
+            <ArrowRight size={16} />
+
+          </Link>
+
+
+          <Link
+            to="/distributors"
+            className="dashboard-quick-card"
+          >
+            <div className="dashboard-quick-icon">
+              <Building2 size={18} />
+            </div>
+
+            <div>
+              <strong>Distributors</strong>
+              <span>Manage distributor accounts</span>
+            </div>
+
+            <ArrowRight size={16} />
+
+          </Link>
+
+
+          <Link
+            to="/ledger"
+            className="dashboard-quick-card"
+          >
+            <div className="dashboard-quick-icon">
+              <Landmark size={18} />
+            </div>
+
+            <div>
+              <strong>Ledger</strong>
+              <span>Review financial activity</span>
+            </div>
+
+            <ArrowRight size={16} />
+
+          </Link>
+
+
+          <Link
+            to="/reports"
+            className="dashboard-quick-card"
+          >
+            <div className="dashboard-quick-icon">
+              <Users size={18} />
+            </div>
+
+            <div>
+              <strong>Reports</strong>
+              <span>View business performance</span>
+            </div>
+
+            <ArrowRight size={16} />
+
+          </Link>
+
+        </div>
+
+      </section>
 
     </div>
   );
