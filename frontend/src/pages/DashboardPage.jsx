@@ -53,8 +53,8 @@ export default function DashboardPage() {
     <div className="content">
       <div className="page-header">
         <div>
-          <h1>Good day, {user?.name?.split(' ')[0]}</h1>
-          <p>Here's what's happening across your distribution network.</p>
+         <h1>Dashboard</h1>
+         <p>Here's what's happening across your distribution network.</p>
         </div>
         <Link to="/orders/new" className="btn">+ New Order</Link>
       </div>
