@@ -86,7 +86,6 @@ export default function DashboardPage() {
 
           <Link to="/orders" className="dashboard-card-action">
             View all
-            <ArrowRight size={14} />
           </Link>
         </div>
 
