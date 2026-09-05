@@ -7,6 +7,13 @@ import { useToast } from '../context/ToastContext';
 import { useLiveOrderEvents } from '../context/SocketContext';
 import StatusBadge from '../components/StatusBadge';
 import { StatSkeleton, TableSkeleton } from '../components/Skeleton';
+import { Link } from 'react-router-dom';
+import {
+  ArrowRight,
+  FileText,
+  Plus,
+} from 'lucide-react';
+
 
 function money(n) {
   return Number(n || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
@@ -86,6 +93,7 @@ export default function DashboardPage() {
 
           <Link to="/orders" className="dashboard-card-action">
             View all
+            <ArrowRight size={14} />
           </Link>
         </div>
 
