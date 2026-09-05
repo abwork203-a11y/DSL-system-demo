@@ -176,30 +176,12 @@ export default function DashboardPage() {
             <div className="stat-value">
               {money(summary?.currentMonth?.totalSales)}
             </div>
-            <div
-              className={
-                salesChange.direction === 'flat'
-                  ? 'stat-note'
-                  : `stat-note ${salesChange.direction}`
-              }
-            >
-              {salesChange.text}
-            </div>
           </div>
 
           <div className="stat-card">
             <div className="stat-label">Orders This Month</div>
             <div className="stat-value">
               {summary?.currentMonth?.orderCount ?? 0}
-            </div>
-            <div
-              className={
-                ordersChange.direction === 'flat'
-                  ? 'stat-note'
-                  : `stat-note ${ordersChange.direction}`
-              }
-            >
-              {ordersChange.text}
             </div>
           </div>
 
