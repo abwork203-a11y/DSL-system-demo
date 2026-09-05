@@ -1886,17 +1886,29 @@ input[type='password']::-ms-clear {
   background: var(--surface);
 }
 
+/* ── Order builder: entrance animation for a newly added row ──
+   Fires automatically whenever a <tr className="added-product-row">
+   is newly mounted into the DOM — existing rows are untouched since
+   React reuses their DOM nodes by key. */
 @keyframes row-enter {
   from {
     opacity: 0;
     transform: translateY(-6px);
+    background: var(--blue-light, var(--green-light));
   }
-
   to {
     opacity: 1;
     transform: translateY(0);
+    background: transparent;
   }
 }
+.added-product-row {
+  animation: row-enter 0.35s ease-out;
+}
+@media (prefers-reduced-motion: reduce) {
+  .added-product-row { animation: none; }
+}
+
 
 .added-product-row {
   animation:
