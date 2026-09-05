@@ -225,7 +225,7 @@ export default function DashboardPage() {
 
         {loading ? (
 
-          <TableSkeleton columns={4} rows={5} />
+          <TableSkeleton columns={5} rows={5} />
 
         ) : (
 
