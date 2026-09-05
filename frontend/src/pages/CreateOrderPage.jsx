@@ -1,6 +1,6 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { useNavigate, useBlocker } from 'react-router-dom';
-import { Plus, Minus, Trash2 } from 'lucide-react';
+import { Plus, Minus, Trash2, Loader2 } from 'lucide-react';
 import { distributors as distributorsApi, products as productsApi, orders as ordersApi } from '../api/endpoints';
 import { apiErrorMessage } from '../api/client';
 import { useToast } from '../context/ToastContext';
@@ -21,6 +21,24 @@ export default function CreateOrderPage() {
   const [submitting, setSubmitting] = useState(false);
   const [submitted, setSubmitted] = useState(false);
 
+  // Mirrors `submitting`/`submitted` but updates synchronously (refs aren't
+  // gated behind a React render/commit). Two things depend on reading the
+  // truly-current value at the exact instant they're checked, not whatever
+  // was true as of the last render:
+  //  1. The double-submit guard at the top of handleSubmit — a fast second
+  //     click can fire before React has re-rendered with `disabled={true}`
+  //     on the button, so the guard has to check something that's already
+  //     up to date the moment the first click's handler starts running.
+  //  2. The unsaved-progress check the navigation blocker uses — without
+  //     this, there's a real race: `setSubmitted(true)` and `navigate(...)`
+  //     both run in the same batched continuation after the create request
+  //     resolves, so the blocker could still evaluate against the
+  //     not-yet-committed `submitted === false`, popping the "leave without
+  //     saving?" confirmation right after a *successful* order creation and
+  //     making it look like nothing happened.
+  const submittingRef = useRef(false);
+  const submittedRef = useRef(false);
+
   const [distributorId, setDistributorId] = useState('');
   const [distributorSearch, setDistributorSearch] = useState('');
   const [items, setItems] = useState([]);
@@ -34,25 +52,26 @@ export default function CreateOrderPage() {
 
   // There's unsaved work worth protecting once the user has picked a
   // distributor or added at least one item — before that, leaving costs nothing.
-  const hasUnsavedProgress = !submitted && (!!distributorId || items.length > 0);
+  const hasUnsavedProgress = () => !submittedRef.current && (!!distributorId || items.length > 0);
 
   // Guards in-app navigation (clicking the sidebar, going back, etc.)
   const blocker = useBlocker(
     ({ currentLocation, nextLocation }) =>
-      hasUnsavedProgress && currentLocation.pathname !== nextLocation.pathname
+      hasUnsavedProgress() && currentLocation.pathname !== nextLocation.pathname
   );
 
   // Guards actual tab close / browser refresh — a separate mechanism from
   // React Router, since the browser itself controls that moment.
   useEffect(() => {
     const handleBeforeUnload = (e) => {
-      if (!hasUnsavedProgress) return;
+      if (!hasUnsavedProgress()) return;
       e.preventDefault();
       e.returnValue = '';
     };
     window.addEventListener('beforeunload', handleBeforeUnload);
     return () => window.removeEventListener('beforeunload', handleBeforeUnload);
-  }, [hasUnsavedProgress]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [distributorId, items]);
 
   useEffect(() => {
     distributorsApi.list({ status: 'active' }).then((res) => setDistributorsList(res.data)).catch((err) => toast.error(apiErrorMessage(err)));
@@ -129,6 +148,13 @@ export default function CreateOrderPage() {
   };
 
   const handleSubmit = async () => {
+    // Belt-and-suspenders double-submit guard: the button's `disabled`
+    // attribute already covers the normal case, but that only takes effect
+    // after React re-renders — a fast enough double-click (or a second
+    // Enter-key submit) can still fire before that render commits. Checking
+    // a ref here is synchronous and closes that gap completely.
+    if (submittingRef.current) return;
+    submittingRef.current = true;
     setSubmitting(true);
     try {
       const res = await ordersApi.create({
@@ -141,11 +167,16 @@ export default function CreateOrderPage() {
         amount_paid: Number(amountPaid || 0),
         notes: notes || undefined,
       });
+      // Set synchronously BEFORE navigating — see the comment on
+      // submittedRef above for why this can't just be the `submitted`
+      // state variable.
+      submittedRef.current = true;
       setSubmitted(true);
       toast.success(`Order ${res.data.order_number} created.`);
       navigate(`/orders/${res.data.id}`);
     } catch (err) {
       toast.error(apiErrorMessage(err));
+      submittingRef.current = false; // allow retrying after a failure
     } finally {
       setSubmitting(false);
     }
@@ -157,7 +188,7 @@ export default function CreateOrderPage() {
     <div className="content" style={{ maxWidth: 760 }}>
       <div className="page-header">
         <div>
-          <h1>Create Order</h1>
+          <h1>New Order</h1>
           <p>Create an order, apply discount/freight, and generate the invoice.</p>
         </div>
       </div>
@@ -474,6 +505,7 @@ export default function CreateOrderPage() {
           <button className="btn" disabled={!canProceed()} onClick={() => setStep(step + 1)}>Continue</button>
         ) : (
           <button className="btn" disabled={submitting} onClick={handleSubmit}>
+            {submitting && <Loader2 size={16} className="spin" />}
             {submitting ? 'Creating order…' : 'Create Order & Generate Invoice'}
           </button>
         )}
