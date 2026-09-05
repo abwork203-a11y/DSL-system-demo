@@ -84,7 +84,7 @@ export default function ProductsPage() {
       </div>
 
       {mfgs.length === 0 && !loading && (
-        <div className="error-banner" style={{ background: 'var(--amber-light)', color: 'var(--amber)' }}>
+        <div className="error-banner">
           Add a manufacturer first — products must be linked to one.
         </div>
       )}
@@ -122,9 +122,9 @@ export default function ProductsPage() {
                     <td className="num">{money(p.retail_price)}</td>
                     <td className="num">{money(p.price)}</td>
                     <td>{p.is_active ? <span className="badge badge-green">active</span> : <span className="badge badge-neutral">inactive</span>}</td>
-                    <td style={{ display: 'flex', gap: 6, justifyContent: 'flex-end' }}>
-                      <button className="btn btn-secondary btn-sm" onClick={() => openEdit(p)}><Pencil size={14} /> Edit</button>
-                      <button className="btn btn-danger btn-sm" onClick={() => handleDelete(p)}><Trash2 size={14} /> Delete</button>
+                    <td className="table-actions">
+                      <button className="btn-ghost" onClick={() => openEdit(p)} title="Edit" aria-label="Edit"><Pencil size={15} /></button>
+                      <button className="btn-ghost" onClick={() => handleDelete(p)} title="Delete" aria-label="Delete"><Trash2 size={15} /></button>
                     </td>
                   </tr>
                 ))}
@@ -133,6 +133,12 @@ export default function ProductsPage() {
                 )}
               </tbody>
             </table>
+          </div>
+        )}
+
+        {!loading && rows.length > 0 && (
+          <div className="table-footer">
+            Showing 1 to {rows.length} of {rows.length} product{rows.length === 1 ? '' : 's'}
           </div>
         )}
       </div>
