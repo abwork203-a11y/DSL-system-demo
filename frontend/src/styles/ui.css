@@ -789,7 +789,8 @@ body {
   display: flex;
   align-items: center;
   flex-wrap: wrap;
-
+  border-top: 2px solid var(--brass);
+  
   gap: 10px;
 
   margin-bottom: 16px;
@@ -2025,7 +2026,6 @@ input[type='password']::-ms-clear {
 
     padding-left: 0;
     padding-top: 14px;
-
     border-left: none;
     border-top: 1px solid var(--rule);
   }
@@ -2177,7 +2177,7 @@ input[type='password']::-ms-clear {
    ─────────────────────────────────────────────────────────── */
 
 .dashboard-stat-grid {
-  grid-template-columns: repeat(5, minmax(0, 1fr));
+  grid-template-columns: repeat(4, minmax(0, 1fr));
   margin-bottom: 20px;
 }
 
@@ -2244,12 +2244,12 @@ input[type='password']::-ms-clear {
 }
 
 .dashboard-orders-table th {
-  padding: 9px 12px;
+  padding: 9px 20px;
   font-size: 10px;
 }
 
 .dashboard-orders-table td {
-  padding: 11px 12px;
+  padding: 11px 20px;
 }
 
 .dashboard-order-number {
