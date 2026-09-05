@@ -7,7 +7,6 @@ import { useToast } from '../context/ToastContext';
 import { useLiveOrderEvents } from '../context/SocketContext';
 import StatusBadge from '../components/StatusBadge';
 import { StatSkeleton, TableSkeleton } from '../components/Skeleton';
-import { Link } from 'react-router-dom';
 import {
   ArrowRight,
   FileText,
