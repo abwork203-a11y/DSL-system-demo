@@ -157,7 +157,7 @@ export default function CreateOrderPage() {
     <div className="content" style={{ maxWidth: 760 }}>
       <div className="page-header">
         <div>
-          <h1>New Order</h1>
+          <h1>Create Order</h1>
           <p>Create an order, apply discount/freight, and generate the invoice.</p>
         </div>
       </div>
@@ -411,8 +411,8 @@ export default function CreateOrderPage() {
             </div>
             <div style={{ fontSize: 14, lineHeight: 1.9, marginTop: 8 }}>
               <div>Subtotal: <span className="num" style={{ float: 'right' }}>{money(subtotal)}</span></div>
-              <div>Discount: <span className="num" style={{ float: 'right' }}>−{money(discountAmount)}</span></div>
-              <div>Freight: <span className="num" style={{ float: 'right' }}>+{money(freightCost)}</span></div>
+              <div>Discount Amount: <span className="num" style={{ float: 'right' }}>{money(discountAmount)}</span></div>
+              <div>Freight: <span className="num" style={{ float: 'right' }}>{money(freightCost)}</span></div>
               <div style={{ borderTop: '1px solid var(--border)', paddingTop: 6, fontWeight: 600 }}>
                 Total: <span className="num" style={{ float: 'right' }}>{money(total)}</span>
               </div>
