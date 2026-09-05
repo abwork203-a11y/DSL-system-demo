@@ -1763,8 +1763,8 @@ input[type='password']::-ms-clear {
   padding: 8px 4px;
   border-bottom: 3px solid var(--rule);
   font-family: var(--font-body);
-  font-size: 13px;
-  font-weight: 500;
+  font-size: 11.5px;
+  font-weight: 700;
   text-transform: uppercase;
   letter-spacing: 0.05em;
   color: var(--ink-muted);

@@ -79,38 +79,98 @@ export default function DashboardPage() {
         </div>
       )}
 
-      <div className="card">
-        <h2 style={{ marginBottom: 14 }}>Recent Orders</h2>
+      <div className="card dashboard-orders-card">
+
+        <div className="dashboard-card-header">
+          <h3>Recent Orders</h3>
+
+          <Link to="/orders" className="dashboard-card-action">
+            View all
+            <ArrowRight size={14} />
+          </Link>
+        </div>
+
         {loading ? (
           <TableSkeleton columns={6} rows={5} />
         ) : recentOrders.length === 0 ? (
           <div className="empty-state">No orders yet. Create your first one to get started.</div>
         ) : (
           <div className="table-wrap">
-            <table className="data-table">
+        
+              <table className="data-table dashboard-orders-table">
+
               <thead>
                 <tr>
-                  <th>Order #</th>
+                  <th>Order</th>
                   <th>Distributor</th>
                   <th>Date</th>
-                  <th className="num">Total</th>
-                  <th>Payment</th>
+                  <th className="num">Amount</th>
                   <th>Status</th>
                 </tr>
               </thead>
+
               <tbody>
-                {recentOrders.map((o) => (
-                  <tr key={o.id}>
-                    <td><Link to={`/orders/${o.id}`} className="link-btn">{o.order_number}</Link></td>
-                    <td>{o.distributor_name}</td>
-                    <td>{new Date(o.order_date).toLocaleDateString()}</td>
-                    <td className="num">{money(o.total)}</td>
-                    <td><StatusBadge value={o.payment_status} /></td>
-                    <td><StatusBadge value={o.order_status} /></td>
+
+                {recentOrders.length === 0 ? (
+
+                  <tr className="dashboard-empty-row">
+                    <td colSpan={5}>
+
+                      <div className="dashboard-empty">
+
+                        <div className="dashboard-empty-icon">
+                          <FileText size={21} strokeWidth={1.7} />
+                        </div>
+
+                        <strong>No orders yet.</strong>
+
+                        <span>
+                          Create your first order to get started.
+                        </span>
+
+                      </div>
+
+                    </td>
                   </tr>
-                ))}
+
+                ) : (
+
+                  recentOrders.map((order) => (
+                    <tr key={order.id}>
+
+                      <td>
+                        <Link
+                          to={`/orders/${order.id}`}
+                          className="dashboard-order-number"
+                        >
+                          {order.order_number}
+                        </Link>
+                      </td>
+
+                      <td>
+                        {order.distributor_name || '—'}
+                      </td>
+
+                      <td>
+                        {formatDate(order.order_date)}
+                      </td>
+
+                      <td className="num">
+                        {money(order.total)}
+                      </td>
+
+                      <td>
+                        <StatusBadge value={order.order_status} />
+                      </td>
+
+                    </tr>
+                  ))
+
+                )}
+
               </tbody>
             </table>
+
           </div>
         )}
       </div>
