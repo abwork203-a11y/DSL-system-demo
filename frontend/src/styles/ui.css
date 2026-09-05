@@ -901,7 +901,7 @@ table.data-table {
 
 .data-table td:first-child,
 .data-table th:first-child {
-  padding-left: 0;
+
 }
 
 .data-table td:last-child,
@@ -1291,8 +1291,6 @@ table.data-table {
 
   font-size: 11.5px;
   font-weight: 600;
-
-  color: var(--ink-muted);
 
   text-transform: uppercase;
   letter-spacing: 0.06em;

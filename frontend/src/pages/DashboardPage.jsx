@@ -202,7 +202,9 @@ export default function DashboardPage() {
           <div className="stat-card">
             <div className="stat-label">Pending / Current Orders</div>
           </div>
-
+            <div className="stat-value">
+              {pendingCount} / {currentCount}
+            </div>
         </div>
 
       )}
