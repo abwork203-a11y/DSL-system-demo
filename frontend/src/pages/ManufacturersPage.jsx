@@ -79,13 +79,13 @@ export default function ManufacturersPage() {
         <button className="btn" onClick={openNew}><Plus size={16} /> Add Manufacturer</button>
       </div>
 
-      <div className="card">
-        <div className="toolbar">
+       <div className="toolbar">
           <div className="toolbar-group">
-            <label htmlFor="manufacturers-search">Search</label>
             <input id="manufacturers-search" type="text" placeholder="Search manufacturers…" value={search} onChange={(e) => setSearch(e.target.value)} />
           </div>
         </div>
+
+      <div className="card">
         {loading ? (
           <TableSkeleton columns={5} rows={5} />
         ) : (

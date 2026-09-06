@@ -91,11 +91,9 @@ export default function ProductsPage() {
 
        <div className="toolbar">
           <div className="toolbar-group">
-            <label htmlFor="products-search">Search</label>
             <input id="products-search" type="text" placeholder="Search products…" value={search} onChange={(e) => setSearch(e.target.value)} />
           </div>
           <div className="toolbar-group">
-            <label htmlFor="products-manufacturer">Manufacturer</label>
             <select id="products-manufacturer" value={mfgFilter} onChange={(e) => setMfgFilter(e.target.value)}>
               <option value="">All manufacturers</option>
               {mfgs.map((m) => <option key={m.id} value={m.id}>{m.name}</option>)}

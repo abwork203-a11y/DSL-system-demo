@@ -100,14 +100,11 @@ export default function DistributorsPage() {
         <button className="btn" onClick={openNew}><Plus size={16} /> Add Distributor</button>
       </div>
 
-      <div className="card">
         <div className="toolbar">
           <div className="toolbar-group">
-            <label htmlFor="distributors-search">Search</label>
             <input id="distributors-search" type="text" placeholder="Search distributors…" value={search} onChange={(e) => setSearch(e.target.value)} />
           </div>
           <div className="toolbar-group">
-            <label htmlFor="distributors-status">Status</label>
             <select id="distributors-status" value={status} onChange={(e) => setStatus(e.target.value)}>
               <option value="">All statuses</option>
               <option value="active">Active</option>
@@ -116,6 +113,7 @@ export default function DistributorsPage() {
           </div>
         </div>
 
+      <div className="card">
         {loading ? (
           <TableSkeleton columns={6} rows={6} />
         ) : (
