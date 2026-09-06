@@ -407,10 +407,6 @@ export default function LedgerPage() {
 
         <div className="ledger-control-group ledger-distributor-group">
 
-          <label htmlFor="ledger-distributor">
-            DISTRIBUTOR
-          </label>
-
           <select
             id="ledger-distributor"
             value={distributorId}
@@ -444,10 +440,6 @@ export default function LedgerPage() {
             className="ledger-control-group ledger-period-group"
             ref={monthPickerRef}
           >
-
-            <label>
-              ACCOUNTING PERIOD
-            </label>
 
             <div className="ledger-period-actions">
 
