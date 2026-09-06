@@ -66,24 +66,36 @@ export default function OrdersPage() {
 
       <div className="card">
         <div className="toolbar">
-          <input type="text" placeholder="Search order # or distributor…" value={search} onChange={(e) => updateFilter(setSearch)(e.target.value)} style={{ minWidth: 220 }} />
-          <select value={distributorId} onChange={(e) => updateFilter(setDistributorId)(e.target.value)}>
-            <option value="">All distributors</option>
-            {distributorsList.map((d) => <option key={d.id} value={d.id}>{d.name}</option>)}
-          </select>
-          <select value={orderStatus} onChange={(e) => updateFilter(setOrderStatus)(e.target.value)}>
-            <option value="">All order statuses</option>
-            <option value="pending">Pending</option>
-            <option value="current">Current</option>
-            <option value="completed">Completed</option>
-            <option value="cancelled">Cancelled</option>
-          </select>
-          <select value={paymentStatus} onChange={(e) => updateFilter(setPaymentStatus)(e.target.value)}>
-            <option value="">All payment statuses</option>
-            <option value="unpaid">Unpaid</option>
-            <option value="partial">Partial</option>
-            <option value="paid">Paid</option>
-          </select>
+          <div className="toolbar-group">
+            <label htmlFor="orders-search">Search</label>
+            <input id="orders-search" type="text" placeholder="Search order # or distributor…" value={search} onChange={(e) => updateFilter(setSearch)(e.target.value)} style={{ minWidth: 220 }} />
+          </div>
+          <div className="toolbar-group">
+            <label htmlFor="orders-distributor">Distributor</label>
+            <select id="orders-distributor" value={distributorId} onChange={(e) => updateFilter(setDistributorId)(e.target.value)}>
+              <option value="">All distributors</option>
+              {distributorsList.map((d) => <option key={d.id} value={d.id}>{d.name}</option>)}
+            </select>
+          </div>
+          <div className="toolbar-group">
+            <label htmlFor="orders-order-status">Order Status</label>
+            <select id="orders-order-status" value={orderStatus} onChange={(e) => updateFilter(setOrderStatus)(e.target.value)}>
+              <option value="">All order statuses</option>
+              <option value="pending">Pending</option>
+              <option value="current">Current</option>
+              <option value="completed">Completed</option>
+              <option value="cancelled">Cancelled</option>
+            </select>
+          </div>
+          <div className="toolbar-group">
+            <label htmlFor="orders-payment-status">Payment Status</label>
+            <select id="orders-payment-status" value={paymentStatus} onChange={(e) => updateFilter(setPaymentStatus)(e.target.value)}>
+              <option value="">All payment statuses</option>
+              <option value="unpaid">Unpaid</option>
+              <option value="partial">Partial</option>
+              <option value="paid">Paid</option>
+            </select>
+          </div>
         </div>
 
         {loading ? (

@@ -102,12 +102,18 @@ export default function DistributorsPage() {
 
       <div className="card">
         <div className="toolbar">
-          <input type="text" placeholder="Search distributors…" value={search} onChange={(e) => setSearch(e.target.value)} />
-          <select value={status} onChange={(e) => setStatus(e.target.value)}>
-            <option value="">All statuses</option>
-            <option value="active">Active</option>
-            <option value="inactive">Inactive</option>
-          </select>
+          <div className="toolbar-group">
+            <label htmlFor="distributors-search">Search</label>
+            <input id="distributors-search" type="text" placeholder="Search distributors…" value={search} onChange={(e) => setSearch(e.target.value)} />
+          </div>
+          <div className="toolbar-group">
+            <label htmlFor="distributors-status">Status</label>
+            <select id="distributors-status" value={status} onChange={(e) => setStatus(e.target.value)}>
+              <option value="">All statuses</option>
+              <option value="active">Active</option>
+              <option value="inactive">Inactive</option>
+            </select>
+          </div>
         </div>
 
         {loading ? (

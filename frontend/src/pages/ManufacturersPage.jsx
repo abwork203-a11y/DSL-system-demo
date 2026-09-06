@@ -81,7 +81,10 @@ export default function ManufacturersPage() {
 
       <div className="card">
         <div className="toolbar">
-          <input type="text" placeholder="Search manufacturers…" value={search} onChange={(e) => setSearch(e.target.value)} />
+          <div className="toolbar-group">
+            <label htmlFor="manufacturers-search">Search</label>
+            <input id="manufacturers-search" type="text" placeholder="Search manufacturers…" value={search} onChange={(e) => setSearch(e.target.value)} />
+          </div>
         </div>
         {loading ? (
           <TableSkeleton columns={5} rows={5} />
