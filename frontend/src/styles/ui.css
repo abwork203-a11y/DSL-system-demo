@@ -779,54 +779,73 @@ body {
 }
 
 
-/* ==============================================================
+==============================================================
    TOOLBAR (search + filter row above a table)
    Height/border/radius/font match the Ledger control bar exactly,
    so a select or input here looks identical to one there.
    ============================================================== */
-
+ 
 .toolbar {
   display: flex;
-  align-items: center;
+  align-items: flex-end;
   flex-wrap: wrap;
-  border-top: 2px solid var(--brass);
-  
+ 
   gap: 10px;
-
+ 
   margin-bottom: 16px;
 }
-
+ 
+.toolbar-group {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+ 
+.toolbar-group > label {
+  display: block;
+  margin: 0;
+ 
+  font-size: 11px;
+  font-weight: 700;
+ 
+  color: var(--ink-muted);
+ 
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+}
+ 
 .toolbar input,
 .toolbar select {
   height: 38px;
-
+ 
   padding: 0 12px;
-
+ 
   border: 1px solid var(--rule);
   border-radius: var(--radius-sm);
-
+ 
   background: var(--surface);
   color: var(--ink);
-
+ 
   font-family: var(--font-body);
   font-size: 13.5px;
 }
-
+ 
 .toolbar select {
   cursor: pointer;
 }
-
+ 
 .toolbar input:hover,
 .toolbar select:hover {
   border-color: var(--rule-strong);
 }
-
+ 
 .toolbar input:focus,
 .toolbar select:focus {
   border-color: var(--brass);
   outline: 2px solid rgba(150, 116, 42, 0.20);
   outline-offset: 0;
 }
+ 
 
 
 /* ==============================================================
