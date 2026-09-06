@@ -89,8 +89,7 @@ export default function ProductsPage() {
         </div>
       )}
 
-      <div className="card">
-        <div className="toolbar">
+       <div className="toolbar">
           <div className="toolbar-group">
             <label htmlFor="products-search">Search</label>
             <input id="products-search" type="text" placeholder="Search products…" value={search} onChange={(e) => setSearch(e.target.value)} />
@@ -103,6 +102,9 @@ export default function ProductsPage() {
             </select>
           </div>
         </div>
+
+      <div className="card">
+        
         {loading ? (
           <TableSkeleton columns={7} rows={5} />
         ) : (
