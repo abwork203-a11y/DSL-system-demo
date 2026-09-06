@@ -779,11 +779,11 @@ body {
 }
 
 
-==============================================================
+/*==============================================================
    TOOLBAR (search + filter row above a table)
    Height/border/radius/font match the Ledger control bar exactly,
    so a select or input here looks identical to one there.
-   ============================================================== */
+============================================================== */
  
 .toolbar {
   display: flex;
