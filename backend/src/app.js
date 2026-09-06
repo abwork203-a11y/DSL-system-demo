@@ -22,21 +22,18 @@ const exportRoutes = require('./routes/exportRoutes');
 const auditRoutes = require('./routes/auditRoutes');
 
 function resolveCorsOrigin() {
-  const configured = process.env.CLIENT_ORIGIN;
-  if (configured && configured !== '*') return configured;
+  const allowedOrigins = [
+    'https://ledger-project-one.vercel.app',
+    'http://localhost:5173',
+  ];
 
-  if (process.env.NODE_ENV === 'production') {
-    // Refuse to silently run wide-open in production — this must be a
-    // deliberate choice, not something that happens because a .env got
-    // copied without editing.
-    throw new Error(
-      'CLIENT_ORIGIN must be set to your real frontend origin in production (not left blank or "*"). ' +
-      'Wide-open CORS combined with cookie-based auth is unsafe.'
-    );
-  }
-  // Local dev without CLIENT_ORIGIN set: fine to be permissive, since nothing
-  // sensitive is at stake on localhost.
-  return configured || '*';
+  return (origin, callback) => {
+    if (!origin || allowedOrigins.includes(origin)) {
+      callback(null, true);
+    } else {
+      callback(new Error('Not allowed by CORS'));
+    }
+  };
 }
 
 function createApp() {
@@ -65,7 +62,10 @@ function createApp() {
     hsts: { maxAge: 15552000, includeSubDomains: true }, // 180 days
   }));
   app.use(compression()); // gzip response bodies — meaningful for the larger JSON payloads (order lists, reports) and free performance
-  app.use(cors({ origin: resolveCorsOrigin(), credentials: true }));
+  app.use(cors({
+  origin: resolveCorsOrigin(),
+  credentials: true,
+}));
   app.use(cookieParser());
   app.use(express.json({ limit: '150kb' })); // generous for a JSON order payload, small enough to blunt body-flooding
   app.use(morgan(process.env.NODE_ENV === 'production' ? 'combined' : 'dev'));
