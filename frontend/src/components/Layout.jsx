@@ -17,6 +17,7 @@ import {
 
 import { useAuth } from '../context/AuthContext';
 import Footer from './Footer';
+import BackupReminder from './BackupReminder';
 import { APP_NAME } from '../config';
 
 const NAV_ITEMS = [
@@ -155,6 +156,9 @@ export default function Layout() {
           </div>
 
         </header>
+
+        {/* Month-end backup reminder — admin-only, matches who can reach /backup */}
+        {isAdmin && <BackupReminder />}
 
         {/* Current page */}
         <Outlet />

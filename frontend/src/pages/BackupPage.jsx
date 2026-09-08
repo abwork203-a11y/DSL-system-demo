@@ -1,18 +1,22 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import client, { apiErrorMessage } from '../api/client';
-import { exportApi, orders as ordersApi } from '../api/endpoints';
+import { exportApi, orders as ordersApi, backups as backupsApi } from '../api/endpoints';
 import { useToast } from '../context/ToastContext';
 import {
   requestGoogleAccessToken, findOrCreateFolder, uploadFileToFolder, driveFolderUrl,
 } from '../utils/googleDrive';
+import { monthToDateRange } from '../utils/dateRange';
 import { GOOGLE_CLIENT_ID } from '../config';
 
 const PARENT_FOLDER_NAME = 'DSL System Backups';
 
-function timestampFolderName() {
+function timestampFolderName(monthStr) {
   const d = new Date();
   const pad = (n) => String(n).padStart(2, '0');
-  return `Backup ${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())} ${pad(d.getHours())}-${pad(d.getMinutes())}`;
+  const stamp = `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())} ${pad(d.getHours())}-${pad(d.getMinutes())}`;
+  if (!monthStr) return `Backup ${stamp}`;
+  const label = new Date(`${monthStr}-01T00:00:00`).toLocaleDateString(undefined, { year: 'numeric', month: 'long' });
+  return `${label} Backup — ${stamp}`;
 }
 
 async function fetchBlob(url) {
@@ -25,13 +29,13 @@ async function fetchBlob(url) {
 // until there's nothing left rather than assuming one request returns
 // everything (which would silently only back up the first ~50 orders once a
 // business has more than that).
-async function fetchAllOrders() {
+async function fetchAllOrders({ date_from, date_to } = {}) {
   const all = [];
   let page = 1;
   const pageSize = 200; // MAX_PAGE_SIZE server-side — fewest round-trips while staying within what the API allows
   // eslint-disable-next-line no-constant-condition
   while (true) {
-    const res = await ordersApi.list({ page, pageSize });
+    const res = await ordersApi.list({ page, pageSize, date_from, date_to });
     all.push(...res.data.data);
     if (page >= res.data.pagination.totalPages) break;
     page += 1;
@@ -44,27 +48,49 @@ export default function BackupPage() {
   const [running, setRunning] = useState(false);
   const [progress, setProgress] = useState(null); // { current, total, label }
   const [lastResult, setLastResult] = useState(null); // { folderUrl, fileCount }
+  const [month, setMonth] = useState(''); // '' = all-time, otherwise 'YYYY-MM'
+  const [history, setHistory] = useState([]);
+  const [historyLoading, setHistoryLoading] = useState(true);
+
+  const loadHistory = async () => {
+    setHistoryLoading(true);
+    try {
+      const res = await backupsApi.list(10);
+      setHistory(res.data);
+    } catch {
+      // History is a nice-to-have on this page — a failed fetch shouldn't
+      // block the backup button itself, so just leave the list empty.
+    } finally {
+      setHistoryLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    loadHistory();
+  }, []);
 
   const runBackup = async () => {
     setRunning(true);
     setLastResult(null);
+    const { startDate, endDate } = monthToDateRange(month);
     try {
       setProgress({ current: 0, total: 1, label: 'Signing in to Google…' });
       const accessToken = await requestGoogleAccessToken();
 
       setProgress({ current: 0, total: 1, label: 'Preparing Drive folders…' });
       const parentId = await findOrCreateFolder(accessToken, PARENT_FOLDER_NAME);
-      const folderId = await findOrCreateFolder(accessToken, timestampFolderName(), parentId);
+      const folderName = timestampFolderName(month);
+      const folderId = await findOrCreateFolder(accessToken, folderName, parentId);
 
       // Build the full list of files this backup will contain up front so we
       // can show real progress instead of a spinner with no sense of scale.
       setProgress({ current: 0, total: 1, label: 'Fetching order list…' });
-      const allOrders = await fetchAllOrders();
+      const allOrders = await fetchAllOrders({ date_from: startDate, date_to: endDate });
 
       const jobs = [
         { filename: 'products.xlsx', url: exportApi.productsUrl() },
         { filename: 'distributors.xlsx', url: exportApi.distributorsUrl() },
-        { filename: 'ledger.xlsx', url: exportApi.ledgerUrl() },
+        { filename: 'ledger.xlsx', url: exportApi.ledgerUrl('excel', { start_date: startDate, end_date: endDate }) },
         ...allOrders.map((o) => ({
           filename: `invoice-${o.order_number}.xlsx`,
           url: exportApi.invoiceUrl(o.id, 'excel'),
@@ -85,7 +111,28 @@ export default function BackupPage() {
         setProgress({ current: uploaded, total: jobs.length, label: `Backed up ${uploaded} of ${jobs.length}…` });
       }
 
-      setLastResult({ folderUrl: driveFolderUrl(folderId), fileCount: jobs.length - failures.length, failures });
+      const folderUrl = driveFolderUrl(folderId);
+      const fileCount = jobs.length - failures.length;
+      setLastResult({ folderUrl, fileCount, failures });
+
+      // Log the receipt server-side — no files, just the summary — so
+      // Backup History and the month-end reminder have something to check.
+      // This is best-effort: if it fails, the backup itself already
+      // succeeded and shouldn't be reported as an error to the user.
+      try {
+        await backupsApi.create({
+          folder_name: folderName,
+          folder_url: folderUrl,
+          period_start: startDate || null,
+          period_end: endDate || null,
+          file_count: fileCount,
+          failed_count: failures.length,
+        });
+        loadHistory();
+      } catch {
+        // Non-fatal — see comment above.
+      }
+
       if (failures.length === 0) {
         toast.success(`Backup complete — ${jobs.length} files uploaded to Google Drive.`);
       } else {
@@ -125,6 +172,35 @@ export default function BackupPage() {
           <li>For businesses with many orders, this can take a little while — a separate invoice file is created per order.</li>
         </ul>
 
+        <div style={{ marginBottom: 16 }}>
+          <label style={{ display: 'block', fontSize: 12.5, color: 'var(--ink-muted)', marginBottom: 6 }}>
+            Scope
+          </label>
+          <select
+            value={month ? 'month' : 'all'}
+            onChange={(e) => setMonth(e.target.value === 'all' ? '' : month || new Date().toISOString().slice(0, 7))}
+            disabled={running}
+            style={{ marginRight: 8 }}
+          >
+            <option value="all">All-time (everything)</option>
+            <option value="month">One month only</option>
+          </select>
+          {month !== '' && (
+            <input
+              type="month"
+              value={month}
+              onChange={(e) => setMonth(e.target.value)}
+              disabled={running}
+              max={new Date().toISOString().slice(0, 7)}
+            />
+          )}
+          <p style={{ fontSize: 12, color: 'var(--ink-muted)', marginTop: 6 }}>
+            {month
+              ? 'Orders, invoices, and ledger entries will be limited to that month. Products and distributors are always the current full list — they aren\'t "for" a specific month.'
+              : 'Backs up every order, invoice, and ledger entry — the full history, not just recent activity.'}
+          </p>
+        </div>
+
         <button className="btn" onClick={runBackup} disabled={running || !GOOGLE_CLIENT_ID}>
           {running ? 'Backing up…' : 'Backup Now'}
         </button>
@@ -153,6 +229,51 @@ export default function BackupPage() {
               </p>
             )}
           </div>
+        )}
+      </div>
+
+      <div className="card" style={{ marginTop: 20 }}>
+        <h2 style={{ marginBottom: 12 }}>Backup History</h2>
+        {historyLoading ? (
+          <p style={{ fontSize: 13.5, color: 'var(--ink-muted)' }}>Loading…</p>
+        ) : history.length === 0 ? (
+          <p style={{ fontSize: 13.5, color: 'var(--ink-muted)' }}>No backups recorded yet.</p>
+        ) : (
+          <table className="data-table">
+            <thead>
+              <tr>
+                <th>When</th>
+                <th>Scope</th>
+                <th>Files</th>
+                <th>By</th>
+                <th></th>
+              </tr>
+            </thead>
+            <tbody>
+              {history.map((b) => (
+                <tr key={b.id}>
+                  <td>{new Date(b.created_at).toLocaleString()}</td>
+                  <td>
+                    {b.period_start
+                      ? new Date(`${b.period_start}T00:00:00`).toLocaleDateString(undefined, { year: 'numeric', month: 'long' })
+                      : 'All-time'}
+                  </td>
+                  <td>
+                    {b.file_count}
+                    {b.failed_count > 0 && (
+                      <span style={{ color: 'var(--red)', marginLeft: 6 }}>({b.failed_count} failed)</span>
+                    )}
+                  </td>
+                  <td>{b.user_name || '—'}</td>
+                  <td>
+                    <a href={b.folder_url} target="_blank" rel="noopener noreferrer" className="link-btn">
+                      Open in Drive →
+                    </a>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
         )}
       </div>
     </div>

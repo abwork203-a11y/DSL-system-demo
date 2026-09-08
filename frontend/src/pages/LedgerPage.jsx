@@ -1,6 +1,5 @@
 import { useEffect, useState, useCallback, useRef } from 'react';
 import { useSearchParams } from 'react-router-dom';
-import DownloadFormatModal from '../components/DownloadFormatModal';
 import {
   Loader2,
   FileSpreadsheet,
@@ -19,6 +18,7 @@ import {
 } from '../api/endpoints';
 
 import { apiErrorMessage, downloadFile } from '../api/client';
+import { monthToDateRange } from '../utils/dateRange';
 import { useAuth } from '../context/AuthContext';
 import { useToast } from '../context/ToastContext';
 import StatusBadge from '../components/StatusBadge';
@@ -57,28 +57,6 @@ function formatMonth(monthStr) {
   if (!year || !month) return 'All activity';
 
   return `${MONTHS[month - 1]} ${year}`;
-}
-
-function monthToDateRange(monthStr) {
-  if (!monthStr) {
-    return {
-      startDate: undefined,
-      endDate: undefined,
-    };
-  }
-
-  const [year, month] = monthStr.split('-').map(Number);
-
-  const startDate = `${monthStr}-01`;
-
-  const lastDay = new Date(year, month, 0).getDate();
-
-  const endDate = `${monthStr}-${String(lastDay).padStart(2, '0')}`;
-
-  return {
-    startDate,
-    endDate,
-  };
 }
 
 export default function LedgerPage() {

@@ -1055,7 +1055,7 @@ table.data-table {
 }
 
 .btn-danger:hover {
-  background: #6E251C;
+  background: var(--status-negative-hover);
 }
 
 .btn-sm {
@@ -1463,6 +1463,49 @@ select.stat-card-value:focus {
 
   font-size: 13px;
   line-height: 1.6;
+}
+
+.backup-reminder-banner {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+
+  margin: 0 24px 16px;
+  padding: 10px 14px;
+
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--status-pending-bg);
+
+  background: var(--status-pending-bg);
+  color: var(--status-pending);
+
+  font-size: 13px;
+  line-height: 1.5;
+}
+
+.backup-reminder-banner .link-btn {
+  margin-left: auto;
+  white-space: nowrap;
+}
+
+.backup-reminder-dismiss {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 22px;
+  height: 22px;
+  padding: 0;
+  border: none;
+  background: none;
+  color: inherit;
+  cursor: pointer;
+  border-radius: var(--radius-sm);
+  opacity: 0.7;
+}
+
+.backup-reminder-dismiss:hover {
+  opacity: 1;
+  background: rgba(0, 0, 0, 0.06);
 }
 
 
@@ -2214,7 +2257,7 @@ input[type='password']::-ms-clear {
 }
 
 .stat-value.violet {
-  color: #7c3aed;
+  color: var(--accent-violet);
 }
 
 

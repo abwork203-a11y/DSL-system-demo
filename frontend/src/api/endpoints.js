@@ -98,3 +98,8 @@ export const exportApi = {
 export const audit = {
   list: (params) => client.get('/audit', { params }),
 };
+
+export const backups = {
+  list: (limit) => client.get('/backups', { params: { limit } }),
+  create: (data) => client.post('/backups', data),
+};
