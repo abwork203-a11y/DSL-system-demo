@@ -1,7 +1,7 @@
 require('dotenv').config();
 const http = require('http');
 const { Server } = require('socket.io');
-const { createApp } = require('./app');
+const { createApp, resolveCorsOrigin } = require('./app');
 
 // A weak or placeholder JWT secret makes every login token forgeable —
 // refuse to start rather than run insecurely because someone forgot to edit
@@ -23,8 +23,10 @@ assertValidJwtSecret();
 const app = createApp();
 const server = http.createServer(app);
 
+// Same origin resolution as the REST API (see app.js) — refuses to run
+// wide-open in production instead of silently falling back to '*'.
 const io = new Server(server, {
-  cors: { origin: process.env.CLIENT_ORIGIN || '*', credentials: true },
+  cors: { origin: resolveCorsOrigin(), credentials: true },
 });
 
 io.on('connection', (socket) => {

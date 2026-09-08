@@ -153,6 +153,28 @@ CREATE INDEX IF NOT EXISTS idx_audit_entity ON audit_log(entity_type, entity_id)
 CREATE INDEX IF NOT EXISTS idx_audit_user ON audit_log(user_id);
 
 -- ─────────────────────────────────────────────────────────────
+-- Backup Log
+-- Records that a Google Drive backup happened — never the files
+-- themselves. Backups upload directly from the browser to the user's own
+-- Drive (see BackupPage.jsx / googleDrive.js); this server never sees the
+-- files or a Google token. This table is purely a receipt, written by the
+-- client after a backup finishes, so "Backup History" and the month-end
+-- reminder have something to check against.
+-- ─────────────────────────────────────────────────────────────
+CREATE TABLE IF NOT EXISTS backups (
+  id              SERIAL PRIMARY KEY,
+  user_id         INTEGER REFERENCES users(id) ON DELETE SET NULL,
+  folder_name     TEXT NOT NULL,
+  folder_url      TEXT NOT NULL,
+  period_start    DATE,             -- NULL when the backup covered all-time data, not one month
+  period_end      DATE,
+  file_count      INTEGER NOT NULL DEFAULT 0,
+  failed_count    INTEGER NOT NULL DEFAULT 0,
+  created_at      TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+CREATE INDEX IF NOT EXISTS idx_backups_created_at ON backups(created_at);
+
+-- ─────────────────────────────────────────────────────────────
 -- updated_at auto-touch trigger (generic, applied per table)
 -- ─────────────────────────────────────────────────────────────
 CREATE OR REPLACE FUNCTION set_updated_at()

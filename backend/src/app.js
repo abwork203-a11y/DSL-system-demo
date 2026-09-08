@@ -20,6 +20,7 @@ const ledgerRoutes = require('./routes/ledgerRoutes');
 const reportRoutes = require('./routes/reportRoutes');
 const exportRoutes = require('./routes/exportRoutes');
 const auditRoutes = require('./routes/auditRoutes');
+const backupRoutes = require('./routes/backupRoutes');
 
 function resolveCorsOrigin() {
   const configured = process.env.CLIENT_ORIGIN;
@@ -85,6 +86,7 @@ function createApp() {
   app.use('/api/reports', reportRoutes);
   app.use('/api/export', exportRoutes);
   app.use('/api/audit', auditRoutes);
+  app.use('/api/backups', backupRoutes);
 
   app.use(notFound);
   app.use(errorHandler);
@@ -92,4 +94,4 @@ function createApp() {
   return app;
 }
 
-module.exports = { createApp };
+module.exports = { createApp, resolveCorsOrigin };
