@@ -436,6 +436,11 @@ body {
 .ledger-period-trigger span {
   flex: 1;
 
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+
   text-align: left;
 }
 
@@ -1508,6 +1513,37 @@ select.stat-card-value:focus {
   background: rgba(0, 0, 0, 0.06);
 }
 
+/* Standalone input/select styling for places outside a .toolbar (which has
+   its own scoped input/select rules) — same visual language: bordered,
+   brass focus ring, --font-body. Use on any bare <input>/<select> that
+   isn't already inside .toolbar or a component with its own styling. */
+.form-control {
+  height: 38px;
+  padding: 0 12px;
+
+  border: 1px solid var(--rule);
+  border-radius: var(--radius-sm);
+
+  background: var(--surface);
+  color: var(--ink);
+
+  font-family: var(--font-body);
+  font-size: 13.5px;
+}
+
+select.form-control {
+  cursor: pointer;
+}
+
+.form-control:hover {
+  border-color: var(--rule-strong);
+}
+
+.form-control:focus {
+  border-color: var(--brass);
+  outline: 2px solid rgba(150, 116, 42, 0.20);
+  outline-offset: 0;
+}
 
 /* ==============================================================
    MODAL ACTION ROWS
@@ -1728,6 +1764,9 @@ select.stat-card-value:focus {
   box-shadow: var(--shadow-sm);
 
   cursor: pointer;
+}
+.hamburger-btn.is-hidden {
+  display: none;
 }
 
 .sidebar-scrim {
@@ -2104,7 +2143,21 @@ input[type='password']::-ms-clear {
     border-left: none;
     border-top: 1px solid var(--rule);
   }
+  .toolbar {
+  flex-direction: column;
+  align-items: stretch;
+  gap: 14px;
+  padding: 18px;
+}
 
+.toolbar-group {
+  width: 100%;
+}
+
+.toolbar input,
+.toolbar select {
+  width: 100%;
+}
 
   /* ── Calendar ────────────────────────────────── */
 
@@ -2153,7 +2206,19 @@ input[type='password']::-ms-clear {
   }
 
 }
+@media (max-width: 480px) {
 
+  .ledger-period-actions {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .ledger-period-trigger,
+  .ledger-download-btn {
+    width: 100%;
+  }
+
+}
 
 /* ==============================================================
    REDUCED MOTION

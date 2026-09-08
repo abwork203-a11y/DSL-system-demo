@@ -176,24 +176,26 @@ export default function BackupPage() {
           <label style={{ display: 'block', fontSize: 12.5, color: 'var(--ink-muted)', marginBottom: 6 }}>
             Scope
           </label>
-          <select
-            value={month ? 'month' : 'all'}
-            onChange={(e) => setMonth(e.target.value === 'all' ? '' : month || new Date().toISOString().slice(0, 7))}
-            disabled={running}
-            style={{ marginRight: 8 }}
-          >
-            <option value="all">All-time (everything)</option>
-            <option value="month">One month only</option>
-          </select>
-          {month !== '' && (
-            <input
-              type="month"
-              value={month}
-              onChange={(e) => setMonth(e.target.value)}
-              disabled={running}
-              max={new Date().toISOString().slice(0, 7)}
-            />
-          )}
+         <select
+  className="form-control"
+  value={month ? 'month' : 'all'}
+  onChange={(e) => setMonth(e.target.value === 'all' ? '' : month || new Date().toISOString().slice(0, 7))}
+  disabled={running}
+  style={{ marginRight: 8 }}
+>
+  <option value="all">All-time (everything)</option>
+  <option value="month">One month only</option>
+</select>
+{month !== '' && (
+  <input
+    className="form-control"
+    type="month"
+    value={month}
+    onChange={(e) => setMonth(e.target.value)}
+    disabled={running}
+    max={new Date().toISOString().slice(0, 7)}
+  />
+)}
           <p style={{ fontSize: 12, color: 'var(--ink-muted)', marginTop: 6 }}>
             {month
               ? 'Orders, invoices, and ledger entries will be limited to that month. Products and distributors are always the current full list — they aren\'t "for" a specific month.'
