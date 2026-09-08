@@ -1,0 +1,191 @@
+/* ═══════════════════════════════════════════════════════════════
+   DESIGN TOKENS — LedgerOne
+   Clean, modern SaaS dashboard palette: deep blue primary, navy
+   sidebar, light gray canvas, semantic success/warning/error.
+   ═══════════════════════════════════════════════════════════════ */
+
+:root {
+  /* ── Surfaces ────────────────────────────────────────────── */
+  --paper: #F8FAFC;
+  --surface: #FFFFFF;
+  --surface-sunken: #F1F5F9;
+  --rule: #E2E8F0;
+  --rule-strong: #CBD5E1;
+
+  /* ── Ink — text and structural color ────────────────────── */
+  --ink: #334155;
+  --ink-muted: #64748B;
+  --ink-faint: #94A3B8;
+
+  /* ── Primary — deep blue ─────────────────────────────────── */
+  --blue: #2563EB;
+  --blue-hover: #1D4ED8;
+  --blue-light: #EFF6FF;
+
+  /* ── Sidebar — navy ──────────────────────────────────────── */
+  --sidebar-bg: #1E293B;
+  --sidebar-ink: #F1F5F9;
+  --sidebar-muted: #94A3B8;
+  --sidebar-active: #2563EB;
+  --sidebar-accent: var(--blue);
+
+  /* ── Status ink ──────────────────────────────────────────── */
+  --status-positive: #22C55E;
+  --status-positive-bg: #F0FDF4;
+  --status-negative: #ef4444b2;
+  --status-negative-hover: #6E251C;
+  --status-negative-bg: #FEF2F2;
+  --status-pending: #F59E0B;
+  --status-pending-bg: #FFFBEB;
+  --status-neutral: #64748B;
+  --status-neutral-bg: #F1F5F9;
+
+  /* ── One-off accents (not part of the surface/ink/primary system,
+     used for a single decorative highlight) ────────────────────── */
+  --accent-violet: #7c3aed;
+
+  /* ── Typography ──────────────────────────────────────────── */
+  --font-display: 'Fraunces', Georgia, serif;
+  --font-body: 'Inter', -apple-system, sans-serif;
+  --font-mono: 'IBM Plex Mono', 'Courier New', monospace;
+
+  /* ── Shape & shadow ──────────────────────────────────────── */
+  --radius: 8px;
+  --radius-sm: 5px;
+  --shadow-sm: 0 1px 2px rgba(30, 41, 59, 0.06);
+  --shadow-md: 0 4px 16px rgba(30, 41, 59, 0.10);
+
+  /* ── Legacy aliases (old class names still work — the app's
+     component CSS references --green/--brass/--accent by name,
+     this maps them onto the new palette without editing every file) */
+  --green: var(--blue);
+  --green-hover: var(--blue-hover);
+  --green-light: var(--blue-light);
+  --brass: var(--blue);
+  --brass-hover: var(--blue-hover);
+  --brass-light: var(--blue-light);
+  --accent: var(--blue);
+  --accent-hover: var(--blue-hover);
+  --border: var(--rule);
+  --red: var(--status-negative);
+  --red-light: var(--status-negative-bg);
+  --amber: var(--status-pending);
+  --amber-light: var(--status-pending-bg);
+}
+
+/* ═══════════════════════════════════════════════════════════════
+   THEME VARIANTS
+   Applied via a `data-theme` attribute on <html>. Each block
+   overrides the same surface/ink/primary/sidebar variable names
+   defined in :root above — everything else (status colors, shape,
+   shadow, and the legacy aliases, which are all `var(...)` refs
+   onto these same tokens) follows automatically through the
+   cascade with no per-theme duplication needed.
+   ═══════════════════════════════════════════════════════════════ */
+
+/* "Ocean" — the default palette above, restated explicitly so it's
+   a selectable, highlightable option in the UI rather than just
+   "whatever happens when no attribute is set". */
+[data-theme="ocean"] {
+  --paper: #F8FAFC;
+  --surface: #FFFFFF;
+  --surface-sunken: #F1F5F9;
+  --rule: #E2E8F0;
+  --rule-strong: #CBD5E1;
+  --ink: #334155;
+  --ink-muted: #64748B;
+  --ink-faint: #94A3B8;
+  --blue: #2563EB;
+  --blue-hover: #1D4ED8;
+  --blue-light: #EFF6FF;
+  --sidebar-bg: #1E293B;
+  --sidebar-ink: #F1F5F9;
+  --sidebar-muted: #94A3B8;
+  --sidebar-active: #2563EB;
+}
+
+/* "Forest" — deep green primary, warm-gray-green neutrals. */
+[data-theme="forest"] {
+  --paper: #F7F9F6;
+  --surface: #FFFFFF;
+  --surface-sunken: #EEF3EC;
+  --rule: #DCE5D8;
+  --rule-strong: #C1D0BC;
+  --ink: #263422;
+  --ink-muted: #5B6B58;
+  --ink-faint: #8B9986;
+  --blue: #2F6D50;
+  --blue-hover: #24543D;
+  --blue-light: #EAF3EC;
+  --sidebar-bg: #182A20;
+  --sidebar-ink: #EAF3EC;
+  --sidebar-muted: #9BB398;
+  --sidebar-active: #3F8A66;
+}
+
+/* "Terracotta" — warm amber/clay primary, cream neutrals. */
+[data-theme="terracotta"] {
+  --paper: #FDF8F3;
+  --surface: #FFFFFF;
+  --surface-sunken: #F5EDE3;
+  --rule: #E8DACA;
+  --rule-strong: #D6C0A7;
+  --ink: #3B2E22;
+  --ink-muted: #7A6553;
+  --ink-faint: #A8917D;
+  --blue: #C2571F;
+  --blue-hover: #A6461A;
+  --blue-light: #FBEEE3;
+  --sidebar-bg: #2E2018;
+  --sidebar-ink: #FBEEE3;
+  --sidebar-muted: #C9AF9B;
+  --sidebar-active: #D97A3F;
+}
+
+/* "Slate" — monochrome cool-gray primary, minimal color anywhere. */
+[data-theme="slate"] {
+  --paper: #F7F8FA;
+  --surface: #FFFFFF;
+  --surface-sunken: #EEF1F4;
+  --rule: #DCE1E7;
+  --rule-strong: #C2C9D1;
+  --ink: #1F2937;
+  --ink-muted: #566073;
+  --ink-faint: #8A93A3;
+  --blue: #475569;
+  --blue-hover: #334155;
+  --blue-light: #EEF1F4;
+  --sidebar-bg: #111827;
+  --sidebar-ink: #E5E7EB;
+  --sidebar-muted: #94A3B8;
+  --sidebar-active: #64748B;
+}
+
+/* ═══════════════════════════════════════════════════════════════
+   FONT PAIRING VARIANTS
+   Applied via a `data-font` attribute on <html>. All fonts referenced
+   here are loaded via <link> tags in index.html.
+   ═══════════════════════════════════════════════════════════════ */
+
+/* "Classic" — the default pairing above, restated explicitly for
+   the same reason as [data-theme="ocean"]. */
+[data-font="classic"] {
+  --font-display: 'Fraunces', Georgia, serif;
+  --font-body: 'Inter', -apple-system, sans-serif;
+  --font-mono: 'IBM Plex Mono', 'Courier New', monospace;
+}
+
+/* "Grotesk" — modern geometric sans pairing. */
+[data-font="grotesk"] {
+  --font-display: 'Space Grotesk', -apple-system, sans-serif;
+  --font-body: 'Work Sans', -apple-system, sans-serif;
+  --font-mono: 'JetBrains Mono', 'Courier New', monospace;
+}
+
+/* "Editorial" — serif-forward pairing; reuses IBM Plex Mono so it
+   doesn't require loading a fourth mono face. */
+[data-font="editorial"] {
+  --font-display: 'Playfair Display', Georgia, serif;
+  --font-body: 'Lora', Georgia, serif;
+  --font-mono: 'IBM Plex Mono', 'Courier New', monospace;
+}

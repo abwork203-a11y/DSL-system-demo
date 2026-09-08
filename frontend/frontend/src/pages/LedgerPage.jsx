@@ -1,6 +1,5 @@
 import { useEffect, useState, useCallback, useRef } from 'react';
 import { useSearchParams } from 'react-router-dom';
-import DownloadFormatModal from '../components/DownloadFormatModal';
 import {
   Loader2,
   FileSpreadsheet,
