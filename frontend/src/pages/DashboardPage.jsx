@@ -23,6 +23,18 @@ function money(n) {
   })}`;
 }
 
+// Stat cards render the "PKR" prefix and the figure as two separately-styled
+// pieces on one line (see .stat-value / .stat-currency) instead of one long
+// string — the string form was wrapping mid-value on narrower cards, putting
+// "PKR" on its own line and pushing the actual number down, which threw off
+// vertical alignment against the plain-number cards next to it.
+function moneyAmount(n) {
+  return Number(n || 0).toLocaleString(undefined, {
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2,
+  });
+}
+
 
 function formatDate(value) {
   if (!value) return '—';
@@ -174,7 +186,8 @@ export default function DashboardPage() {
           <div className="stat-card">
             <div className="stat-label">This Month's Sales</div>
             <div className="stat-value">
-              {money(summary?.currentMonth?.totalSales)}
+              <span className="stat-currency">PKR</span>
+              <span>{moneyAmount(summary?.currentMonth?.totalSales)}</span>
             </div>
           </div>
 
@@ -188,7 +201,8 @@ export default function DashboardPage() {
           <div className="stat-card">
             <div className="stat-label">Outstanding Receivables</div>
             <div className="stat-value">
-              {money(summary?.totalOutstanding)}
+              <span className="stat-currency">PKR</span>
+              <span>{moneyAmount(summary?.totalOutstanding)}</span>
             </div>
           </div>
 
