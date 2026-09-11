@@ -118,10 +118,7 @@ export default function OrdersPage() {
         </button>
       </div>
 
-      {activeTab === 'orders' ? (
-
-        <div className="card">
-          <div className="toolbar">
+      <div className="toolbar">
             <div className="toolbar-group">
               <label htmlFor="orders-search">Search</label>
               <input id="orders-search" type="text" placeholder="Search order # or distributor…" value={search} onChange={(e) => updateFilter(setSearch)(e.target.value)} style={{ minWidth: 220 }} />
@@ -153,6 +150,11 @@ export default function OrdersPage() {
               </select>
             </div>
           </div>
+          
+      {activeTab === 'orders' ? (
+        
+        <div className="card">
+          
 
           {loading ? (
             <TableSkeleton columns={7} rows={6} />
