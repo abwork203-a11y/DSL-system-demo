@@ -1,12 +1,11 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { useNavigate, useBlocker } from 'react-router-dom';
-import { Plus, Minus, Trash2, Loader2 } from 'lucide-react';
+import { useNavigate, useBlocker, useLocation } from 'react-router-dom';
+import { Plus, Minus, Trash2, Loader2, Check } from 'lucide-react';
 import { distributors as distributorsApi, products as productsApi, orders as ordersApi } from '../api/endpoints';
 import { apiErrorMessage } from '../api/client';
 import { useToast } from '../context/ToastContext';
 import Modal from '../components/Modal';
-
-const STEPS = ['Distributor', 'Items', 'Discount & Freight', 'Payment', 'Review'];
+import { newDraftId, getDraft, saveDraft, deleteDraft, ORDER_STEPS as STEPS } from '../utils/orderDrafts';
 
 function money(n) {
   return Number(n || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
@@ -14,6 +13,7 @@ function money(n) {
 
 export default function CreateOrderPage() {
   const navigate = useNavigate();
+  const location = useLocation();
   const toast = useToast();
   const [step, setStep] = useState(0);
   const [distributorsList, setDistributorsList] = useState([]);
@@ -38,6 +38,10 @@ export default function CreateOrderPage() {
   //     making it look like nothing happened.
   const submittingRef = useRef(false);
   const submittedRef = useRef(false);
+  // Assigned on first save (or immediately, if resuming an existing draft) —
+  // every save after that updates the same localStorage record instead of
+  // creating a new one each time.
+  const draftIdRef = useRef(null);
 
   const [distributorId, setDistributorId] = useState('');
   const [distributorSearch, setDistributorSearch] = useState('');
@@ -54,6 +58,32 @@ export default function CreateOrderPage() {
   // distributor or added at least one item — before that, leaving costs nothing.
   const hasUnsavedProgress = () => !submittedRef.current && (!!distributorId || items.length > 0);
 
+  // Snapshot of everything needed to resume later. Deliberately excludes
+  // productSearch/distributorsList/productsList — those are either ephemeral
+  // UI state or re-fetched fresh on load, not user input worth persisting.
+  const buildDraftData = () => ({
+    step,
+    distributorId,
+    distributorSearch,
+    distributorName: selectedDistributor?.name || distributorSearch || '',
+    items,
+    discount,
+    discountType,
+    freightCost,
+    paymentTerm,
+    amountPaid,
+    notes,
+  });
+
+  // No server-side draft concept exists yet (see utils/orderDrafts.js), so
+  // this writes to localStorage only — a per-browser convenience, not a
+  // synced record.
+  const saveDraftNow = () => {
+    if (!hasUnsavedProgress()) return;
+    if (!draftIdRef.current) draftIdRef.current = newDraftId();
+    saveDraft({ id: draftIdRef.current, ...buildDraftData() });
+  };
+
   // Guards in-app navigation (clicking the sidebar, going back, etc.)
   const blocker = useBlocker(
     ({ currentLocation, nextLocation }) =>
@@ -61,17 +91,46 @@ export default function CreateOrderPage() {
   );
 
   // Guards actual tab close / browser refresh — a separate mechanism from
-  // React Router, since the browser itself controls that moment.
+  // React Router, since the browser itself controls that moment. Saves a
+  // draft synchronously before the browser's own (unskippable, non-
+  // customizable) confirmation shows, so the work isn't lost even if the
+  // user goes ahead and closes the tab.
   useEffect(() => {
     const handleBeforeUnload = (e) => {
       if (!hasUnsavedProgress()) return;
+      saveDraftNow();
       e.preventDefault();
       e.returnValue = '';
     };
     window.addEventListener('beforeunload', handleBeforeUnload);
     return () => window.removeEventListener('beforeunload', handleBeforeUnload);
+    // Deliberately broad: this needs to re-register with a fresh closure
+    // whenever any field that ends up in the draft snapshot changes, or a
+    // real close event could save stale values.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [distributorId, items]);
+  }, [step, distributorId, distributorSearch, items, discount, discountType, freightCost, paymentTerm, amountPaid, notes]);
+
+  // Resuming a draft: OrdersPage navigates here with { state: { resumeDraftId } }.
+  useEffect(() => {
+    const resumeId = location.state?.resumeDraftId;
+    if (!resumeId) return;
+
+    const draft = getDraft(resumeId);
+    if (!draft) return;
+
+    draftIdRef.current = draft.id;
+    setStep(draft.step ?? 0);
+    setDistributorId(draft.distributorId ?? '');
+    setDistributorSearch(draft.distributorSearch ?? draft.distributorName ?? '');
+    setItems(Array.isArray(draft.items) ? draft.items : []);
+    setDiscount(draft.discount ?? '0');
+    setDiscountType(draft.discountType ?? 'fixed');
+    setFreightCost(draft.freightCost ?? '0');
+    setPaymentTerm(draft.paymentTerm ?? 'cash');
+    setAmountPaid(draft.amountPaid ?? '0');
+    setNotes(draft.notes ?? '');
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   useEffect(() => {
     distributorsApi.list({ status: 'active' }).then((res) => setDistributorsList(res.data)).catch((err) => toast.error(apiErrorMessage(err)));
@@ -172,6 +231,7 @@ export default function CreateOrderPage() {
       // state variable.
       submittedRef.current = true;
       setSubmitted(true);
+      if (draftIdRef.current) deleteDraft(draftIdRef.current);
       toast.success(`Order ${res.data.order_number} created.`);
       navigate(`/orders/${res.data.id}`);
     } catch (err) {
@@ -196,7 +256,8 @@ export default function CreateOrderPage() {
       <div className="stepper">
         {STEPS.map((label, i) => (
           <div key={label} className={`stepper-item${i === step ? ' active' : i < step ? ' done' : ''}`}>
-            {label}
+            <span className="stepper-number">{i < step ? <Check size={12} strokeWidth={3} /> : i + 1}</span>
+            <span className="stepper-label">{label}</span>
           </div>
         ))}
       </div>
@@ -204,7 +265,7 @@ export default function CreateOrderPage() {
       <div className="card">
         {step === 0 && (
           <div>
-            <h2 style={{ marginBottom: 14 }}>Select Distributor</h2>
+            <h2>Select Distributor</h2>
             <div className="field">
               <label>Distributor</label>
               <input
@@ -253,7 +314,7 @@ export default function CreateOrderPage() {
 
         {step === 1 && (
           <div>
-            <h2 style={{ marginBottom: 14 }}>Add Products</h2>
+            <h2>Add Products</h2>
             <p style={{ color: 'var(--ink-muted)', fontSize: 13, marginBottom: 12 }}>
               Manufacturer is inherited per product — you can mix products from multiple manufacturers on one order.
             </p>
@@ -396,7 +457,7 @@ export default function CreateOrderPage() {
 
         {step === 2 && (
           <div>
-            <h2 style={{ marginBottom: 14 }}>Discount &amp; Freight</h2>
+            <h2>Discount &amp; Freight</h2>
 
             <div className="field">
               <label>Discount Type</label>
@@ -440,12 +501,22 @@ export default function CreateOrderPage() {
                 <input type="number" min="0" step="0.01" value={freightCost} onChange={(e) => setFreightCost(e.target.value)} />
               </div>
             </div>
-            <div style={{ fontSize: 14, lineHeight: 1.9, marginTop: 8 }}>
-              <div>Subtotal: <span className="num" style={{ float: 'right' }}>{money(subtotal)}</span></div>
-              <div>Discount Amount: <span className="num" style={{ float: 'right' }}>{money(discountAmount)}</span></div>
-              <div>Freight: <span className="num" style={{ float: 'right' }}>{money(freightCost)}</span></div>
-              <div style={{ borderTop: '1px solid var(--border)', paddingTop: 6, fontWeight: 600 }}>
-                Total: <span className="num" style={{ float: 'right' }}>{money(total)}</span>
+            <div className="order-summary">
+              <div className="order-summary-row">
+                <span>Subtotal</span>
+                <span className="num">{money(subtotal)}</span>
+              </div>
+              <div className="order-summary-row">
+                <span>Discount</span>
+                <span className="num">−{money(discountAmount)}</span>
+              </div>
+              <div className="order-summary-row">
+                <span>Freight</span>
+                <span className="num">+{money(freightCost)}</span>
+              </div>
+              <div className="order-summary-row order-summary-total">
+                <span>Total</span>
+                <span className="num">{money(total)}</span>
               </div>
             </div>
           </div>
@@ -453,7 +524,7 @@ export default function CreateOrderPage() {
 
         {step === 3 && (
           <div>
-            <h2 style={{ marginBottom: 14 }}>Payment</h2>
+            <h2>Payment</h2>
             <div className="field">
               <label>Payment Term</label>
               <select value={paymentTerm} onChange={(e) => setPaymentTerm(e.target.value)}>
@@ -477,22 +548,29 @@ export default function CreateOrderPage() {
 
         {step === 4 && (
           <div>
-            <h2 style={{ marginBottom: 14 }}>Review</h2>
+            <h2>Review</h2>
             <div style={{ fontSize: 14, lineHeight: 2 }}>
               <div><strong>Distributor:</strong> {selectedDistributor?.name}</div>
               <div><strong>Items:</strong> {items.length}</div>
               <div><strong>Payment Term:</strong> <span style={{ textTransform: 'capitalize' }}>{paymentTerm}</span></div>
               <div><strong>Amount Paid Now:</strong> <span className="num">{money(amountPaid)}</span></div>
             </div>
-            <div style={{ fontSize: 14, lineHeight: 1.9, marginTop: 14, borderTop: '1px solid var(--border)', paddingTop: 10 }}>
-              <div>Subtotal: <span className="num" style={{ float: 'right' }}>{money(subtotal)}</span></div>
-              <div>
-                Discount{discountType === 'percentage' ? ` (${Number(discount || 0)}%)` : ''}:
-                <span className="num" style={{ float: 'right' }}>−{money(discountAmount)}</span>
+            <div className="order-summary">
+              <div className="order-summary-row">
+                <span>Subtotal</span>
+                <span className="num">{money(subtotal)}</span>
               </div>
-              <div>Freight: <span className="num" style={{ float: 'right' }}>+{money(freightCost)}</span></div>
-              <div style={{ fontWeight: 600, fontSize: 16, marginTop: 4 }}>
-                Total: <span className="num" style={{ float: 'right' }}>{money(total)}</span>
+              <div className="order-summary-row">
+                <span>Discount{discountType === 'percentage' ? ` (${Number(discount || 0)}%)` : ''}</span>
+                <span className="num">−{money(discountAmount)}</span>
+              </div>
+              <div className="order-summary-row">
+                <span>Freight</span>
+                <span className="num">+{money(freightCost)}</span>
+              </div>
+              <div className="order-summary-row order-summary-total">
+                <span>Total</span>
+                <span className="num">{money(total)}</span>
               </div>
             </div>
           </div>
@@ -512,13 +590,14 @@ export default function CreateOrderPage() {
       </div>
 
       {blocker.state === 'blocked' && (
-        <Modal title="Leave without saving?" onClose={() => blocker.reset()} width={420}>
+        <Modal title="Save this order as a draft?" onClose={() => blocker.reset()} width={440}>
           <p style={{ color: 'var(--ink-muted)', marginBottom: 20 }}>
-            This order hasn't been created yet — going back now will lose everything you've entered.
+            This order hasn't been created yet. We'll save your progress as a draft you can pick back
+            up anytime from the Drafts tab on the Orders page.
           </p>
-          <div style={{ display: 'flex', gap: 10, justifyContent: 'flex-end' }}>
+          <div className="modal-actions">
             <button className="btn btn-secondary" onClick={() => blocker.reset()}>Stay on this page</button>
-            <button className="btn btn-danger" onClick={() => blocker.proceed()}>Leave anyway</button>
+            <button className="btn" onClick={() => { saveDraftNow(); blocker.proceed(); }}>Save &amp; Leave</button>
           </div>
         </Modal>
       )}

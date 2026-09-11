@@ -225,6 +225,68 @@ body {
   font-size: 13.5px;
 }
 
+
+/* ==============================================================
+   PAGE TABS
+   Top-level tab bar under a page header (e.g. Orders / Drafts).
+   ============================================================== */
+
+.page-tabs {
+  display: flex;
+  gap: 22px;
+
+  margin-bottom: 18px;
+
+  border-bottom: 1px solid var(--rule);
+}
+
+.page-tab {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+
+  margin-bottom: -1px;
+  padding: 0 2px 10px;
+
+  border: none;
+  border-bottom: 2px solid transparent;
+
+  background: transparent;
+  color: var(--ink-muted);
+
+  font-family: var(--font-body);
+  font-size: 13.5px;
+  font-weight: 600;
+
+  cursor: pointer;
+}
+
+.page-tab:hover {
+  color: var(--ink);
+}
+
+.page-tab.active {
+  color: var(--ink);
+  border-bottom-color: var(--blue);
+}
+
+.page-tab-count {
+  padding: 1px 7px;
+
+  border-radius: 100px;
+
+  background: var(--surface-sunken);
+  color: var(--ink-muted);
+
+  font-size: 11px;
+  font-weight: 700;
+}
+
+.page-tab.active .page-tab-count {
+  background: var(--blue);
+  color: #fff;
+}
+
 .page-header-actions {
   display: flex;
   align-items: center;
@@ -295,7 +357,6 @@ body {
   background: var(--surface);
 
   border: 1px solid var(--rule);
-  border-top: 2px solid var(--brass);
 
   border-radius: var(--radius);
 
@@ -435,11 +496,6 @@ body {
 
 .ledger-period-trigger span {
   flex: 1;
-
-  min-width: 0;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
 
   text-align: left;
 }
@@ -784,47 +840,30 @@ body {
 }
 
 
-/*==============================================================
+/* ==============================================================
    TOOLBAR (search + filter row above a table)
    Height/border/radius/font match the Ledger control bar exactly,
    so a select or input here looks identical to one there.
-============================================================== */
- 
-.toolbar {
-  position: relative;
+   ============================================================== */
 
+.toolbar {
   display: flex;
   align-items: flex-end;
+  flex-wrap: wrap;
 
-  gap: 32px;
+  gap: 10px;
 
-  width: 100%;
-
-  margin-bottom: 20px;
-  padding: 20px 28px;
-
-  background: var(--surface);
-
-  border: 1px solid var(--rule);
-  border-top: 2px solid var(--brass);
-
-  border-radius: var(--radius);
-
-  box-shadow: var(--shadow-sm);
+  margin-bottom: 16px;
 }
- 
+
 .toolbar-group {
   display: flex;
   flex-direction: column;
-
   gap: 6px;
-
-  margin: 0;
 }
- 
+
 .toolbar-group > label {
   display: block;
-
   margin: 0;
 
   font-size: 11px;
@@ -835,39 +874,38 @@ body {
   text-transform: uppercase;
   letter-spacing: 0.06em;
 }
- 
+
 .toolbar input,
 .toolbar select {
   height: 38px;
- 
+
   padding: 0 12px;
- 
+
   border: 1px solid var(--rule);
   border-radius: var(--radius-sm);
- 
+
   background: var(--surface);
   color: var(--ink);
- 
+
   font-family: var(--font-body);
   font-size: 13.5px;
 }
- 
+
 .toolbar select {
   cursor: pointer;
 }
- 
+
 .toolbar input:hover,
 .toolbar select:hover {
   border-color: var(--rule-strong);
 }
- 
+
 .toolbar input:focus,
 .toolbar select:focus {
   border-color: var(--brass);
   outline: 2px solid rgba(150, 116, 42, 0.20);
   outline-offset: 0;
 }
- 
 
 
 /* ==============================================================
@@ -942,7 +980,7 @@ table.data-table {
 
 .data-table td:first-child,
 .data-table th:first-child {
-
+  padding-left: 0;
 }
 
 .data-table td:last-child,
@@ -1060,7 +1098,7 @@ table.data-table {
 }
 
 .btn-danger:hover {
-  background: var(--status-negative-hover);
+  background: #6E251C;
 }
 
 .btn-sm {
@@ -1329,9 +1367,12 @@ table.data-table {
 
 .stat-label {
   margin-bottom: 6px;
- color: var(--ink);
+
   font-size: 11.5px;
   font-weight: 600;
+
+  color: var(--ink-muted);
+
   text-transform: uppercase;
   letter-spacing: 0.06em;
 }
@@ -1341,10 +1382,11 @@ table.data-table {
 
   font-size: 25px;
   font-weight: 500;
-  color: var(--ink);
+
   font-variant-numeric:
     tabular-nums;
 
+  color: var(--ink);
 }
 
 .stat-card-value {
@@ -1470,80 +1512,6 @@ select.stat-card-value:focus {
   line-height: 1.6;
 }
 
-.backup-reminder-banner {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-
-  margin: 0 24px 16px;
-  padding: 10px 14px;
-
-  border-radius: var(--radius-sm);
-  border: 1px solid var(--status-pending-bg);
-
-  background: var(--status-pending-bg);
-  color: var(--status-pending);
-
-  font-size: 13px;
-  line-height: 1.5;
-}
-
-.backup-reminder-banner .link-btn {
-  margin-left: auto;
-  white-space: nowrap;
-}
-
-.backup-reminder-dismiss {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  width: 22px;
-  height: 22px;
-  padding: 0;
-  border: none;
-  background: none;
-  color: inherit;
-  cursor: pointer;
-  border-radius: var(--radius-sm);
-  opacity: 0.7;
-}
-
-.backup-reminder-dismiss:hover {
-  opacity: 1;
-  background: rgba(0, 0, 0, 0.06);
-}
-
-/* Standalone input/select styling for places outside a .toolbar (which has
-   its own scoped input/select rules) — same visual language: bordered,
-   brass focus ring, --font-body. Use on any bare <input>/<select> that
-   isn't already inside .toolbar or a component with its own styling. */
-.form-control {
-  height: 38px;
-  padding: 0 12px;
-
-  border: 1px solid var(--rule);
-  border-radius: var(--radius-sm);
-
-  background: var(--surface);
-  color: var(--ink);
-
-  font-family: var(--font-body);
-  font-size: 13.5px;
-}
-
-select.form-control {
-  cursor: pointer;
-}
-
-.form-control:hover {
-  border-color: var(--rule-strong);
-}
-
-.form-control:focus {
-  border-color: var(--brass);
-  outline: 2px solid rgba(150, 116, 42, 0.20);
-  outline-offset: 0;
-}
 
 /* ==============================================================
    MODAL ACTION ROWS
@@ -1765,9 +1733,6 @@ select.form-control {
 
   cursor: pointer;
 }
-.hamburger-btn.is-hidden {
-  display: none;
-}
 
 .sidebar-scrim {
   display: none;
@@ -1804,9 +1769,11 @@ input[type='password']::-ms-clear {
    ============================================================== */
 
 .page-table-scroll {
-  max-height: 340px;
+  max-height: 640px;
 
   overflow-y: auto;
+
+  border: 1px solid var(--rule);
 
   border-radius: var(--radius);
 }
@@ -1871,29 +1838,80 @@ input[type='password']::-ms-clear {
    STEPPER (multi-step form progress indicator)
    ============================================================== */
 
-
-
-.stepper-item {
-  flex: 1;
-  padding: 8px 4px;
-  border-bottom: 3px solid var(--rule);
-  font-family: var(--font-body);
-  font-size: 11.5px;
-  font-weight: 700;
-  text-transform: uppercase;
-  letter-spacing: 0.05em;
-  color: var(--ink-muted);
-  text-align: center;
-  transition: border-color 0.15s, color 0.15s;
-}
-.stepper-item.active { border-color: var(--brass); color: var(--ink); }
-.stepper-item.done { border-color: var(--status-positive); color: var(--ink); }
-
 .stepper {
   display: flex;
+  align-items: flex-start;
+
   margin-bottom: 20px;
 }
 
+.stepper-item {
+  display: flex;
+  align-items: center;
+
+  gap: 8px;
+
+  color: var(--ink-muted);
+
+  font-family: var(--font-body);
+  font-size: 13px;
+  font-weight: 500;
+}
+
+.stepper-item:not(:last-child) {
+  flex: 1;
+}
+
+.stepper-item:not(:last-child)::after {
+  content: '';
+  flex: 1;
+
+  height: 1px;
+  min-width: 20px;
+
+  margin: 0 12px;
+
+  background: var(--rule);
+}
+
+.stepper-number {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+
+  width: 24px;
+  height: 24px;
+  flex-shrink: 0;
+
+  border: 1.5px solid var(--rule);
+  border-radius: 50%;
+
+  background: var(--surface);
+  color: var(--ink-muted);
+
+  font-size: 11.5px;
+  font-weight: 700;
+}
+
+.stepper-item.active .stepper-number,
+.stepper-item.done .stepper-number {
+  border-color: var(--blue);
+  background: var(--blue);
+  color: #fff;
+}
+
+.stepper-item.active .stepper-label {
+  color: var(--ink);
+  font-weight: 600;
+}
+
+.stepper-item.done .stepper-label {
+  color: var(--ink);
+}
+
+.stepper-item.done:not(:last-child)::after {
+  background: var(--blue);
+}
 
 
 @media (max-width: 640px) {
@@ -1950,29 +1968,17 @@ input[type='password']::-ms-clear {
   background: var(--surface);
 }
 
-/* ── Order builder: entrance animation for a newly added row ──
-   Fires automatically whenever a <tr className="added-product-row">
-   is newly mounted into the DOM — existing rows are untouched since
-   React reuses their DOM nodes by key. */
 @keyframes row-enter {
   from {
     opacity: 0;
     transform: translateY(-6px);
-    background: var(--blue-light, var(--green-light));
   }
+
   to {
     opacity: 1;
     transform: translateY(0);
-    background: transparent;
   }
 }
-.added-product-row {
-  animation: row-enter 0.35s ease-out;
-}
-@media (prefers-reduced-motion: reduce) {
-  .added-product-row { animation: none; }
-}
-
 
 .added-product-row {
   animation:
@@ -2140,24 +2146,11 @@ input[type='password']::-ms-clear {
 
     padding-left: 0;
     padding-top: 14px;
+
     border-left: none;
     border-top: 1px solid var(--rule);
   }
-  .toolbar {
-  flex-direction: column;
-  align-items: stretch;
-  gap: 14px;
-  padding: 18px;
-}
 
-.toolbar-group {
-  width: 100%;
-}
-
-.toolbar input,
-.toolbar select {
-  width: 100%;
-}
 
   /* ── Calendar ────────────────────────────────── */
 
@@ -2206,19 +2199,7 @@ input[type='password']::-ms-clear {
   }
 
 }
-@media (max-width: 480px) {
 
-  .ledger-period-actions {
-    flex-direction: column;
-    align-items: stretch;
-  }
-
-  .ledger-period-trigger,
-  .ledger-download-btn {
-    width: 100%;
-  }
-
-}
 
 /* ==============================================================
    REDUCED MOTION
@@ -2317,12 +2298,12 @@ input[type='password']::-ms-clear {
    ─────────────────────────────────────────────────────────── */
 
 .dashboard-stat-grid {
-  grid-template-columns: repeat(4, minmax(0, 1fr));
+  grid-template-columns: repeat(5, minmax(0, 1fr));
   margin-bottom: 20px;
 }
 
 .stat-value.violet {
-  color: var(--accent-violet);
+  color: #7c3aed;
 }
 
 
@@ -2349,6 +2330,7 @@ input[type='password']::-ms-clear {
 
 .dashboard-orders-card {
   min-width: 0;
+  padding: 0;
   overflow: hidden;
   display: flex;
   flex-direction: column;
@@ -2383,12 +2365,12 @@ input[type='password']::-ms-clear {
 }
 
 .dashboard-orders-table th {
-  padding: 9px 20px;
+  padding: 9px 12px;
   font-size: 10px;
 }
 
 .dashboard-orders-table td {
-  padding: 11px 20px;
+  padding: 11px 12px;
 }
 
 .dashboard-order-number {
@@ -2409,6 +2391,7 @@ input[type='password']::-ms-clear {
    ─────────────────────────────────────────────────────────── */
 
 .dashboard-empty-row > td {
+  padding: 0;
   border-bottom: none;
 }
 
