@@ -150,7 +150,7 @@ export default function OrdersPage() {
               </select>
             </div>
           </div>
-          
+
       {activeTab === 'orders' ? (
         
         <div className="card">
@@ -195,21 +195,9 @@ export default function OrdersPage() {
         </div>
 
       ) : (
-
+        
         <div className="card">
-          <div className="toolbar">
-            <div className="toolbar-group">
-              <label htmlFor="drafts-search">Search</label>
-              <input id="drafts-search" type="text" placeholder="Search by distributor…" value={draftSearch} onChange={(e) => setDraftSearch(e.target.value)} style={{ minWidth: 220 }} />
-            </div>
-            <div className="toolbar-group">
-              <label htmlFor="drafts-distributor">Distributor</label>
-              <select id="drafts-distributor" value={draftDistributorId} onChange={(e) => setDraftDistributorId(e.target.value)}>
-                <option value="">All distributors</option>
-                {distributorsList.map((d) => <option key={d.id} value={d.id}>{d.name}</option>)}
-              </select>
-            </div>
-          </div>
+        
 
           <div className="table-wrap">
             <table className="data-table">
