@@ -635,6 +635,13 @@ export default function CreateOrderPage() {
           <div className="modal-actions">
             <button className="btn btn-secondary" disabled={savingDraft} onClick={() => blocker.reset()}>Stay on this page</button>
             <button
+              className="btn btn-danger"
+              disabled={savingDraft}
+              onClick={() => blocker.proceed()}
+            >
+              Leave Anyway
+            </button>
+            <button
               className="btn"
               disabled={savingDraft}
               onClick={async () => {
