@@ -5,6 +5,18 @@ const CSRF_HEADER = 'x-csrf-token';
 const SAFE_METHODS = new Set(['GET', 'HEAD', 'OPTIONS']);
 const TOKEN_TTL_MS = 24 * 60 * 60 * 1000; // generous — this just proves "issued by us," not identity
 
+// Exempted from CSRF entirely: the draft autosave-on-tab-close path uses
+// navigator.sendBeacon() (see frontend/src/utils/orderDrafts.js), which is
+// fire-and-forget and cannot attach custom headers — there is no way for it
+// to supply this token. Kept as narrow as possible (this one exact path,
+// nothing else) rather than exempting the whole order-drafts resource. The
+// worst case if this were abused cross-site is a forged/junk draft row
+// under whichever account's session cookie happened to be attached — not
+// financial impact, not access to anything else, and requireAuth still
+// applies on top of this. Every other draft route (including the normal,
+// non-beacon save) keeps full CSRF protection.
+const CSRF_EXEMPT_PATHS = new Set(['/api/order-drafts/beacon']);
+
 // Why not a cookie-based double-submit token (the original design)?
 // This app's frontend (Vercel) and backend (Render) are on different
 // domains. A cookie set by Render in response to a cross-site request from
@@ -39,6 +51,7 @@ function issueCsrfToken() {
 
 function verifyCsrf(req, res, next) {
   if (SAFE_METHODS.has(req.method)) return next();
+  if (CSRF_EXEMPT_PATHS.has(req.path)) return next();
 
   const token = req.headers[CSRF_HEADER];
   if (!token || typeof token !== 'string') {

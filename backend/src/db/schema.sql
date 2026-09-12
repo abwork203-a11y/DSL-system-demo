@@ -175,6 +175,37 @@ CREATE TABLE IF NOT EXISTS backups (
 CREATE INDEX IF NOT EXISTS idx_backups_created_at ON backups(created_at);
 
 -- ─────────────────────────────────────────────────────────────
+-- Order Drafts
+-- Server-persisted in-progress orders — replaces the earlier localStorage-
+-- only version so a draft follows the user across devices/browsers instead
+-- of being tied to one machine.
+--
+-- id is CLIENT-generated (a UUID, assigned the moment there's something
+-- worth saving — see frontend/src/utils/orderDrafts.js), not server-
+-- assigned. This is deliberate: the tab-close autosave path uses
+-- navigator.sendBeacon(), which is fire-and-forget with no response the
+-- client can read — it has to already know the id it's saving under
+-- *before* sending, so a server-assigned id would be unreachable from that
+-- code path. Ownership is still enforced in every query via user_id, so a
+-- guessed/colliding id can't let one user touch another's draft.
+--
+-- `data` holds everything the wizard needs to resume (step, items,
+-- discount, freight, payment fields, notes, etc.) as one flexible JSONB
+-- blob rather than a column per field — this mirrors the same "receipt/blob,
+-- not a rigid schema" choice made for `backups`, and means adding a new
+-- field to the order wizard later doesn't require a migration here.
+-- ─────────────────────────────────────────────────────────────
+CREATE TABLE IF NOT EXISTS order_drafts (
+  id              TEXT PRIMARY KEY,
+  user_id         INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  distributor_id  INTEGER REFERENCES distributors(id) ON DELETE SET NULL,
+  data            JSONB NOT NULL,
+  created_at      TIMESTAMPTZ NOT NULL DEFAULT now(),
+  updated_at      TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+CREATE INDEX IF NOT EXISTS idx_order_drafts_user ON order_drafts(user_id);
+
+-- ─────────────────────────────────────────────────────────────
 -- updated_at auto-touch trigger (generic, applied per table)
 -- ─────────────────────────────────────────────────────────────
 CREATE OR REPLACE FUNCTION set_updated_at()
@@ -189,7 +220,7 @@ DO $$
 DECLARE
   t TEXT;
 BEGIN
-  FOREACH t IN ARRAY ARRAY['users','manufacturers','products','distributors','orders']
+  FOREACH t IN ARRAY ARRAY['users','manufacturers','products','distributors','orders','order_drafts']
   LOOP
     EXECUTE format(
       'DROP TRIGGER IF EXISTS trg_%I_updated_at ON %I;

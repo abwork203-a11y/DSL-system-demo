@@ -21,6 +21,7 @@ const reportRoutes = require('./routes/reportRoutes');
 const exportRoutes = require('./routes/exportRoutes');
 const auditRoutes = require('./routes/auditRoutes');
 const backupRoutes = require('./routes/backupRoutes');
+const orderDraftRoutes = require('./routes/orderDraftRoutes');
 
 function resolveCorsOrigin() {
   const configured = process.env.CLIENT_ORIGIN;
@@ -87,6 +88,7 @@ function createApp() {
   app.use('/api/export', exportRoutes);
   app.use('/api/audit', auditRoutes);
   app.use('/api/backups', backupRoutes);
+  app.use('/api/order-drafts', orderDraftRoutes);
 
   app.use(notFound);
   app.use(errorHandler);
