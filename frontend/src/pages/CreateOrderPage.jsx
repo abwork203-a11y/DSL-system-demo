@@ -579,14 +579,29 @@ export default function CreateOrderPage() {
 
       <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: 20 }}>
         <button className="btn btn-secondary" disabled={step === 0} onClick={() => setStep(step - 1)}>Back</button>
-        {step < STEPS.length - 1 ? (
-          <button className="btn" disabled={!canProceed()} onClick={() => setStep(step + 1)}>Continue</button>
-        ) : (
-          <button className="btn" disabled={submitting} onClick={handleSubmit}>
-            {submitting && <Loader2 size={16} className="spin" />}
-            {submitting ? 'Creating order…' : 'Create Order & Generate Invoice'}
-          </button>
-        )}
+        <div style={{ display: 'flex', gap: 10 }}>
+          {hasUnsavedProgress() && (
+            <button
+              className="btn btn-secondary"
+              onClick={() => {
+                saveDraftNow();
+                submittedRef.current = true; // already saved deliberately — don't also block this navigation
+                toast.success('Draft saved.');
+                navigate('/orders', { state: { tab: 'drafts' } });
+              }}
+            >
+              Save as Draft
+            </button>
+          )}
+          {step < STEPS.length - 1 ? (
+            <button className="btn" disabled={!canProceed()} onClick={() => setStep(step + 1)}>Continue</button>
+          ) : (
+            <button className="btn" disabled={submitting} onClick={handleSubmit}>
+              {submitting && <Loader2 size={16} className="spin" />}
+              {submitting ? 'Creating order…' : 'Create Order & Generate Invoice'}
+            </button>
+          )}
+        </div>
       </div>
 
       {blocker.state === 'blocked' && (

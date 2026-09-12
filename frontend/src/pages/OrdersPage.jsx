@@ -1,5 +1,5 @@
 import { useEffect, useState, useCallback } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
+import { Link, useNavigate, useLocation } from 'react-router-dom';
 import { Trash2 } from 'lucide-react';
 import { orders as ordersApi, distributors as distributorsApi } from '../api/endpoints';
 import { apiErrorMessage } from '../api/client';
@@ -18,8 +18,9 @@ function money(n) {
 
 export default function OrdersPage() {
   const navigate = useNavigate();
+  const location = useLocation();
   const toast = useToast();
-  const [activeTab, setActiveTab] = useState('orders');
+  const [activeTab, setActiveTab] = useState(() => (location.state?.tab === 'drafts' ? 'drafts' : 'orders'));
 
   const [rows, setRows] = useState([]);
   const [pagination, setPagination] = useState(null);
