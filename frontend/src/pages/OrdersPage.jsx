@@ -32,12 +32,26 @@ export default function OrdersPage() {
   const [distributorId, setDistributorId] = useState('');
   const [loading, setLoading] = useState(true);
 
-  // Drafts are local-only (see utils/orderDrafts.js) — loaded lazily so the
-  // tab's count badge is correct from first paint, refreshed whenever the
-  // tab becomes active in case a resume/discard happened elsewhere.
-  const [drafts, setDrafts] = useState(() => listDrafts());
+  // Server-persisted now (see utils/orderDrafts.js) rather than localStorage,
+  // so this starts empty and fills in once the fetch resolves — the tab's
+  // count badge pops in a beat after first paint instead of being available
+  // instantly, which is the trade-off for drafts now following the user
+  // across devices instead of being stuck in one browser.
+  const [drafts, setDrafts] = useState([]);
+  const [draftsLoading, setDraftsLoading] = useState(true);
   const [draftSearch, setDraftSearch] = useState('');
   const [draftDistributorId, setDraftDistributorId] = useState('');
+
+  const loadDrafts = useCallback(async () => {
+    try {
+      setDrafts(await listDrafts());
+    } catch (err) {
+      toast.error(apiErrorMessage(err));
+    } finally {
+      setDraftsLoading(false);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   const load = useCallback(async () => {
     try {
@@ -63,9 +77,10 @@ export default function OrdersPage() {
   useEffect(() => { distributorsApi.list().then((res) => setDistributorsList(res.data)).catch(() => {}); }, []);
   useLiveOrderEvents(() => load());
 
+  useEffect(() => { loadDrafts(); }, [loadDrafts]);
   useEffect(() => {
-    if (activeTab === 'drafts') setDrafts(listDrafts());
-  }, [activeTab]);
+    if (activeTab === 'drafts') loadDrafts();
+  }, [activeTab, loadDrafts]);
 
   // Any filter change should reset back to page 1 — staying on page 4 of a
   // now-different, shorter result set would just show an empty page.
@@ -83,12 +98,16 @@ export default function OrdersPage() {
     navigate('/orders/new', { state: { resumeDraftId: draft.id } });
   };
 
-  const handleDiscard = (draft) => {
+  const handleDiscard = async (draft) => {
     const label = draft.distributorName ? ` for "${draft.distributorName}"` : '';
     if (!window.confirm(`Discard this draft${label}? This cannot be undone.`)) return;
-    deleteDraft(draft.id);
-    setDrafts(listDrafts());
-    toast.success('Draft discarded.');
+    try {
+      await deleteDraft(draft.id);
+      await loadDrafts();
+      toast.success('Draft discarded.');
+    } catch (err) {
+      toast.error(apiErrorMessage(err));
+    }
   };
 
   return (
@@ -214,7 +233,10 @@ export default function OrdersPage() {
       ) : (
 
         <div className="card">
-          <div className="table-wrap">
+          {draftsLoading ? (
+            <TableSkeleton columns={5} rows={4} />
+          ) : (
+            <div className="table-wrap">
             <table className="data-table">
               <thead>
                 <tr>
@@ -246,8 +268,9 @@ export default function OrdersPage() {
               </tbody>
             </table>
           </div>
+          )}
 
-          {drafts.length > 0 && (
+          {!draftsLoading && drafts.length > 0 && (
             <div className="table-footer">
               Showing {filteredDrafts.length} of {drafts.length} draft{drafts.length === 1 ? '' : 's'}
             </div>

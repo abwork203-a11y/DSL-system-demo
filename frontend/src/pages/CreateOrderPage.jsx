@@ -5,7 +5,7 @@ import { distributors as distributorsApi, products as productsApi, orders as ord
 import { apiErrorMessage } from '../api/client';
 import { useToast } from '../context/ToastContext';
 import Modal from '../components/Modal';
-import { newDraftId, getDraft, saveDraft, deleteDraft, ORDER_STEPS as STEPS } from '../utils/orderDrafts';
+import { newDraftId, getDraft, saveDraft, saveDraftBeacon, deleteDraft, ORDER_STEPS as STEPS } from '../utils/orderDrafts';
 
 function money(n) {
   return Number(n || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
@@ -19,6 +19,7 @@ export default function CreateOrderPage() {
   const [distributorsList, setDistributorsList] = useState([]);
   const [productsList, setProductsList] = useState([]);
   const [submitting, setSubmitting] = useState(false);
+  const [savingDraft, setSavingDraft] = useState(false);
   const [submitted, setSubmitted] = useState(false);
 
   // Mirrors `submitting`/`submitted` but updates synchronously (refs aren't
@@ -75,13 +76,13 @@ export default function CreateOrderPage() {
     notes,
   });
 
-  // No server-side draft concept exists yet (see utils/orderDrafts.js), so
-  // this writes to localStorage only — a per-browser convenience, not a
-  // synced record.
-  const saveDraftNow = () => {
+  // Persisted server-side now (see utils/orderDrafts.js / backend's
+  // order_drafts table) instead of localStorage — every save after the
+  // first updates the same row rather than creating a new one.
+  const saveDraftNow = async () => {
     if (!hasUnsavedProgress()) return;
     if (!draftIdRef.current) draftIdRef.current = newDraftId();
-    saveDraft({ id: draftIdRef.current, ...buildDraftData() });
+    await saveDraft({ id: draftIdRef.current, ...buildDraftData() });
   };
 
   // Guards in-app navigation (clicking the sidebar, going back, etc.)
@@ -91,14 +92,16 @@ export default function CreateOrderPage() {
   );
 
   // Guards actual tab close / browser refresh — a separate mechanism from
-  // React Router, since the browser itself controls that moment. Saves a
-  // draft synchronously before the browser's own (unskippable, non-
-  // customizable) confirmation shows, so the work isn't lost even if the
-  // user goes ahead and closes the tab.
+  // React Router, since the browser itself controls that moment. A normal
+  // async save can't be trusted to finish before the tab actually closes,
+  // so this uses navigator.sendBeacon() instead (see saveDraftBeacon in
+  // utils/orderDrafts.js) — the one save path guaranteed to be attempted
+  // even as the page is being torn down.
   useEffect(() => {
     const handleBeforeUnload = (e) => {
       if (!hasUnsavedProgress()) return;
-      saveDraftNow();
+      if (!draftIdRef.current) draftIdRef.current = newDraftId();
+      saveDraftBeacon({ id: draftIdRef.current, ...buildDraftData() });
       e.preventDefault();
       e.returnValue = '';
     };
@@ -115,20 +118,32 @@ export default function CreateOrderPage() {
     const resumeId = location.state?.resumeDraftId;
     if (!resumeId) return;
 
-    const draft = getDraft(resumeId);
-    if (!draft) return;
+    let cancelled = false;
 
-    draftIdRef.current = draft.id;
-    setStep(draft.step ?? 0);
-    setDistributorId(draft.distributorId ?? '');
-    setDistributorSearch(draft.distributorSearch ?? draft.distributorName ?? '');
-    setItems(Array.isArray(draft.items) ? draft.items : []);
-    setDiscount(draft.discount ?? '0');
-    setDiscountType(draft.discountType ?? 'fixed');
-    setFreightCost(draft.freightCost ?? '0');
-    setPaymentTerm(draft.paymentTerm ?? 'cash');
-    setAmountPaid(draft.amountPaid ?? '0');
-    setNotes(draft.notes ?? '');
+    (async () => {
+      let draft;
+      try {
+        draft = await getDraft(resumeId);
+      } catch (err) {
+        if (!cancelled) toast.error(apiErrorMessage(err));
+        return;
+      }
+      if (cancelled || !draft) return;
+
+      draftIdRef.current = draft.id;
+      setStep(draft.step ?? 0);
+      setDistributorId(draft.distributorId ?? '');
+      setDistributorSearch(draft.distributorSearch ?? draft.distributorName ?? '');
+      setItems(Array.isArray(draft.items) ? draft.items : []);
+      setDiscount(draft.discount ?? '0');
+      setDiscountType(draft.discountType ?? 'fixed');
+      setFreightCost(draft.freightCost ?? '0');
+      setPaymentTerm(draft.paymentTerm ?? 'cash');
+      setAmountPaid(draft.amountPaid ?? '0');
+      setNotes(draft.notes ?? '');
+    })();
+
+    return () => { cancelled = true; };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
@@ -231,7 +246,7 @@ export default function CreateOrderPage() {
       // state variable.
       submittedRef.current = true;
       setSubmitted(true);
-      if (draftIdRef.current) deleteDraft(draftIdRef.current);
+      if (draftIdRef.current) deleteDraft(draftIdRef.current).catch(() => {});
       toast.success(`Order ${res.data.order_number} created.`);
       navigate(`/orders/${res.data.id}`);
     } catch (err) {
@@ -583,14 +598,22 @@ export default function CreateOrderPage() {
           {hasUnsavedProgress() && (
             <button
               className="btn btn-secondary"
-              onClick={() => {
-                saveDraftNow();
-                submittedRef.current = true; // already saved deliberately — don't also block this navigation
-                toast.success('Draft saved.');
-                navigate('/orders', { state: { tab: 'drafts' } });
+              disabled={savingDraft}
+              onClick={async () => {
+                setSavingDraft(true);
+                try {
+                  await saveDraftNow();
+                  submittedRef.current = true; // already saved deliberately — don't also block this navigation
+                  toast.success('Draft saved.');
+                  navigate('/orders', { state: { tab: 'drafts' } });
+                } catch (err) {
+                  toast.error(apiErrorMessage(err));
+                  setSavingDraft(false); // stay put — nothing was actually saved, don't pretend otherwise
+                }
               }}
             >
-              Save as Draft
+              {savingDraft && <Loader2 size={16} className="spin" />}
+              {savingDraft ? 'Saving…' : 'Save as Draft'}
             </button>
           )}
           {step < STEPS.length - 1 ? (
@@ -611,8 +634,25 @@ export default function CreateOrderPage() {
             up anytime from the Drafts tab on the Orders page.
           </p>
           <div className="modal-actions">
-            <button className="btn btn-secondary" onClick={() => blocker.reset()}>Stay on this page</button>
-            <button className="btn" onClick={() => { saveDraftNow(); blocker.proceed(); }}>Save &amp; Leave</button>
+            <button className="btn btn-secondary" disabled={savingDraft} onClick={() => blocker.reset()}>Stay on this page</button>
+            <button
+              className="btn"
+              disabled={savingDraft}
+              onClick={async () => {
+                setSavingDraft(true);
+                try {
+                  await saveDraftNow();
+                  blocker.proceed();
+                } catch (err) {
+                  toast.error(apiErrorMessage(err));
+                } finally {
+                  setSavingDraft(false);
+                }
+              }}
+            >
+              {savingDraft && <Loader2 size={16} className="spin" />}
+              {savingDraft ? 'Saving…' : 'Save & Leave'}
+            </button>
           </div>
         </Modal>
       )}

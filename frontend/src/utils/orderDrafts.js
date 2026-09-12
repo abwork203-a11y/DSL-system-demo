@@ -1,76 +1,67 @@
-// Local, per-browser storage for in-progress orders. There is currently no
-// server-side draft concept — the orders API doesn't accept incomplete
-// orders and has no `draft` status — so this is a client-side convenience,
-// not a synced record. It won't follow the user to another browser or
-// device, and clearing site data clears it too.
+// Server-persisted in-progress orders — replaces the earlier localStorage-
+// only version (see backend/src/db/schema.sql's order_drafts table for the
+// full reasoning) so a draft follows the user across devices/browsers
+// instead of being stuck in one machine's browser storage.
 
-const STORAGE_KEY = 'ledgerone.orderDrafts';
+import client, { API_BASE_URL } from '../api/client';
 
 export const ORDER_STEPS = ['Distributor', 'Items', 'Discount & Freight', 'Payment', 'Review'];
 
-function readAll() {
-  try {
-    const raw = localStorage.getItem(STORAGE_KEY);
-    const parsed = raw ? JSON.parse(raw) : [];
-    return Array.isArray(parsed) ? parsed : [];
-  } catch {
-    // Corrupted JSON, storage disabled (private browsing in some browsers),
-    // or blocked by permissions — treat it the same as "no drafts" rather
-    // than breaking the page over a convenience feature.
-    return [];
-  }
-}
-
-function writeAll(drafts) {
-  try {
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(drafts));
-    return true;
-  } catch {
-    // Quota exceeded or storage unavailable — fail silently for the same
-    // reason as above.
-    return false;
-  }
-}
-
+// Client-generated on purpose — see the schema comment on order_drafts.id.
+// A UUID (not the old timestamp+random string) since this id is now a
+// shared database primary key across every user, not a per-browser
+// localStorage key where collision risk was a non-issue.
 export function newDraftId() {
-  return `draft_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
+  return crypto.randomUUID();
 }
 
-// Most recently edited first — matches how a "recent work" list is expected
-// to read.
-export function listDrafts() {
-  return readAll().sort((a, b) => new Date(b.updatedAt) - new Date(a.updatedAt));
+// Most recently edited first — matches how a "recent work" list is
+// expected to read. (Server already returns them in this order; sorting
+// again here is just cheap insurance against relying on that silently.)
+export async function listDrafts() {
+  const res = await client.get('/order-drafts');
+  return res.data.sort((a, b) => new Date(b.updatedAt) - new Date(a.updatedAt));
 }
 
-export function getDraft(id) {
-  return readAll().find((d) => d.id === id) || null;
+export async function getDraft(id) {
+  // No single-draft GET endpoint exists — the list is expected to stay
+  // small (a handful of in-progress orders per user at most), so fetching
+  // it and finding the one we want client-side avoids an extra route for
+  // a case that isn't performance-sensitive.
+  const drafts = await listDrafts();
+  return drafts.find((d) => d.id === id) || null;
 }
 
-// Upsert: creates the record on first save, updates it in place on every
-// save after that (matched by id). `updatedAt` is always stamped fresh;
-// `createdAt` is preserved from the existing record if there is one.
-export function saveDraft(data) {
-  const drafts = readAll();
-  const now = new Date().toISOString();
-  const idx = drafts.findIndex((d) => d.id === data.id);
-  const record = {
-    ...data,
-    updatedAt: now,
-    createdAt: idx >= 0 ? drafts[idx].createdAt : now,
-  };
+// Normal save path — used for the explicit "Save as Draft" button and the
+// leave-blocker's "Save & Leave" action. Goes through the regular
+// CSRF-protected axios client like every other mutating request in the app.
+export async function saveDraft(data) {
+  const res = await client.post('/order-drafts', data);
+  return res.data;
+}
 
-  if (idx >= 0) {
-    drafts[idx] = record;
-  } else {
-    drafts.push(record);
+// Tab-close save path — a normal async saveDraft() can't be trusted to
+// finish before the browser actually closes the tab. navigator.sendBeacon()
+// is built specifically for this moment: the browser guarantees it will
+// attempt the request even as the page is being torn down, at the cost of
+// being fire-and-forget (no response, no custom headers). That second cost
+// is why this hits a dedicated, deliberately CSRF-exempt endpoint — see
+// backend/src/middleware/csrf.js for the reasoning and the narrow blast
+// radius that trade-off carries.
+export function saveDraftBeacon(data) {
+  if (!navigator.sendBeacon) return; // ancient-browser fallback: simply can't guarantee this save, nothing else to do about it here
+  try {
+    const blob = new Blob([JSON.stringify(data)], { type: 'application/json' });
+    navigator.sendBeacon(`${API_BASE_URL}/api/order-drafts/beacon`, blob);
+  } catch {
+    // Same reasoning as above — this is a best-effort safety net, not a
+    // guaranteed save, and there's nothing left to fall back to at this
+    // point in the page lifecycle.
   }
-
-  writeAll(drafts);
-  return record;
 }
 
-export function deleteDraft(id) {
-  writeAll(readAll().filter((d) => d.id !== id));
+export async function deleteDraft(id) {
+  await client.delete(`/order-drafts/${id}`);
 }
 
 // Small, dependency-free relative-time label for the Drafts list — full
