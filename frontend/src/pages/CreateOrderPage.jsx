@@ -627,10 +627,10 @@ export default function CreateOrderPage() {
       </div>
 
       {blocker.state === 'blocked' && (
-        <Modal title="Save this order as a draft?" onClose={() => blocker.reset()} width={440}>
+        <Modal title="Leave Order" onClose={() => blocker.reset()} width={440}>
           <p style={{ color: 'var(--ink-muted)', marginBottom: 20 }}>
-            This order hasn't been created yet. We'll save your progress as a draft you can pick back
-            up anytime from the Drafts tab on the Orders page.
+            You have an unfinished order.
+            Save it as a draft before leaving?  
           </p>
           <div className="modal-actions">
             <button className="btn btn-secondary" disabled={savingDraft} onClick={() => blocker.reset()}>Stay on this page</button>
