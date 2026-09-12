@@ -4,6 +4,7 @@ import { usersApi, distributors as distributorsApi } from '../api/endpoints';
 import { apiErrorMessage, apiErrorFields } from '../api/client';
 import { useAuth } from '../context/AuthContext';
 import { useToast } from '../context/ToastContext';
+import { useConfirm } from '../context/ConfirmContext';
 import Modal from '../components/Modal';
 import PasswordInput from '../components/PasswordInput';
 import PasswordStrengthMeter from '../components/PasswordStrengthMeter';
@@ -14,6 +15,7 @@ const EMPTY_FORM = { name: '', email: '', password: '', role: 'sales_rep', assig
 export default function UsersPage() {
   const { user: currentUser } = useAuth();
   const toast = useToast();
+  const confirm = useConfirm();
   const [rows, setRows] = useState([]);
   const [zones, setZones] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -103,7 +105,12 @@ export default function UsersPage() {
   };
 
   const handleDelete = async (u) => {
-    if (!window.confirm(`Delete user "${u.name}"? This cannot be undone.`)) return;
+    if (!await confirm({
+      title: 'Delete User?',
+      message: `Delete user "${u.name}"? This cannot be undone.`,
+      confirmLabel: 'Delete',
+      danger: true,
+    })) return;
     try {
       await usersApi.remove(u.id);
       toast.success('Account deleted.');

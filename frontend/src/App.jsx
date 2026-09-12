@@ -2,6 +2,7 @@ import { createBrowserRouter, RouterProvider, Outlet } from 'react-router-dom';
 import { AuthProvider } from './context/AuthContext';
 import { SocketProvider } from './context/SocketContext';
 import { ToastProvider } from './context/ToastContext';
+import { ConfirmProvider } from './context/ConfirmContext';
 import ProtectedRoute from './components/ProtectedRoute';
 import Layout from './components/Layout';
 
@@ -32,9 +33,11 @@ function Root() {
   return (
     <AuthProvider>
       <ToastProvider>
-        <SocketProvider>
-          <Outlet />
-        </SocketProvider>
+        <ConfirmProvider>
+          <SocketProvider>
+            <Outlet />
+          </SocketProvider>
+        </ConfirmProvider>
       </ToastProvider>
     </AuthProvider>
   );

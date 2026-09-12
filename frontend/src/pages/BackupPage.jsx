@@ -6,6 +6,7 @@ import {
   requestGoogleAccessToken, findOrCreateFolder, uploadFileToFolder, driveFolderUrl,
 } from '../utils/googleDrive';
 import { monthToDateRange } from '../utils/dateRange';
+import { SavingModal } from '../components/StatusModals';
 import { GOOGLE_CLIENT_ID } from '../config';
 
 const PARENT_FOLDER_NAME = 'DSL System Backups';
@@ -208,15 +209,11 @@ export default function BackupPage() {
         </button>
 
         {progress && (
-          <div style={{ marginTop: 18 }}>
-            <div style={{ fontSize: 13, color: 'var(--ink-muted)', marginBottom: 6 }}>{progress.label}</div>
-            <div style={{ background: 'var(--surface-sunken)', borderRadius: 100, height: 8, overflow: 'hidden' }}>
-              <div style={{
-                width: `${progress.total ? (progress.current / progress.total) * 100 : 0}%`,
-                background: 'var(--accent)', height: '100%', transition: 'width 0.2s',
-              }} />
-            </div>
-          </div>
+          <SavingModal
+            title="Backing Up…"
+            message={progress.label}
+            progress={progress.total ? (progress.current / progress.total) * 100 : 0}
+          />
         )}
 
         {lastResult && (

@@ -4,6 +4,7 @@ import { Trash2 } from 'lucide-react';
 import { orders as ordersApi, distributors as distributorsApi } from '../api/endpoints';
 import { apiErrorMessage } from '../api/client';
 import { useToast } from '../context/ToastContext';
+import { useConfirm } from '../context/ConfirmContext';
 import { useLiveOrderEvents } from '../context/SocketContext';
 import StatusBadge from '../components/StatusBadge';
 import Pagination from '../components/Pagination';
@@ -20,6 +21,7 @@ export default function OrdersPage() {
   const navigate = useNavigate();
   const location = useLocation();
   const toast = useToast();
+  const confirm = useConfirm();
   const [activeTab, setActiveTab] = useState(() => (location.state?.tab === 'drafts' ? 'drafts' : 'orders'));
 
   const [rows, setRows] = useState([]);
@@ -100,14 +102,22 @@ export default function OrdersPage() {
 
   const handleDiscard = async (draft) => {
     const label = draft.distributorName ? ` for "${draft.distributorName}"` : '';
-    if (!window.confirm(`Discard this draft${label}? This cannot be undone.`)) return;
-    try {
-      await deleteDraft(draft.id);
-      await loadDrafts();
-      toast.success('Draft discarded.');
-    } catch (err) {
-      toast.error(apiErrorMessage(err));
-    }
+    await confirm({
+      title: 'Discard Draft?',
+      message: `Discard this draft${label}? This cannot be undone.`,
+      confirmLabel: 'Discard',
+      danger: true,
+      onConfirm: async () => {
+        try {
+          await deleteDraft(draft.id);
+          await loadDrafts();
+          toast.success('Draft discarded.');
+        } catch (err) {
+          toast.error(apiErrorMessage(err));
+          throw err; // re-throw so ConfirmContext knows not to treat this as settled cleanly
+        }
+      },
+    });
   };
 
   return (

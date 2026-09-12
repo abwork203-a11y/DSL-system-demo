@@ -3,6 +3,7 @@ import { Plus, Pencil, Trash2 } from 'lucide-react';
 import { manufacturers as mfgApi } from '../api/endpoints';
 import { apiErrorMessage } from '../api/client';
 import { useToast } from '../context/ToastContext';
+import { useConfirm } from '../context/ConfirmContext';
 import Modal from '../components/Modal';
 import { TableSkeleton } from '../components/Skeleton';
 
@@ -14,6 +15,7 @@ function money(n) {
 
 export default function ManufacturersPage() {
   const toast = useToast();
+  const confirm = useConfirm();
   const [rows, setRows] = useState([]);
   const [search, setSearch] = useState('');
   const [loading, setLoading] = useState(true);
@@ -59,7 +61,12 @@ export default function ManufacturersPage() {
   };
 
   const handleDelete = async (m) => {
-    if (!window.confirm(`Delete manufacturer "${m.name}"? This cannot be undone.`)) return;
+    if (!await confirm({
+      title: 'Delete Manufacturer?',
+      message: `Delete manufacturer "${m.name}"? This cannot be undone.`,
+      confirmLabel: 'Delete',
+      danger: true,
+    })) return;
     try {
       await mfgApi.remove(m.id);
       toast.success('Manufacturer deleted.');

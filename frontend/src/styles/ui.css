@@ -1122,7 +1122,7 @@ table.data-table {
 }
 
 .btn-danger:hover {
-  filter: brightness(1.12);
+  background: var(--status-negative-hover);
 }
 
 .btn-sm {
@@ -1628,6 +1628,175 @@ select.form-control {
   display: flex;
   gap: 10px;
   justify-content: flex-end;
+}
+
+
+/* ==============================================================
+   STATUS MODALS
+   Confirm / Success / Error / Info / Loading / Saving — share the same
+   overlay as .modal-overlay above but lead with a colored icon circle
+   instead of a header bar. Colors come from the fixed --status-* tokens
+   (never the theme-adaptive ones) so "success" and "danger" carry the
+   same meaning no matter which visual theme is active.
+   ============================================================== */
+
+.status-modal {
+  position: relative;
+
+  width: 100%;
+  max-width: 400px;
+
+  padding: 32px 28px 24px;
+
+  background: var(--surface);
+
+  border-radius: 10px;
+
+  box-shadow: var(--shadow-md);
+
+  text-align: center;
+}
+
+.status-modal-close {
+  position: absolute;
+  top: 12px;
+  right: 12px;
+
+  display: flex;
+  align-items: center;
+  justify-content: center;
+
+  width: 28px;
+  height: 28px;
+
+  border: none;
+  border-radius: var(--radius-sm);
+
+  background: none;
+  color: var(--ink-muted);
+
+  cursor: pointer;
+}
+
+.status-modal-close:hover {
+  background: var(--surface-sunken);
+}
+
+.status-modal-icon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+
+  width: 56px;
+  height: 56px;
+  margin: 0 auto 16px;
+
+  border-radius: 100%;
+}
+
+.status-modal-icon-positive {
+  background: var(--status-positive-bg);
+  color: var(--status-positive);
+}
+
+.status-modal-icon-negative {
+  background: var(--status-negative-bg);
+  color: var(--status-negative);
+}
+
+.status-modal-icon-neutral {
+  background: var(--status-neutral-bg);
+  color: var(--sidebar-bg);
+}
+
+.status-modal-title {
+  margin: 0 0 8px;
+
+  font-size: 18px;
+}
+
+.status-modal-message {
+  margin: 0 0 20px;
+
+  color: var(--ink-muted);
+  font-size: 13.5px;
+  line-height: 1.6;
+}
+
+.status-modal-detail {
+  margin: -8px 0 20px;
+  padding: 10px 12px;
+
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--status-negative-bg);
+
+  background: var(--status-negative-bg);
+  color: var(--status-negative);
+
+  font-size: 12.5px;
+  text-align: left;
+}
+
+.status-modal .modal-actions {
+  justify-content: center;
+}
+
+.status-modal-steps {
+  margin: 0 0 4px;
+  padding: 0;
+
+  list-style: none;
+
+  text-align: left;
+}
+
+.status-modal-step {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+
+  padding: 7px 0;
+
+  font-size: 13px;
+  color: var(--ink-muted);
+}
+
+.status-modal-step-done {
+  color: var(--status-positive);
+}
+
+.status-modal-step-active {
+  color: var(--ink);
+  font-weight: 600;
+}
+
+.status-modal-step-dot {
+  width: 6px;
+  height: 6px;
+  margin: 0 4px;
+
+  border-radius: 100%;
+
+  background: var(--rule-strong);
+}
+
+.status-modal-progress {
+  height: 6px;
+  margin-bottom: 4px;
+
+  border-radius: 100px;
+
+  background: var(--surface-sunken);
+
+  overflow: hidden;
+}
+
+.status-modal-progress-fill {
+  height: 100%;
+
+  background: var(--status-positive);
+
+  transition: width 0.2s ease;
 }
 
 

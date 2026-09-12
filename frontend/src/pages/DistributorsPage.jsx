@@ -5,6 +5,7 @@ import { distributors as distributorsApi } from '../api/endpoints';
 import { apiErrorMessage } from '../api/client';
 import { useAuth } from '../context/AuthContext';
 import { useToast } from '../context/ToastContext';
+import { useConfirm } from '../context/ConfirmContext';
 import StatusBadge from '../components/StatusBadge';
 import Modal from '../components/Modal';
 import { TableSkeleton } from '../components/Skeleton';
@@ -18,6 +19,7 @@ function money(n) {
 export default function DistributorsPage() {
   const { isAdmin } = useAuth();
   const toast = useToast();
+  const confirm = useConfirm();
   const [rows, setRows] = useState([]);
   const [search, setSearch] = useState('');
   const [status, setStatus] = useState('');
@@ -80,7 +82,12 @@ export default function DistributorsPage() {
   };
 
   const handleDelete = async (d) => {
-    if (!window.confirm(`Delete distributor "${d.name}"? This cannot be undone.`)) return;
+    if (!await confirm({
+      title: 'Delete Distributor?',
+      message: `Are you sure you want to delete "${d.name}"? This action cannot be undone and will remove all related data.`,
+      confirmLabel: 'Delete',
+      danger: true,
+    })) return;
     try {
       await distributorsApi.remove(d.id);
       toast.success('Distributor deleted.');

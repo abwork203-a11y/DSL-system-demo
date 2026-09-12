@@ -5,6 +5,7 @@ import { distributors as distributorsApi, products as productsApi, orders as ord
 import { apiErrorMessage } from '../api/client';
 import { useToast } from '../context/ToastContext';
 import Modal from '../components/Modal';
+import { LoadingModal, SavingModal } from '../components/StatusModals';
 import { newDraftId, getDraft, saveDraft, saveDraftBeacon, deleteDraft, ORDER_STEPS as STEPS } from '../utils/orderDrafts';
 
 function money(n) {
@@ -271,6 +272,7 @@ export default function CreateOrderPage() {
       <div className="stepper">
         {STEPS.map((label, i) => (
           <div key={label} className={`stepper-item${i === step ? ' active' : i < step ? ' done' : ''}`}>
+            <span className="stepper-number">{i < step ? <Check size={12} strokeWidth={3} /> : i + 1}</span>
             <span className="stepper-label">{label}</span>
           </div>
         ))}
@@ -626,21 +628,14 @@ export default function CreateOrderPage() {
         </div>
       </div>
 
-      {blocker.state === 'blocked' && (
-        <Modal title="Leave Order" onClose={() => blocker.reset()} width={440}>
+      {blocker.state === 'blocked' && !savingDraft && (
+        <Modal title="Save this order as a draft?" onClose={() => blocker.reset()} width={440}>
           <p style={{ color: 'var(--ink-muted)', marginBottom: 20 }}>
-            You have an unfinished order.
-            Save it as a draft before leaving?  
+            This order hasn't been created yet. We'll save your progress as a draft you can pick back
+            up anytime from the Drafts tab on the Orders page.
           </p>
           <div className="modal-actions">
             <button className="btn btn-secondary" disabled={savingDraft} onClick={() => blocker.reset()}>Stay on this page</button>
-            <button
-              className="btn btn-danger"
-              disabled={savingDraft}
-              onClick={() => blocker.proceed()}
-            >
-              Leave Anyway
-            </button>
             <button
               className="btn"
               disabled={savingDraft}
@@ -662,6 +657,9 @@ export default function CreateOrderPage() {
           </div>
         </Modal>
       )}
+
+      {savingDraft && <SavingModal title="Saving Draft…" />}
+      {submitting && <LoadingModal title="Creating Order…" message="Please wait while we generate your invoice." />}
     </div>
   );
 }

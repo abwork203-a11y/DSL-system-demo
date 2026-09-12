@@ -3,6 +3,7 @@ import { Plus, Pencil, Trash2 } from 'lucide-react';
 import { products as productsApi, manufacturers as mfgApi } from '../api/endpoints';
 import { apiErrorMessage } from '../api/client';
 import { useToast } from '../context/ToastContext';
+import { useConfirm } from '../context/ConfirmContext';
 import Modal from '../components/Modal';
 import { TableSkeleton } from '../components/Skeleton';
 
@@ -14,6 +15,7 @@ function money(n) {
 
 export default function ProductsPage() {
   const toast = useToast();
+  const confirm = useConfirm();
   const [rows, setRows] = useState([]);
   const [mfgs, setMfgs] = useState([]);
   const [search, setSearch] = useState('');
@@ -63,7 +65,12 @@ export default function ProductsPage() {
   };
 
   const handleDelete = async (p) => {
-    if (!window.confirm(`Delete product "${p.name}"? This cannot be undone.`)) return;
+    if (!await confirm({
+      title: 'Delete Product?',
+      message: `Delete product "${p.name}"? This cannot be undone.`,
+      confirmLabel: 'Delete',
+      danger: true,
+    })) return;
     try {
       await productsApi.remove(p.id);
       toast.success('Product deleted.');
