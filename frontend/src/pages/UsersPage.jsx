@@ -141,12 +141,12 @@ export default function UsersPage() {
               </thead>
               <tbody>
                 {rows.map((u) => (
-                  <tr key={u.id}>
-                    <td><strong>{u.name}</strong></td>
-                    <td>{u.email}</td>
-                    <td style={{ textTransform: 'capitalize' }}>{u.role.replace('_', ' ')}</td>
-                    <td>{u.assigned_zone || '—'}</td>
-                    <td>{u.is_active ? <span className="badge badge-green">active</span> : <span className="badge badge-neutral">inactive</span>}</td>
+                  <tr key={u.id} data-status={u.is_active ? 'active' : 'inactive'}>
+                    <td data-label="Name"><strong>{u.name}</strong></td>
+                    <td data-label="Email">{u.email}</td>
+                    <td data-label="Role" style={{ textTransform: 'capitalize' }}>{u.role.replace('_', ' ')}</td>
+                    <td data-label="Zone">{u.assigned_zone || '—'}</td>
+                    <td data-label="Status">{u.is_active ? <span className="badge badge-green">active</span> : <span className="badge badge-neutral">inactive</span>}</td>
                     <td style={{ display: 'flex', gap: 6, justifyContent: 'flex-end' }}>
                       <button className="btn btn-secondary btn-sm" onClick={() => openEdit(u)}><Pencil size={14} /> Edit</button>
                       {u.id !== currentUser.id && (

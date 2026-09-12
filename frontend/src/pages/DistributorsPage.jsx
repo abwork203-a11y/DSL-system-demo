@@ -138,12 +138,12 @@ export default function DistributorsPage() {
               </thead>
               <tbody>
                 {rows.map((d) => (
-                  <tr key={d.id} onClick={() => openEdit(d)} style={{ cursor: 'pointer' }}>
-                    <td><strong>{d.name}</strong></td>
-                    <td>{[d.zone, d.city].filter(Boolean).join(' · ') || '—'}</td>
-                    <td>{d.contact_name || '—'}{d.contact_phone ? ` · ${d.contact_phone}` : ''}</td>
-                    <td className="num">{money(d.balance)}</td>
-                    <td><StatusBadge value={d.status} /></td>
+                  <tr key={d.id} data-status={d.status} onClick={() => openEdit(d)} style={{ cursor: 'pointer' }}>
+                    <td data-label="Name"><strong>{d.name}</strong></td>
+                    <td data-label="Zone / City">{[d.zone, d.city].filter(Boolean).join(' · ') || '—'}</td>
+                    <td data-label="Contact">{d.contact_name || '—'}{d.contact_phone ? ` · ${d.contact_phone}` : ''}</td>
+                    <td className="num" data-label="Balance">{money(d.balance)}</td>
+                    <td data-label="Status"><StatusBadge value={d.status} /></td>
                     <td className="table-actions" onClick={(e) => e.stopPropagation()}>
                       <Link to={`/ledger?distributor_id=${d.id}`} className="btn-ghost" title="View ledger" aria-label="View ledger"><Eye size={15} /></Link>
                       <button className="btn-ghost" onClick={() => openEdit(d)} title="Edit" aria-label="Edit"><Pencil size={15} /></button>

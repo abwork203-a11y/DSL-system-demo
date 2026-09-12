@@ -109,11 +109,11 @@ export default function ManufacturersPage() {
               </thead>
               <tbody>
                 {rows.map((m) => (
-                  <tr key={m.id}>
-                    <td><strong>{m.name}</strong></td>
-                    <td>{m.contact_name || '—'}{m.contact_phone ? ` · ${m.contact_phone}` : ''}</td>
-                    <td className="num">{money(m.balance)}</td>
-                    <td>{m.is_active ? <span className="badge badge-green">active</span> : <span className="badge badge-neutral">inactive</span>}</td>
+                  <tr key={m.id} data-status={m.is_active ? 'active' : 'inactive'}>
+                    <td data-label="Name"><strong>{m.name}</strong></td>
+                    <td data-label="Contact">{m.contact_name || '—'}{m.contact_phone ? ` · ${m.contact_phone}` : ''}</td>
+                    <td className="num" data-label="Balance Owed">{money(m.balance)}</td>
+                    <td data-label="Status">{m.is_active ? <span className="badge badge-green">active</span> : <span className="badge badge-neutral">inactive</span>}</td>
                     <td className="table-actions">
                       <button className="btn-ghost" onClick={() => openEdit(m)} title="Edit" aria-label="Edit"><Pencil size={15} /></button>
                       <button className="btn-ghost" onClick={() => handleDelete(m)} title="Delete" aria-label="Delete"><Trash2 size={15} /></button>

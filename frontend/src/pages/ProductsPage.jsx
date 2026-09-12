@@ -128,13 +128,13 @@ export default function ProductsPage() {
               </thead>
               <tbody>
                 {rows.map((p) => (
-                  <tr key={p.id}>
-                    <td><strong>{p.name}</strong></td>
-                    <td>{p.manufacturer_name}</td>
-                    <td>{p.size_packaging || '—'}</td>
-                    <td className="num">{money(p.retail_price)}</td>
-                    <td className="num">{money(p.price)}</td>
-                    <td>{p.is_active ? <span className="badge badge-green">active</span> : <span className="badge badge-neutral">inactive</span>}</td>
+                  <tr key={p.id} data-status={p.is_active ? 'active' : 'inactive'}>
+                    <td data-label="Product"><strong>{p.name}</strong></td>
+                    <td data-label="Manufacturer">{p.manufacturer_name}</td>
+                    <td data-label="Size / Packaging">{p.size_packaging || '—'}</td>
+                    <td className="num" data-label="Retail Price">{money(p.retail_price)}</td>
+                    <td className="num" data-label="Invoice Price">{money(p.price)}</td>
+                    <td data-label="Status">{p.is_active ? <span className="badge badge-green">active</span> : <span className="badge badge-neutral">inactive</span>}</td>
                     <td className="table-actions">
                       <button className="btn-ghost" onClick={() => openEdit(p)} title="Edit" aria-label="Edit"><Pencil size={15} /></button>
                       <button className="btn-ghost" onClick={() => handleDelete(p)} title="Delete" aria-label="Delete"><Trash2 size={15} /></button>

@@ -859,45 +859,45 @@ export default function LedgerPage() {
                   <tr key={e.id}>
 
                     {!distributor && (
-                      <td>
+                      <td data-label="Distributor">
                         {e.distributor_name}
                       </td>
                     )}
 
-                    <td>
+                    <td data-label="Date">
                       {new Date(
                         e.entry_date
                       ).toLocaleDateString()}
                     </td>
 
-                    <td>
+                    <td data-label="Order">
                       {e.order_number || '—'}
                     </td>
 
-                    <td className="capitalize">
+                    <td className="capitalize" data-label="Payment Term">
                       {e.payment_term || '—'}
                     </td>
 
-                    <td>
+                    <td data-label="Type">
                       <StatusBadge
                         value={e.type}
                       />
                     </td>
 
-                    <td className="num">
+                    <td className="num" data-label="Amount">
                       {e.type === 'debit'
                         ? '+'
                         : '−'}
                       {money(e.amount)}
                     </td>
 
-                    <td className="num">
+                    <td className="num" data-label="Running Balance">
                       {money(
                         e.running_balance
                       )}
                     </td>
 
-                    <td className="ledger-note">
+                    <td className="ledger-note" data-label="Note">
                       {e.note || '—'}
                     </td>
 

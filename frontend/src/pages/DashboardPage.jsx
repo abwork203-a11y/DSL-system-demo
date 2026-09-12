@@ -4,6 +4,7 @@ import {
   ArrowRight,
   FileText,
   Plus,
+  CalendarDays,
 } from 'lucide-react';
 
 import { reports, orders as ordersApi } from '../api/endpoints';
@@ -245,8 +246,8 @@ export default function DashboardPage() {
           <TableSkeleton columns={5} rows={5} />
 
         ) : (
-
-          <div className="table-wrap">
+          <>
+          <div className="table-wrap dashboard-orders-table-wrap">
 
             <table className="data-table dashboard-orders-table">
 
@@ -324,6 +325,44 @@ export default function DashboardPage() {
             </table>
 
           </div>
+
+          {/* Mobile-only card list — same data as the table above, laid out
+              to match a compact, glanceable card instead of a cramped
+              horizontally-scrolled table row. */}
+          <div className="dashboard-orders-cards">
+            {recentOrders.length === 0 ? (
+              <div className="dashboard-empty">
+                <div className="dashboard-empty-icon">
+                  <FileText size={21} strokeWidth={1.7} />
+                </div>
+                <strong>No orders yet.</strong>
+                <span>Create your first order to get started.</span>
+              </div>
+            ) : (
+              recentOrders.map((order) => (
+                <div key={order.id} className="recent-order-card" data-status={order.order_status}>
+                  <div className="recent-order-card-top">
+                    <Link to={`/orders/${order.id}`} className="dashboard-order-number">
+                      {order.order_number}
+                    </Link>
+                    <StatusBadge value={order.order_status} />
+                  </div>
+                  <div className="recent-order-card-distributor">{order.distributor_name || '—'}</div>
+                  <div className="recent-order-card-row">
+                    <span className="recent-order-card-date">
+                      <CalendarDays size={13} />
+                      {formatDate(order.order_date)}
+                    </span>
+                    <span className="recent-order-card-amount">{money(order.total)}</span>
+                  </div>
+                  <Link to={`/orders/${order.id}`} className="recent-order-card-link">
+                    View details <ArrowRight size={13} />
+                  </Link>
+                </div>
+              ))
+            )}
+          </div>
+          </>
 
         )}
 

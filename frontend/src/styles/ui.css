@@ -1040,6 +1040,108 @@ table.data-table {
 
 
 /* ==============================================================
+   RESPONSIVE TABLES → CARDS (small screens)
+   Below the breakpoint, every .data-table (inside the standard
+   .table-wrap) turns into a stacked list of cards instead of a
+   horizontally-cramped table — one card per row, each cell showing its
+   column name (from a data-label="..." attribute on the <td>) next to its
+   value. This is intentionally a single shared pattern rather than a
+   bespoke layout per page: any table that adds `data-label` to its <td>s
+   gets this for free.
+
+   Optional: a <tr data-status="..."> gets a colored left accent border,
+   matching the same fixed --status-* tokens used everywhere else (see
+   .btn-danger, StatusBadge) — used for Orders/Distributors where a row has
+   a clear at-a-glance status; tables without that concept (Products,
+   Manufacturers, Ledger, Users) simply don't set it and get a plain card.
+   ============================================================== */
+
+@media (max-width: 640px) {
+
+  .data-table thead {
+    display: none;
+  }
+
+  .data-table, .data-table tbody, .data-table tr, .data-table td {
+    display: block;
+    width: 100%;
+  }
+
+  .data-table {
+    background: none;
+  }
+
+  .data-table tr {
+    margin-bottom: 12px;
+
+    padding: 12px 14px;
+
+    border: 1px solid var(--rule);
+    border-left: 3px solid var(--rule-strong);
+    border-radius: var(--radius-sm);
+
+    background: var(--surface);
+    box-shadow: var(--shadow-sm);
+  }
+
+  .data-table tr[data-status="pending"],
+  .data-table tr[data-status="unpaid"] {
+    border-left-color: var(--status-pending);
+  }
+
+  .data-table tr[data-status="completed"],
+  .data-table tr[data-status="paid"],
+  .data-table tr[data-status="active"] {
+    border-left-color: var(--status-positive);
+  }
+
+  .data-table tr[data-status="cancelled"],
+  .data-table tr[data-status="inactive"] {
+    border-left-color: var(--status-negative);
+  }
+
+  .data-table tr:last-child {
+    margin-bottom: 0;
+  }
+
+  .data-table td {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+
+    padding: 6px 0;
+
+    border: none;
+
+    font-size: 13.5px;
+  }
+
+  .data-table td[data-label]::before {
+    content: attr(data-label);
+    flex-shrink: 0;
+
+    color: var(--ink-muted);
+    font-size: 11px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+  }
+
+  .data-table td.num {
+    text-align: right;
+  }
+
+  .data-table td.table-actions {
+    justify-content: flex-end;
+    margin-top: 4px;
+  }
+
+}
+
+
+
+/* ==============================================================
    EMPTY STATE
    ============================================================== */
 
@@ -2920,4 +3022,117 @@ input[type='password']::-ms-clear {
     grid-template-columns: 1fr;
   }
 
+}
+
+
+/* ==============================================================
+   RECENT ORDERS — MOBILE CARDS
+   Bespoke card design for the Dashboard's Recent Orders widget
+   specifically (matches the reference design closely: colored left
+   border by status, order # + status badge on one line, distributor
+   below, a date row with an icon, right-aligned amount, and a
+   "View details" link). Other tables app-wide use the plainer generic
+   card transformation above — this one widget got the richer treatment
+   since it's the app's first-impression view.
+   ============================================================== */
+
+.dashboard-orders-cards {
+  display: none;
+}
+
+@media (max-width: 640px) {
+
+  .dashboard-orders-table-wrap {
+    display: none;
+  }
+
+  .dashboard-orders-cards {
+    display: block;
+  }
+
+}
+
+.recent-order-card {
+  margin-bottom: 12px;
+  padding: 14px 16px;
+
+  border: 1px solid var(--rule);
+  border-left: 3px solid var(--rule-strong);
+  border-radius: var(--radius-sm);
+
+  background: var(--surface);
+  box-shadow: var(--shadow-sm);
+}
+
+.recent-order-card:last-child {
+  margin-bottom: 0;
+}
+
+.recent-order-card[data-status="pending"] {
+  border-left-color: var(--status-pending);
+}
+
+.recent-order-card[data-status="completed"] {
+  border-left-color: var(--status-positive);
+}
+
+.recent-order-card[data-status="cancelled"] {
+  border-left-color: var(--status-negative);
+}
+
+.recent-order-card-top {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+
+  margin-bottom: 4px;
+}
+
+.recent-order-card-distributor {
+  margin-bottom: 10px;
+
+  color: var(--ink);
+  font-size: 13.5px;
+}
+
+.recent-order-card-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+
+  margin-bottom: 12px;
+}
+
+.recent-order-card-date {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+
+  color: var(--ink-muted);
+  font-size: 12.5px;
+}
+
+.recent-order-card-amount {
+  font-family: var(--font-mono);
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+}
+
+.recent-order-card-link {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+
+  padding-top: 10px;
+  border-top: 1px solid var(--rule);
+
+  color: var(--blue);
+  text-decoration: none;
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.recent-order-card-link:hover {
+  text-decoration: underline;
 }

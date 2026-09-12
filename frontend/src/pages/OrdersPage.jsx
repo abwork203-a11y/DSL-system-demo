@@ -220,14 +220,14 @@ export default function OrdersPage() {
                 </thead>
                 <tbody>
                   {rows.map((o) => (
-                    <tr key={o.id}>
-                      <td><Link to={`/orders/${o.id}`} className="link-btn">{o.order_number}</Link></td>
-                      <td>{o.distributor_name}</td>
-                      <td>{new Date(o.order_date).toLocaleDateString()}</td>
-                      <td className="num">{money(o.total)}</td>
-                      <td style={{ textTransform: 'capitalize' }}>{o.payment_term}</td>
-                      <td><StatusBadge value={o.payment_status} /></td>
-                      <td><StatusBadge value={o.order_status} /></td>
+                    <tr key={o.id} data-status={o.order_status}>
+                      <td data-label="Order #"><Link to={`/orders/${o.id}`} className="link-btn">{o.order_number}</Link></td>
+                      <td data-label="Distributor">{o.distributor_name}</td>
+                      <td data-label="Date">{new Date(o.order_date).toLocaleDateString()}</td>
+                      <td className="num" data-label="Total">{money(o.total)}</td>
+                      <td data-label="Term" style={{ textTransform: 'capitalize' }}>{o.payment_term}</td>
+                      <td data-label="Payment"><StatusBadge value={o.payment_status} /></td>
+                      <td data-label="Status"><StatusBadge value={o.order_status} /></td>
                     </tr>
                   ))}
                   {rows.length === 0 && (
@@ -260,10 +260,10 @@ export default function OrdersPage() {
               <tbody>
                 {filteredDrafts.map((d) => (
                   <tr key={d.id}>
-                    <td><strong>{d.distributorName || 'No distributor selected'}</strong></td>
-                    <td>{ORDER_STEPS[d.step] || ORDER_STEPS[0]}</td>
-                    <td>{d.items?.length || 0} item{(d.items?.length || 0) === 1 ? '' : 's'}</td>
-                    <td>{formatRelativeTime(d.updatedAt)}</td>
+                    <td data-label="Distributor"><strong>{d.distributorName || 'No distributor selected'}</strong></td>
+                    <td data-label="Progress">{ORDER_STEPS[d.step] || ORDER_STEPS[0]}</td>
+                    <td data-label="Items">{d.items?.length || 0} item{(d.items?.length || 0) === 1 ? '' : 's'}</td>
+                    <td data-label="Last Edited">{formatRelativeTime(d.updatedAt)}</td>
                     <td className="table-actions">
                       <button className="btn btn-secondary btn-sm" onClick={() => handleResume(d)}>Resume</button>
                       <button className="btn-ghost" onClick={() => handleDiscard(d)} title="Discard draft" aria-label="Discard draft"><Trash2 size={15} /></button>
