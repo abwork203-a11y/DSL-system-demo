@@ -271,7 +271,6 @@ export default function CreateOrderPage() {
       <div className="stepper">
         {STEPS.map((label, i) => (
           <div key={label} className={`stepper-item${i === step ? ' active' : i < step ? ' done' : ''}`}>
-            <span className="stepper-number">{i < step ? <Check size={12} strokeWidth={3} /> : i + 1}</span>
             <span className="stepper-label">{label}</span>
           </div>
         ))}
