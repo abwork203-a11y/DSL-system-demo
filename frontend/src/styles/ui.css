@@ -3136,3 +3136,141 @@ input[type='password']::-ms-clear {
 .recent-order-card-link:hover {
   text-decoration: underline;
 }
+
+
+/* ==============================================================
+   ORDER DETAIL — layout, info strip, activity list
+   The only genuinely new CSS for the Order Detail rework — everything
+   else on that page (.page-header, .page-tabs, .card, .data-table,
+   StatusBadge, .btn*) is reused as-is.
+   ============================================================== */
+
+.order-detail-layout {
+  display: flex;
+  align-items: flex-start;
+  gap: 20px;
+}
+
+.order-detail-main {
+  flex: 1;
+  min-width: 0;
+}
+
+.order-detail-sidebar {
+  width: 300px;
+  flex-shrink: 0;
+
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+@media (max-width: 960px) {
+  .order-detail-layout {
+    flex-direction: column;
+  }
+  .order-detail-sidebar {
+    width: 100%;
+  }
+}
+
+.info-strip {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 28px;
+}
+
+.info-strip-item {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+
+  flex: 1 1 160px;
+  min-width: 160px;
+}
+
+.info-strip-item svg {
+  margin-top: 2px;
+  color: var(--ink-muted);
+  flex-shrink: 0;
+}
+
+.info-strip-item .stat-label {
+  margin-bottom: 4px;
+}
+
+.summary-row {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+
+  padding: 8px 0;
+
+  border-bottom: 1px solid var(--rule);
+
+  font-size: 13px;
+}
+
+.summary-row:last-child {
+  border-bottom: none;
+}
+
+.summary-row-label {
+  color: var(--ink-muted);
+}
+
+.summary-row-value {
+  font-weight: 600;
+  text-align: right;
+}
+
+.activity-list {
+  display: flex;
+  flex-direction: column;
+}
+
+.activity-item {
+  display: flex;
+  gap: 10px;
+  padding-bottom: 16px;
+  position: relative;
+}
+
+.activity-item:not(:last-child)::before {
+  content: '';
+  position: absolute;
+  left: 4px;
+  top: 12px;
+  bottom: 0;
+  width: 1px;
+  background: var(--rule);
+}
+
+.activity-item-dot {
+  flex-shrink: 0;
+  width: 9px;
+  height: 9px;
+  margin-top: 4px;
+
+  border-radius: 100%;
+
+  background: var(--rule-strong);
+}
+
+.activity-item:first-child .activity-item-dot {
+  background: var(--status-positive);
+}
+
+.activity-item-text strong {
+  display: block;
+  font-size: 13.5px;
+}
+
+.activity-item-text span {
+  display: block;
+  margin-top: 2px;
+
+  color: var(--ink-muted);
+  font-size: 12px;
+}
+

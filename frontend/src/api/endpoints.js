@@ -43,6 +43,7 @@ export const distributors = {
 export const orders = {
   list: (params) => client.get('/orders', { params }),
   get: (id) => client.get(`/orders/${id}`),
+  activity: (id) => client.get(`/orders/${id}/activity`),
   create: (data) => client.post('/orders', data),
   updateStatus: (id, order_status) => client.patch(`/orders/${id}/status`, { order_status }),
   pay: (id, amount, note) => client.post(`/orders/${id}/pay`, { amount, note }),

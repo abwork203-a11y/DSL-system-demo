@@ -1,9 +1,11 @@
 import { useEffect, useState, useCallback, useRef } from 'react';
 import { useParams, useNavigate, Link } from 'react-router-dom';
+import { ArrowLeft, Building2, CalendarDays, CreditCard, Wallet } from 'lucide-react';
 import { orders as ordersApi, exportApi } from '../api/endpoints';
 import { apiErrorMessage, downloadFile } from '../api/client';
 import { useAuth } from '../context/AuthContext';
 import { useToast } from '../context/ToastContext';
+import { useConfirm } from '../context/ConfirmContext';
 import StatusBadge from '../components/StatusBadge';
 import Modal from '../components/Modal';
 import DownloadFormatModal from '../components/DownloadFormatModal';
@@ -13,13 +15,60 @@ function money(n) {
   return Number(n || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 }
 
+function formatDateTime(iso) {
+  return new Date(iso).toLocaleString(undefined, {
+    month: 'short', day: 'numeric', year: 'numeric', hour: 'numeric', minute: '2-digit',
+  });
+}
+
+// Turns a raw audit_log row into a plain-English line — mirrors the same
+// action vocabulary ledgerService.js already writes (CREATE / PAYMENT /
+// STATUS_CHANGE / CANCEL / DELETE), so this is just a label lookup, not a
+// second source of truth about what happened.
+function describeActivity(entry) {
+  switch (entry.action) {
+    case 'CREATE': return 'Order created';
+    case 'PAYMENT': return 'Payment recorded';
+    case 'STATUS_CHANGE': {
+      const next = entry.changes?.after?.order_status || entry.changes?.after?.status;
+      return next ? `Status updated to ${next}` : 'Status updated';
+    }
+    case 'CANCEL': return 'Order cancelled';
+    case 'DELETE': return 'Order deleted';
+    case 'UPDATE': return 'Order updated';
+    default: return entry.action;
+  }
+}
+
+function ActivityList({ entries }) {
+  if (entries.length === 0) {
+    return <p style={{ color: 'var(--ink-muted)', fontSize: 13 }}>No recorded activity yet.</p>;
+  }
+  return (
+    <div className="activity-list">
+      {entries.map((entry) => (
+        <div key={entry.id} className="activity-item">
+          <span className="activity-item-dot" />
+          <div className="activity-item-text">
+            <strong>{describeActivity(entry)}</strong>
+            <span>{formatDateTime(entry.created_at)}{entry.user_name ? ` · by ${entry.user_name}` : ''}</span>
+          </div>
+        </div>
+      ))}
+    </div>
+  );
+}
+
 export default function OrderDetailPage() {
   const { id } = useParams();
   const navigate = useNavigate();
   const { isAdmin } = useAuth();
   const toast = useToast();
+  const confirm = useConfirm();
   const [order, setOrder] = useState(null);
+  const [activity, setActivity] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [tab, setTab] = useState('overview');
   const [payOpen, setPayOpen] = useState(false);
   const [payAmount, setPayAmount] = useState('');
   const [paying, setPaying] = useState(false);
@@ -31,15 +80,18 @@ export default function OrderDetailPage() {
   // but that only takes effect after a re-render, and a ref closes that gap
   // deterministically regardless of render timing.
   const downloadingRef = useRef(false);
-  const [cancelOpen, setCancelOpen] = useState(false);
-  const [cancelling, setCancelling] = useState(false);
-  const [deleteOpen, setDeleteOpen] = useState(false);
-  const [deleting, setDeleting] = useState(false);
 
   const load = useCallback(async () => {
     try {
-      const res = await ordersApi.get(id);
-      setOrder(res.data);
+      const [orderRes, activityRes] = await Promise.all([
+        ordersApi.get(id),
+        // Activity is supplementary context, not core order data — a
+        // failure here (e.g. a transient network hiccup) shouldn't block
+        // the page from showing the order itself.
+        ordersApi.activity(id).catch(() => ({ data: [] })),
+      ]);
+      setOrder(orderRes.data);
+      setActivity(activityRes.data);
     } catch (err) {
       toast.error(apiErrorMessage(err));
     } finally {
@@ -94,6 +146,7 @@ export default function OrderDetailPage() {
       const res = await ordersApi.pay(id, amount);
       setOrder((current) => ({ ...current, ...res.data.order })); // reconcile with the server's real numbers
       toast.success('Payment recorded.');
+      load(); // also refreshes the activity list with the new PAYMENT entry
     } catch (err) {
       setOrder(previousOrder); // roll back — the payment didn't actually happen
       toast.error(apiErrorMessage(err));
@@ -109,51 +162,53 @@ export default function OrderDetailPage() {
     try {
       await ordersApi.updateStatus(id, order_status);
       toast.success(`Order marked ${order_status}.`);
+      load(); // refresh activity with the new STATUS_CHANGE entry
     } catch (err) {
       setOrder((current) => ({ ...current, order_status: previousStatus })); // roll back
       toast.error(apiErrorMessage(err));
     }
   };
 
-  const handleCancelOrder = async () => {
-    setCancelling(true);
-    try {
+  const handleCancelOrder = () => confirm({
+    title: 'Cancel this order?',
+    message: "This will reverse this order's effect on the distributor's ledger balance. The order record itself is kept for history, just marked cancelled.",
+    confirmLabel: 'Cancel Order',
+    danger: true,
+    onConfirm: async () => {
       await ordersApi.cancel(id);
       toast.success('Order cancelled.');
-      setCancelOpen(false);
-      load(); // refresh so the corrected status and distributor balance show immediately
-    } catch (err) {
-      toast.error(apiErrorMessage(err));
-    } finally {
-      setCancelling(false);
-    }
-  };
+      load();
+    },
+  });
 
-  const handleDeleteOrder = async () => {
-    setDeleting(true);
-    try {
-      await ordersApi.remove(id);
-      toast.success('Order deleted.');
-      navigate('/orders');
-    } catch (err) {
-      // A 409 here means the backend refused because newer ledger activity
-      // exists for this distributor — its message already explains why and
-      // points at Cancel instead, so surface it verbatim rather than a
-      // generic error.
-      if (err.response?.status === 409) {
-        toast.error(err.response?.data?.message || apiErrorMessage(err));
-      } else {
-        toast.error(apiErrorMessage(err));
+  const handleDeleteOrder = () => confirm({
+    title: 'Delete this order?',
+    message: 'This is permanent and cannot be undone — unlike Cancel, the order record itself will be removed entirely.',
+    confirmLabel: 'Delete Order',
+    danger: true,
+    onConfirm: async () => {
+      try {
+        await ordersApi.remove(id);
+        toast.success('Order deleted.');
+        navigate('/orders');
+      } catch (err) {
+        // A 409 here means the backend refused because newer ledger activity
+        // exists for this distributor — its message already explains why and
+        // points at Cancel instead, so surface it verbatim rather than a
+        // generic error.
+        if (err.response?.status === 409) {
+          toast.error(err.response?.data?.message || apiErrorMessage(err));
+        } else {
+          toast.error(apiErrorMessage(err));
+        }
+        throw err; // let ConfirmContext know this didn't succeed, so it closes without navigating
       }
-      setDeleteOpen(false);
-    } finally {
-      setDeleting(false);
-    }
-  };
+    },
+  });
 
   if (loading) {
     return (
-      <div className="content" style={{ maxWidth: 820 }}>
+      <div className="content" style={{ maxWidth: 1100 }}>
         <div className="page-header">
           <div>
             <div className="skeleton skeleton-text" style={{ width: 160, height: 26, marginBottom: 8 }} />
@@ -172,105 +227,219 @@ export default function OrderDetailPage() {
   const balanceRemaining = Number(order.total) - Number(order.amount_paid);
 
   return (
-    <div className="content" style={{ maxWidth: 820 }}>
+    <div className="content" style={{ maxWidth: 1100 }}>
       <div className="page-header">
         <div>
-          <h1>{order.order_number}</h1>
+          <Link to="/orders" className="link-btn" style={{ display: 'inline-flex', alignItems: 'center', gap: 4, marginBottom: 10, fontSize: 13 }}>
+            <ArrowLeft size={14} /> Back to Orders
+          </Link>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
+            <h1>{order.order_number}</h1>
+            <StatusBadge value={order.order_status} />
+          </div>
           <p>
             <Link to={`/ledger?distributor_id=${order.distributor_id}`} className="link-btn">{order.distributor_name}</Link>
             {' · '}{new Date(order.order_date).toLocaleDateString()}
+            {' · '}<span style={{ textTransform: 'capitalize' }}>{order.payment_term}</span>
             {order.created_by_name ? ` · created by ${order.created_by_name}` : ''}
           </p>
         </div>
         <div style={{ display: 'flex', gap: 8 }}>
           <button className="btn btn-secondary" onClick={() => setDownloadOpen(true)}>Download</button>
           {order.order_status !== 'cancelled' && (
-            <button className="btn btn-secondary" onClick={() => setCancelOpen(true)}>Cancel Order</button>
+            <button className="btn btn-secondary" onClick={handleCancelOrder}>Cancel Order</button>
           )}
           {isAdmin && (
-            <button className="btn btn-danger" onClick={() => setDeleteOpen(true)}>Delete Order</button>
+            <button className="btn btn-danger" onClick={handleDeleteOrder}>Delete Order</button>
           )}
         </div>
       </div>
 
-      <div className="card" style={{ display: 'flex', gap: 28, flexWrap: 'wrap' }}>
-        <div>
-          <div className="stat-label">Order Status</div>
-          {isAdmin ? (
-            <select value={order.order_status} onChange={(e) => handleStatusChange(e.target.value)} style={{ marginTop: 6, border: '1px solid var(--border)', borderRadius: 6, padding: '6px 8px' }}>
-              <option value="pending">Pending</option>
-              <option value="current">Current</option>
-              <option value="completed">Completed</option>
-              <option value="cancelled">Cancelled</option>
-            </select>
-          ) : (
-            <div style={{ marginTop: 6 }}><StatusBadge value={order.order_status} /></div>
+      <div className="page-tabs">
+        <button type="button" className={`page-tab${tab === 'overview' ? ' active' : ''}`} onClick={() => setTab('overview')}>Overview</button>
+        <button type="button" className={`page-tab${tab === 'items' ? ' active' : ''}`} onClick={() => setTab('items')}>
+          Line Items <span className="page-tab-count">{order.items.length}</span>
+        </button>
+        <button type="button" className={`page-tab${tab === 'payments' ? ' active' : ''}`} onClick={() => setTab('payments')}>Payments</button>
+        <button type="button" className={`page-tab${tab === 'history' ? ' active' : ''}`} onClick={() => setTab('history')}>History</button>
+      </div>
+
+      <div className="order-detail-layout">
+        <div className="order-detail-main">
+
+          {tab === 'overview' && (
+            <>
+              <div className="card">
+                <div className="info-strip">
+                  <div className="info-strip-item">
+                    <Building2 size={18} />
+                    <div>
+                      <div className="stat-label">Distributor</div>
+                      <div>{order.distributor_name}</div>
+                    </div>
+                  </div>
+                  <div className="info-strip-item">
+                    <CalendarDays size={18} />
+                    <div>
+                      <div className="stat-label">Order Date</div>
+                      <div>{new Date(order.order_date).toLocaleDateString()}</div>
+                    </div>
+                  </div>
+                  <div className="info-strip-item">
+                    <CreditCard size={18} />
+                    <div>
+                      <div className="stat-label">Payment Term</div>
+                      <div style={{ textTransform: 'capitalize' }}>{order.payment_term}</div>
+                    </div>
+                  </div>
+                  <div className="info-strip-item">
+                    <Wallet size={18} />
+                    <div>
+                      <div className="stat-label">Order Status</div>
+                      {isAdmin ? (
+                        <select
+                          value={order.order_status}
+                          onChange={(e) => handleStatusChange(e.target.value)}
+                          style={{ marginTop: 2, border: '1px solid var(--rule)', borderRadius: 6, padding: '4px 6px' }}
+                        >
+                          <option value="pending">Pending</option>
+                          <option value="current">Current</option>
+                          <option value="completed">Completed</option>
+                          <option value="cancelled">Cancelled</option>
+                        </select>
+                      ) : (
+                        <StatusBadge value={order.order_status} />
+                      )}
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              {order.notes && (
+                <div className="card">
+                  <h3 style={{ marginBottom: 8 }}>Notes</h3>
+                  <p style={{ color: 'var(--ink-muted)' }}>{order.notes}</p>
+                </div>
+              )}
+            </>
           )}
-        </div>
-        <div>
-          <div className="stat-label">Payment Status</div>
-          <div style={{ marginTop: 6 }}><StatusBadge value={order.payment_status} /></div>
-        </div>
-        <div>
-          <div className="stat-label">Payment Term</div>
-          <div style={{ marginTop: 6, textTransform: 'capitalize' }}>{order.payment_term}</div>
-        </div>
-        <div>
-          <div className="stat-label">Balance Remaining</div>
-          <div className="num" style={{ marginTop: 6 }}>{money(balanceRemaining)}</div>
-        </div>
-        {balanceRemaining > 0 && (
-          <div style={{ marginLeft: 'auto', alignSelf: 'center' }}>
-            <button className="btn" onClick={() => { setPayAmount(String(balanceRemaining)); setPayOpen(true); }}>Record Payment</button>
-          </div>
-        )}
-      </div>
 
-      <div className="card">
-        <h2 style={{ marginBottom: 14 }}>Line Items</h2>
-        <div className="table-wrap">
-          <table className="data-table">
-            <thead>
-              <tr>
-                <th>Manufacturer</th>
-                <th>Product</th>
-                <th className="num">Qty</th>
-                <th className="num">Unit Price</th>
-                <th className="num">Line Total</th>
-              </tr>
-            </thead>
-            <tbody>
-              {order.items.map((it) => (
-                <tr key={it.id}>
-                  <td>{it.manufacturer_name}</td>
-                  <td>{it.product_name}{it.size_packaging ? <span style={{ color: 'var(--ink-muted)' }}> ({it.size_packaging})</span> : ''}</td>
-                  <td className="num">{Number(it.quantity)}</td>
-                  <td className="num">{money(it.price_at_time_of_order)}</td>
-                  <td className="num">{money(it.line_total)}</td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
+          {tab === 'items' && (
+            <div className="card">
+              <h2 style={{ marginBottom: 14 }}>Line Items</h2>
+              <div className="table-wrap">
+                <table className="data-table">
+                  <thead>
+                    <tr>
+                      <th>Manufacturer</th>
+                      <th>Product</th>
+                      <th className="num">Qty</th>
+                      <th className="num">Unit Price</th>
+                      <th className="num">Line Total</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {order.items.map((it) => (
+                      <tr key={it.id}>
+                        <td data-label="Manufacturer">{it.manufacturer_name}</td>
+                        <td data-label="Product">
+                          {it.product_name}
+                          {it.size_packaging ? <span style={{ color: 'var(--ink-muted)' }}> ({it.size_packaging})</span> : ''}
+                        </td>
+                        <td className="num" data-label="Qty">{Number(it.quantity)}</td>
+                        <td className="num" data-label="Unit Price">{money(it.price_at_time_of_order)}</td>
+                        <td className="num" data-label="Line Total">{money(it.line_total)}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+              <div style={{ marginTop: 16, marginLeft: 'auto', width: 260, fontSize: 14, lineHeight: 1.9 }}>
+                <div>Subtotal <span className="num" style={{ float: 'right' }}>{money(order.subtotal)}</span></div>
+                <div>Discount Amount <span className="num" style={{ float: 'right' }}>{money(order.discount)}</span></div>
+                <div>Freight <span className="num" style={{ float: 'right' }}>{money(order.freight_cost)}</span></div>
+                <div style={{ borderTop: '1px solid var(--rule)', paddingTop: 6, fontWeight: 700, fontSize: 15 }}>
+                  Total <span className="num" style={{ float: 'right' }}>{money(order.total)}</span>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {tab === 'payments' && (
+            <div className="card">
+              <h2 style={{ marginBottom: 14 }}>Payment Information</h2>
+              <div className="summary-row"><span className="summary-row-label">Total</span><span className="summary-row-value">{money(order.total)}</span></div>
+              <div className="summary-row"><span className="summary-row-label">Paid Amount</span><span className="summary-row-value">{money(order.amount_paid)}</span></div>
+              <div className="summary-row"><span className="summary-row-label">Balance Remaining</span><span className="summary-row-value">{money(balanceRemaining)}</span></div>
+              <div className="summary-row"><span className="summary-row-label">Payment Status</span><span className="summary-row-value"><StatusBadge value={order.payment_status} /></span></div>
+              {balanceRemaining > 0 && (
+                <button
+                  className="btn"
+                  style={{ marginTop: 16, width: '100%', justifyContent: 'center' }}
+                  onClick={() => { setPayAmount(String(balanceRemaining)); setPayOpen(true); }}
+                >
+                  Record Payment
+                </button>
+              )}
+              <p style={{ marginTop: 14, fontSize: 12, color: 'var(--ink-muted)' }}>
+                For this distributor's full payment history across every order, see the{' '}
+                <Link to={`/ledger?distributor_id=${order.distributor_id}`} className="link-btn">Ledger</Link>.
+              </p>
+            </div>
+          )}
+
+          {tab === 'history' && (
+            <div className="card">
+              <h2 style={{ marginBottom: 14 }}>Activity History</h2>
+              <ActivityList entries={activity} />
+            </div>
+          )}
+
         </div>
-        <div style={{ marginTop: 16, marginLeft: 'auto', width: 260, fontSize: 14, lineHeight: 1.9 }}>
-          <div>Subtotal <span className="num" style={{ float: 'right' }}>{money(order.subtotal)}</span></div>
-          <div>Discount Amount  <span className="num" style={{ float: 'right' }}>{money(order.discount)}</span></div>
-          <div>Freight <span className="num" style={{ float: 'right' }}>{money(order.freight_cost)}</span></div>
-          <div style={{ borderTop: '1px solid var(--border)', paddingTop: 6, fontWeight: 600 }}>
-            Total <span className="num" style={{ float: 'right' }}>{money(order.total)}</span>
+
+        <div className="order-detail-sidebar">
+
+          <div className="card">
+            <h3 style={{ marginBottom: 4 }}>Order Summary</h3>
+            <div className="summary-row"><span className="summary-row-label">Order ID</span><span className="summary-row-value">{order.order_number}</span></div>
+            <div className="summary-row"><span className="summary-row-label">Distributor</span><span className="summary-row-value">{order.distributor_name}</span></div>
+            <div className="summary-row"><span className="summary-row-label">Order Date</span><span className="summary-row-value">{new Date(order.order_date).toLocaleDateString()}</span></div>
+            <div className="summary-row"><span className="summary-row-label">Payment Term</span><span className="summary-row-value" style={{ textTransform: 'capitalize' }}>{order.payment_term}</span></div>
+            <div className="summary-row"><span className="summary-row-label">Status</span><span className="summary-row-value"><StatusBadge value={order.order_status} /></span></div>
           </div>
-          <div style={{ color: 'var(--ink-muted)' }}>
-            Paid <span className="num" style={{ float: 'right' }}>{money(order.amount_paid)}</span>
+
+          <div className="card">
+            <h3 style={{ marginBottom: 4 }}>Payment Information</h3>
+            <div className="summary-row"><span className="summary-row-label">Balance Remaining</span><span className="summary-row-value">{money(balanceRemaining)}</span></div>
+            <div className="summary-row"><span className="summary-row-label">Paid Amount</span><span className="summary-row-value">{money(order.amount_paid)}</span></div>
+            {balanceRemaining > 0 && (
+              <button
+                className="btn"
+                style={{ marginTop: 14, width: '100%', justifyContent: 'center' }}
+                onClick={() => { setPayAmount(String(balanceRemaining)); setPayOpen(true); }}
+              >
+                Record Payment
+              </button>
+            )}
           </div>
+
+          <div className="card">
+            <h3 style={{ marginBottom: 10 }}>Recent Activity</h3>
+            <ActivityList entries={activity.slice(0, 4)} />
+            {activity.length > 4 && (
+              <button
+                type="button"
+                className="link-btn"
+                style={{ marginTop: 4, background: 'none', border: 'none', cursor: 'pointer', padding: 0, font: 'inherit' }}
+                onClick={() => setTab('history')}
+              >
+                View all activity →
+              </button>
+            )}
+          </div>
+
         </div>
       </div>
-
-      {order.notes && (
-        <div className="card">
-          <h3 style={{ marginBottom: 8 }}>Notes</h3>
-          <p style={{ color: 'var(--ink-muted)' }}>{order.notes}</p>
-        </div>
-      )}
 
       {downloadOpen && (
         <DownloadFormatModal
@@ -292,36 +461,6 @@ export default function OrderDetailPage() {
               {paying ? 'Recording…' : 'Record Payment'}
             </button>
           </form>
-        </Modal>
-      )}
-
-      {cancelOpen && (
-        <Modal title="Cancel this order?" onClose={() => setCancelOpen(false)} width={440}>
-          <p style={{ color: 'var(--ink-muted)', marginBottom: 20 }}>
-            This will reverse this order's effect on the distributor's ledger balance.
-            The order record itself is kept for history, just marked cancelled.
-          </p>
-          <div style={{ display: 'flex', gap: 10, justifyContent: 'flex-end' }}>
-            <button className="btn btn-secondary" onClick={() => setCancelOpen(false)} disabled={cancelling}>Keep Order</button>
-            <button className="btn btn-danger" onClick={handleCancelOrder} disabled={cancelling}>
-              {cancelling ? 'Cancelling…' : 'Cancel Order'}
-            </button>
-          </div>
-        </Modal>
-      )}
-
-      {deleteOpen && (
-        <Modal title="Delete this order?" onClose={() => setDeleteOpen(false)} width={440}>
-          <p style={{ color: 'var(--ink-muted)', marginBottom: 20 }}>
-            This is permanent and cannot be undone — unlike Cancel, the order record itself
-            will be removed entirely.
-          </p>
-          <div style={{ display: 'flex', gap: 10, justifyContent: 'flex-end' }}>
-            <button className="btn btn-secondary" onClick={() => setDeleteOpen(false)} disabled={deleting}>Keep Order</button>
-            <button className="btn btn-danger" onClick={handleDeleteOrder} disabled={deleting}>
-              {deleting ? 'Deleting…' : 'Delete Order'}
-            </button>
-          </div>
         </Modal>
       )}
     </div>
