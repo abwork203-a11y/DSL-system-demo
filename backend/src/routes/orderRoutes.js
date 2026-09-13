@@ -26,6 +26,7 @@ const payRules = [
 
 router.get('/', controller.list);
 router.get('/:id', controller.getOne);
+router.get('/:id/activity', controller.getActivity);
 router.post('/', createRules, validate, controller.create); // admin + sales_rep
 router.patch('/:id/status', requireRole('admin'), controller.updateStatus);
 router.patch('/:id/cancel', controller.cancel); // admin + sales_rep — same access level as create, no extra role check

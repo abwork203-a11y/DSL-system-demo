@@ -235,4 +235,21 @@ const remove = asyncHandler(async (req, res) => {
   }
 });
 
-module.exports = { list, getOne, create, updateStatus, pay, cancel, remove };
+// Scoped, narrow read of this one order's history — deliberately not a
+// wrapper around the general /api/audit browsing endpoint (which stays
+// admin-only, since it can query *any* entity type/id). Any authenticated
+// role that can view an order at all can see its own activity trail; that's
+// a much narrower surface than being able to browse the whole audit log.
+const getActivity = asyncHandler(async (req, res) => {
+  const result = await pool.query(
+    `SELECT a.*, u.name AS user_name
+     FROM audit_log a
+     LEFT JOIN users u ON u.id = a.user_id
+     WHERE a.entity_type = 'order' AND a.entity_id = $1
+     ORDER BY a.created_at DESC`,
+    [req.params.id]
+  );
+  res.json(result.rows);
+});
+
+module.exports = { list, getOne, create, updateStatus, pay, cancel, remove, getActivity };
