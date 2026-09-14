@@ -2,9 +2,11 @@ const { pool } = require('../config/db');
 const { asyncHandler } = require('../utils/asyncHandler');
 const { ApiError } = require('../utils/ApiError');
 const { recordAudit } = require('../utils/audit');
+const { parsePagination, paginatedResponse } = require('../utils/pagination');
 
 const list = asyncHandler(async (req, res) => {
   const { search, manufacturer_id, is_active } = req.query;
+  const { page, pageSize, offset } = parsePagination(req.query);
   const clauses = [];
   const params = [];
 
@@ -22,15 +24,23 @@ const list = asyncHandler(async (req, res) => {
   }
 
   const where = clauses.length ? `WHERE ${clauses.join(' AND ')}` : '';
+
+  const countResult = await pool.query(
+    `SELECT COUNT(*) FROM products p ${where}`,
+    params
+  );
+  const total = Number(countResult.rows[0].count);
+
   const result = await pool.query(
     `SELECT p.*, m.name AS manufacturer_name
      FROM products p
      JOIN manufacturers m ON m.id = p.manufacturer_id
      ${where}
-     ORDER BY p.name`,
-    params
+     ORDER BY p.name
+     LIMIT $${params.length + 1} OFFSET $${params.length + 2}`,
+    [...params, pageSize, offset]
   );
-  res.json(result.rows);
+  res.json(paginatedResponse(result.rows, total, page, pageSize));
 });
 
 const getOne = asyncHandler(async (req, res) => {
