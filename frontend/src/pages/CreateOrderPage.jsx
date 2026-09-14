@@ -4,6 +4,7 @@ import { Plus, Minus, Trash2, Loader2, Check, ArrowLeft } from 'lucide-react';
 import { distributors as distributorsApi, products as productsApi, orders as ordersApi } from '../api/endpoints';
 import { apiErrorMessage } from '../api/client';
 import { useToast } from '../context/ToastContext';
+import { useConfirm } from '../context/ConfirmContext';
 import Modal from '../components/Modal';
 import { LoadingModal, SavingModal } from '../components/StatusModals';
 import { newDraftId, getDraft, saveDraft, saveDraftBeacon, deleteDraft, ORDER_STEPS as STEPS } from '../utils/orderDrafts';
@@ -17,11 +18,13 @@ export default function CreateOrderPage() {
   const navigate = useNavigate();
   const location = useLocation();
   const toast = useToast();
+  const confirm = useConfirm();
   const [step, setStep] = useState(0);
   const [distributorsList, setDistributorsList] = useState([]);
   const [productsList, setProductsList] = useState([]);
   const [submitting, setSubmitting] = useState(false);
   const [savingDraft, setSavingDraft] = useState(false);
+  const [discarding, setDiscarding] = useState(false);
   const [submitted, setSubmitted] = useState(false);
 
   // Mirrors `submitting`/`submitted` but updates synchronously (refs aren't
@@ -604,6 +607,25 @@ export default function CreateOrderPage() {
             <button
               className="btn btn-secondary"
               disabled={savingDraft}
+              onClick={() => confirm({
+                title: 'Discard this order?',
+                message: 'Your progress will not be saved. This cannot be undone.',
+                confirmLabel: 'Discard',
+                danger: true,
+                onConfirm: async () => {
+                  if (draftIdRef.current) await deleteDraft(draftIdRef.current).catch(() => {});
+                  submittedRef.current = true; // already handled — don't also trigger the leave-blocker on this navigation
+                  navigate('/orders');
+                },
+              })}
+            >
+              Discard
+            </button>
+          )}
+          {hasUnsavedProgress() && (
+            <button
+              className="btn btn-secondary"
+              disabled={savingDraft}
               onClick={async () => {
                 setSavingDraft(true);
                 try {
@@ -632,17 +654,32 @@ export default function CreateOrderPage() {
         </div>
       </div>
 
-      {blocker.state === 'blocked' && !savingDraft && (
+      {blocker.state === 'blocked' && !savingDraft && !discarding && (
         <Modal title="Save this order as a draft?" onClose={() => blocker.reset()} width={440}>
           <p style={{ color: 'var(--ink-muted)', marginBottom: 20 }}>
             This order hasn't been created yet. We'll save your progress as a draft you can pick back
             up anytime from the Drafts tab on the Orders page.
           </p>
           <div className="modal-actions">
-            <button className="btn btn-secondary" disabled={savingDraft} onClick={() => blocker.reset()}>Stay on this page</button>
+            <button
+              className="btn btn-secondary"
+              disabled={savingDraft || discarding}
+              onClick={async () => {
+                setDiscarding(true);
+                try {
+                  if (draftIdRef.current) await deleteDraft(draftIdRef.current).catch(() => {});
+                  submittedRef.current = true; // already handled — don't also trigger beforeunload's save
+                  blocker.proceed();
+                } finally {
+                  setDiscarding(false);
+                }
+              }}
+            >
+              {discarding ? 'Discarding…' : 'Discard'}
+            </button>
             <button
               className="btn"
-              disabled={savingDraft}
+              disabled={savingDraft || discarding}
               onClick={async () => {
                 setSavingDraft(true);
                 try {
