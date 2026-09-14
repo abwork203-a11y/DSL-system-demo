@@ -6,6 +6,7 @@ import {
   requestGoogleAccessToken, findOrCreateFolder, uploadFileToFolder, driveFolderUrl,
 } from '../utils/googleDrive';
 import { monthToDateRange } from '../utils/dateRange';
+import { fetchAllPages } from '../utils/fetchAllPages';
 import { SavingModal } from '../components/StatusModals';
 import { GOOGLE_CLIENT_ID } from '../config';
 
@@ -31,17 +32,7 @@ async function fetchBlob(url) {
 // everything (which would silently only back up the first ~50 orders once a
 // business has more than that).
 async function fetchAllOrders({ date_from, date_to } = {}) {
-  const all = [];
-  let page = 1;
-  const pageSize = 200; // MAX_PAGE_SIZE server-side — fewest round-trips while staying within what the API allows
-  // eslint-disable-next-line no-constant-condition
-  while (true) {
-    const res = await ordersApi.list({ page, pageSize, date_from, date_to });
-    all.push(...res.data.data);
-    if (page >= res.data.pagination.totalPages) break;
-    page += 1;
-  }
-  return all;
+  return fetchAllPages(ordersApi.list, { date_from, date_to });
 }
 
 export default function BackupPage() {

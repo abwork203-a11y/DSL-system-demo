@@ -400,15 +400,6 @@ export default function OrderDetailPage() {
         <div className="order-detail-sidebar">
 
           <div className="card">
-            <h3 style={{ marginBottom: 4 }}>Order Summary</h3>
-            <div className="summary-row"><span className="summary-row-label">Order ID</span><span className="summary-row-value">{order.order_number}</span></div>
-            <div className="summary-row"><span className="summary-row-label">Distributor</span><span className="summary-row-value">{order.distributor_name}</span></div>
-            <div className="summary-row"><span className="summary-row-label">Order Date</span><span className="summary-row-value">{new Date(order.order_date).toLocaleDateString()}</span></div>
-            <div className="summary-row"><span className="summary-row-label">Payment Term</span><span className="summary-row-value" style={{ textTransform: 'capitalize' }}>{order.payment_term}</span></div>
-            <div className="summary-row"><span className="summary-row-label">Status</span><span className="summary-row-value"><StatusBadge value={order.order_status} /></span></div>
-          </div>
-
-          <div className="card">
             <h3 style={{ marginBottom: 4 }}>Payment Information</h3>
             <div className="summary-row"><span className="summary-row-label">Balance Remaining</span><span className="summary-row-value">{money(balanceRemaining)}</span></div>
             <div className="summary-row"><span className="summary-row-label">Paid Amount</span><span className="summary-row-value">{money(order.amount_paid)}</span></div>

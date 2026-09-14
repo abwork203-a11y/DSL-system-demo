@@ -3274,3 +3274,128 @@ input[type='password']::-ms-clear {
   font-size: 12px;
 }
 
+
+/* ==============================================================
+   LIST CARDS (mobile)
+   The compact, richer mobile card used on Orders/Products/Distributors/
+   Manufacturers/Users — name + status badge, a muted subtitle, an
+   optional icon+meta line, and one or two value columns, with a chevron
+   for "tap to open". Ledger and Drafts keep the plainer generic
+   .data-table → label:value transformation (see RESPONSIVE TABLES →
+   CARDS above) since neither has a natural "named record" shape.
+   ============================================================== */
+
+.list-cards {
+  display: none;
+}
+
+@media (max-width: 640px) {
+  .list-cards {
+    display: block;
+  }
+  .list-cards + .table-wrap {
+    display: none;
+  }
+}
+
+.list-card {
+  position: relative;
+
+  margin-bottom: 12px;
+  padding: 14px 34px 14px 16px;
+
+  border: 1px solid var(--rule);
+  border-left: 3px solid var(--rule-strong);
+  border-radius: var(--radius-sm);
+
+  background: var(--surface);
+  box-shadow: var(--shadow-sm);
+}
+
+.list-card:last-child {
+  margin-bottom: 0;
+}
+
+.list-card[data-status="pending"],
+.list-card[data-status="unpaid"] {
+  border-left-color: var(--status-pending);
+}
+
+.list-card[data-status="completed"],
+.list-card[data-status="paid"],
+.list-card[data-status="active"] {
+  border-left-color: var(--status-positive);
+}
+
+.list-card[data-status="cancelled"],
+.list-card[data-status="inactive"] {
+  border-left-color: var(--status-negative);
+}
+
+.list-card-top {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+
+  margin-bottom: 3px;
+}
+
+.list-card-title {
+  font-weight: 600;
+  font-size: 14px;
+}
+
+.list-card-subtitle {
+  margin-bottom: 8px;
+
+  color: var(--ink-muted);
+  font-size: 13px;
+}
+
+.list-card-meta {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+
+  margin-bottom: 10px;
+
+  color: var(--ink-muted);
+  font-size: 12.5px;
+}
+
+.list-card-values {
+  display: flex;
+  gap: 28px;
+}
+
+.list-card-values > div:not(:last-child) {
+  margin-right: 28px;
+}
+
+.list-card-value-label {
+  display: block;
+  margin-bottom: 2px;
+
+  color: var(--ink-muted);
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.list-card-value-amount {
+  font-family: var(--font-mono);
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+}
+
+.list-card-chevron {
+  position: absolute;
+  top: 16px;
+  right: 12px;
+
+  color: var(--ink-muted);
+}
+
+

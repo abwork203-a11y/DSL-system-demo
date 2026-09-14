@@ -1,6 +1,6 @@
 import { useEffect, useState, useCallback } from 'react';
 import { Link } from 'react-router-dom';
-import { Plus, Pencil, Trash2, Eye, Ban, RotateCcw } from 'lucide-react';
+import { Plus, Pencil, Trash2, Eye, Ban, RotateCcw, ChevronRight } from 'lucide-react';
 import { distributors as distributorsApi } from '../api/endpoints';
 import { apiErrorMessage } from '../api/client';
 import { useAuth } from '../context/AuthContext';
@@ -8,6 +8,7 @@ import { useToast } from '../context/ToastContext';
 import { useConfirm } from '../context/ConfirmContext';
 import StatusBadge from '../components/StatusBadge';
 import Modal from '../components/Modal';
+import Pagination from '../components/Pagination';
 import { TableSkeleton } from '../components/Skeleton';
 
 const EMPTY_FORM = { name: '', contact_name: '', contact_phone: '', contact_email: '', zone: '', region: '', city: '', area: '', address: '' };
@@ -21,6 +22,8 @@ export default function DistributorsPage() {
   const toast = useToast();
   const confirm = useConfirm();
   const [rows, setRows] = useState([]);
+  const [pagination, setPagination] = useState(null);
+  const [page, setPage] = useState(1);
   const [search, setSearch] = useState('');
   const [status, setStatus] = useState('');
   const [loading, setLoading] = useState(true);
@@ -30,17 +33,20 @@ export default function DistributorsPage() {
 
   const load = useCallback(async () => {
     try {
-      const res = await distributorsApi.list({ search: search || undefined, status: status || undefined });
-      setRows(res.data);
+      const res = await distributorsApi.list({ search: search || undefined, status: status || undefined, page, pageSize: 25 });
+      setRows(res.data.data);
+      setPagination(res.data.pagination);
     } catch (err) {
       toast.error(apiErrorMessage(err));
     } finally {
       setLoading(false);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [search, status]);
+  }, [search, status, page]);
 
   useEffect(() => { load(); }, [load]);
+
+  const updateFilter = (setter) => (value) => { setter(value); setPage(1); };
 
   const openNew = () => { setForm(EMPTY_FORM); setEditing({}); };
   const openEdit = (d) => { setForm({ ...EMPTY_FORM, ...d }); setEditing(d); };
@@ -109,10 +115,10 @@ export default function DistributorsPage() {
 
         <div className="toolbar">
           <div className="toolbar-group">
-            <input id="distributors-search" type="text" placeholder="Search distributors…" value={search} onChange={(e) => setSearch(e.target.value)} />
+            <input id="distributors-search" type="text" placeholder="Search distributors…" value={search} onChange={(e) => updateFilter(setSearch)(e.target.value)} />
           </div>
           <div className="toolbar-group">
-            <select id="distributors-status" value={status} onChange={(e) => setStatus(e.target.value)}>
+            <select id="distributors-status" value={status} onChange={(e) => updateFilter(setStatus)(e.target.value)}>
               <option value="">All statuses</option>
               <option value="active">Active</option>
               <option value="inactive">Inactive</option>
@@ -124,7 +130,39 @@ export default function DistributorsPage() {
         {loading ? (
           <TableSkeleton columns={6} rows={6} />
         ) : (
-          <div className="table-wrap page-table-scroll">
+          <>
+          <div className="list-cards">
+            {rows.map((d) => (
+              <div key={d.id} className="list-card" data-status={d.status} onClick={() => openEdit(d)}>
+                <div className="list-card-top">
+                  <span className="list-card-title">{d.name}</span>
+                  <StatusBadge value={d.status} />
+                </div>
+                <div className="list-card-subtitle">{[d.zone, d.city].filter(Boolean).join(' · ') || '—'}</div>
+                {(d.contact_name || d.contact_phone) && (
+                  <div className="list-card-meta">
+                    {d.contact_name || '—'}{d.contact_phone ? ` · ${d.contact_phone}` : ''}
+                  </div>
+                )}
+                <div className="list-card-values">
+                  <div>
+                    <span className="list-card-value-label">Balance</span>
+                    <span className="list-card-value-amount">{money(d.balance)}</span>
+                  </div>
+                </div>
+                <div className="table-actions" style={{ marginTop: 12 }} onClick={(e) => e.stopPropagation()}>
+                  <Link to={`/ledger?distributor_id=${d.id}`} className="btn-ghost" title="View ledger" aria-label="View ledger"><Eye size={15} /></Link>
+                  <button className="btn-ghost" onClick={() => openEdit(d)} title="Edit" aria-label="Edit"><Pencil size={15} /></button>
+                  <button className="btn-ghost" onClick={() => toggleStatus(d)} title={d.status === 'active' ? 'Mark inactive' : 'Reactivate'} aria-label={d.status === 'active' ? 'Mark inactive' : 'Reactivate'}>
+                    {d.status === 'active' ? <Ban size={15} /> : <RotateCcw size={15} />}
+                  </button>
+                  {isAdmin && <button className="btn-ghost" onClick={() => handleDelete(d)} title="Delete" aria-label="Delete"><Trash2 size={15} /></button>}
+                </div>
+              </div>
+            ))}
+            {rows.length === 0 && <div className="empty-state">No distributors found.</div>}
+          </div>
+          <div className="table-wrap">
             <table className="data-table">
               <thead>
                 <tr>
@@ -160,13 +198,10 @@ export default function DistributorsPage() {
               </tbody>
             </table>
           </div>
+          </>
         )}
 
-        {!loading && rows.length > 0 && (
-          <div className="table-footer">
-            Showing 1 to {rows.length} of {rows.length} distributor{rows.length === 1 ? '' : 's'}
-          </div>
-        )}
+        <Pagination pagination={pagination} onPageChange={setPage} />
       </div>
 
       {editing !== null && (

@@ -1,12 +1,13 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { useNavigate, useBlocker, useLocation } from 'react-router-dom';
-import { Plus, Minus, Trash2, Loader2, Check } from 'lucide-react';
+import { useNavigate, useBlocker, useLocation, Link } from 'react-router-dom';
+import { Plus, Minus, Trash2, Loader2, Check, ArrowLeft } from 'lucide-react';
 import { distributors as distributorsApi, products as productsApi, orders as ordersApi } from '../api/endpoints';
 import { apiErrorMessage } from '../api/client';
 import { useToast } from '../context/ToastContext';
 import Modal from '../components/Modal';
 import { LoadingModal, SavingModal } from '../components/StatusModals';
 import { newDraftId, getDraft, saveDraft, saveDraftBeacon, deleteDraft, ORDER_STEPS as STEPS } from '../utils/orderDrafts';
+import { fetchAllPages } from '../utils/fetchAllPages';
 
 function money(n) {
   return Number(n || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
@@ -149,8 +150,8 @@ export default function CreateOrderPage() {
   }, []);
 
   useEffect(() => {
-    distributorsApi.list({ status: 'active' }).then((res) => setDistributorsList(res.data)).catch((err) => toast.error(apiErrorMessage(err)));
-    productsApi.list({ is_active: 'true' }).then((res) => setProductsList(res.data)).catch((err) => toast.error(apiErrorMessage(err)));
+    fetchAllPages(distributorsApi.list, { status: 'active' }).then(setDistributorsList).catch((err) => toast.error(apiErrorMessage(err)));
+    fetchAllPages(productsApi.list, { is_active: 'true' }).then(setProductsList).catch((err) => toast.error(apiErrorMessage(err)));
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
@@ -264,6 +265,9 @@ export default function CreateOrderPage() {
     <div className="content" style={{ maxWidth: 760 }}>
       <div className="page-header">
         <div>
+          <Link to="/orders" className="link-btn" style={{ display: 'inline-flex', alignItems: 'center', gap: 4, marginBottom: 10, fontSize: 13 }}>
+            <ArrowLeft size={14} /> Leave Order Page
+          </Link>
           <h1>New Order</h1>
           <p>Create an order, apply discount/freight, and generate the invoice.</p>
         </div>

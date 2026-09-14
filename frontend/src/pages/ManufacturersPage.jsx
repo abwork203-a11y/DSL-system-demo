@@ -1,5 +1,5 @@
 import { useEffect, useState, useCallback } from 'react';
-import { Plus, Pencil, Trash2 } from 'lucide-react';
+import { Plus, Pencil, Trash2, ChevronRight } from 'lucide-react';
 import { manufacturers as mfgApi } from '../api/endpoints';
 import { apiErrorMessage } from '../api/client';
 import { useToast } from '../context/ToastContext';
@@ -96,6 +96,31 @@ export default function ManufacturersPage() {
         {loading ? (
           <TableSkeleton columns={5} rows={5} />
         ) : (
+          <>
+          <div className="list-cards">
+            {rows.map((m) => (
+              <div key={m.id} className="list-card" data-status={m.is_active ? 'active' : 'inactive'} onClick={() => openEdit(m)}>
+                <div className="list-card-top">
+                  <span className="list-card-title">{m.name}</span>
+                  {m.is_active ? <span className="badge badge-green">active</span> : <span className="badge badge-neutral">inactive</span>}
+                </div>
+                {(m.contact_name || m.contact_phone) && (
+                  <div className="list-card-subtitle">{m.contact_name || '—'}{m.contact_phone ? ` · ${m.contact_phone}` : ''}</div>
+                )}
+                <div className="list-card-values">
+                  <div>
+                    <span className="list-card-value-label">Balance Owed</span>
+                    <span className="list-card-value-amount">{money(m.balance)}</span>
+                  </div>
+                </div>
+                <div className="table-actions" style={{ marginTop: 12 }} onClick={(e) => e.stopPropagation()}>
+                  <button className="btn-ghost" onClick={() => openEdit(m)} title="Edit" aria-label="Edit"><Pencil size={15} /></button>
+                  <button className="btn-ghost" onClick={() => handleDelete(m)} title="Delete" aria-label="Delete"><Trash2 size={15} /></button>
+                </div>
+              </div>
+            ))}
+            {rows.length === 0 && <div className="empty-state">No manufacturers found.</div>}
+          </div>
           <div className="table-wrap">
             <table className="data-table">
               <thead>
@@ -126,6 +151,7 @@ export default function ManufacturersPage() {
               </tbody>
             </table>
           </div>
+          </>
         )}
 
         {!loading && rows.length > 0 && (

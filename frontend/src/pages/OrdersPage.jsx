@@ -1,6 +1,6 @@
 import { useEffect, useState, useCallback } from 'react';
 import { Link, useNavigate, useLocation } from 'react-router-dom';
-import { Trash2 } from 'lucide-react';
+import { Trash2, CalendarDays, ChevronRight } from 'lucide-react';
 import { orders as ordersApi, distributors as distributorsApi } from '../api/endpoints';
 import { apiErrorMessage } from '../api/client';
 import { useToast } from '../context/ToastContext';
@@ -10,6 +10,7 @@ import StatusBadge from '../components/StatusBadge';
 import Pagination from '../components/Pagination';
 import { TableSkeleton } from '../components/Skeleton';
 import { listDrafts, deleteDraft, formatRelativeTime, ORDER_STEPS } from '../utils/orderDrafts';
+import { fetchAllPages } from '../utils/fetchAllPages';
 
 const PAGE_SIZE = 25;
 
@@ -76,7 +77,7 @@ export default function OrdersPage() {
   }, [search, orderStatus, paymentStatus, distributorId, page]);
 
   useEffect(() => { load(); }, [load]);
-  useEffect(() => { distributorsApi.list().then((res) => setDistributorsList(res.data)).catch(() => {}); }, []);
+  useEffect(() => { fetchAllPages(distributorsApi.list).then(setDistributorsList).catch(() => {}); }, []);
   useLiveOrderEvents(() => load());
 
   useEffect(() => { loadDrafts(); }, [loadDrafts]);
@@ -205,6 +206,35 @@ export default function OrdersPage() {
           {loading ? (
             <TableSkeleton columns={7} rows={6} />
           ) : (
+            <>
+            <div className="list-cards">
+              {rows.map((o) => (
+                <Link
+                  key={o.id}
+                  to={`/orders/${o.id}`}
+                  className="list-card"
+                  data-status={o.order_status}
+                  style={{ display: 'block', textDecoration: 'none', color: 'inherit' }}
+                >
+                  <div className="list-card-top">
+                    <span className="list-card-title" style={{ fontFamily: 'var(--font-mono)' }}>{o.order_number}</span>
+                    <StatusBadge value={o.order_status} />
+                  </div>
+                  <div className="list-card-subtitle">{o.distributor_name}</div>
+                  <div className="list-card-meta">
+                    <CalendarDays size={13} /> {new Date(o.order_date).toLocaleDateString()}
+                  </div>
+                  <div className="list-card-values">
+                    <div>
+                      <span className="list-card-value-label">Total</span>
+                      <span className="list-card-value-amount">{money(o.total)}</span>
+                    </div>
+                  </div>
+                  <ChevronRight size={16} className="list-card-chevron" />
+                </Link>
+              ))}
+              {rows.length === 0 && <div className="empty-state">No orders match these filters.</div>}
+            </div>
             <div className="table-wrap">
               <table className="data-table">
                 <thead>
@@ -236,6 +266,7 @@ export default function OrdersPage() {
                 </tbody>
               </table>
             </div>
+            </>
           )}
           <Pagination pagination={pagination} onPageChange={setPage} />
         </div>

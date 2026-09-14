@@ -9,6 +9,7 @@ import Modal from '../components/Modal';
 import PasswordInput from '../components/PasswordInput';
 import PasswordStrengthMeter from '../components/PasswordStrengthMeter';
 import { TableSkeleton } from '../components/Skeleton';
+import { fetchAllPages } from '../utils/fetchAllPages';
 
 const EMPTY_FORM = { name: '', email: '', password: '', role: 'sales_rep', assigned_zone: '' };
 
@@ -42,9 +43,9 @@ export default function UsersPage() {
   // keeps a sales rep's assigned zone consistent with real zone names
   // instead of free text that could drift (typos, casing, abbreviations).
   useEffect(() => {
-    distributorsApi.list()
-      .then((res) => {
-        const distinctZones = Array.from(new Set(res.data.map((d) => d.zone).filter(Boolean))).sort();
+    fetchAllPages(distributorsApi.list)
+      .then((allDistributors) => {
+        const distinctZones = Array.from(new Set(allDistributors.map((d) => d.zone).filter(Boolean))).sort();
         setZones(distinctZones);
       })
       .catch(() => {});
@@ -134,6 +135,33 @@ export default function UsersPage() {
         {loading ? (
           <TableSkeleton columns={6} rows={4} />
         ) : (
+          <>
+          <div className="list-cards">
+            {rows.map((u) => (
+              <div key={u.id} className="list-card" data-status={u.is_active ? 'active' : 'inactive'}>
+                <div className="list-card-top">
+                  <span className="list-card-title">{u.name}</span>
+                  {u.is_active ? <span className="badge badge-green">active</span> : <span className="badge badge-neutral">inactive</span>}
+                </div>
+                <div className="list-card-subtitle">{u.email}</div>
+                <div className="list-card-meta" style={{ textTransform: 'capitalize' }}>
+                  {u.role.replace('_', ' ')}{u.assigned_zone ? ` · ${u.assigned_zone}` : ''}
+                </div>
+                <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginTop: 4 }}>
+                  <button className="btn btn-secondary btn-sm" onClick={() => openEdit(u)}><Pencil size={14} /> Edit</button>
+                  {u.id !== currentUser.id && (
+                    <button className="btn btn-secondary btn-sm" onClick={() => toggleActive(u)}>
+                      {u.is_active ? 'Deactivate' : 'Reactivate'}
+                    </button>
+                  )}
+                  {u.id !== currentUser.id && (
+                    <button className="btn btn-danger btn-sm" onClick={() => handleDelete(u)}><Trash2 size={14} /> Delete</button>
+                  )}
+                </div>
+              </div>
+            ))}
+            {rows.length === 0 && <div className="empty-state">No accounts yet.</div>}
+          </div>
           <div className="table-wrap">
             <table className="data-table">
               <thead>
@@ -164,6 +192,7 @@ export default function UsersPage() {
               </tbody>
             </table>
           </div>
+          </>
         )}
       </div>
 

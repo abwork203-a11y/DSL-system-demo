@@ -1,10 +1,11 @@
 import { useEffect, useState, useCallback } from 'react';
-import { Plus, Pencil, Trash2 } from 'lucide-react';
+import { Plus, Pencil, Trash2, ChevronRight } from 'lucide-react';
 import { products as productsApi, manufacturers as mfgApi } from '../api/endpoints';
 import { apiErrorMessage } from '../api/client';
 import { useToast } from '../context/ToastContext';
 import { useConfirm } from '../context/ConfirmContext';
 import Modal from '../components/Modal';
+import Pagination from '../components/Pagination';
 import { TableSkeleton } from '../components/Skeleton';
 
 const EMPTY_FORM = { manufacturer_id: '', name: '', size_packaging: '', price: '', retail_price: '' };
@@ -17,6 +18,8 @@ export default function ProductsPage() {
   const toast = useToast();
   const confirm = useConfirm();
   const [rows, setRows] = useState([]);
+  const [pagination, setPagination] = useState(null);
+  const [page, setPage] = useState(1);
   const [mfgs, setMfgs] = useState([]);
   const [search, setSearch] = useState('');
   const [mfgFilter, setMfgFilter] = useState('');
@@ -27,18 +30,23 @@ export default function ProductsPage() {
 
   const load = useCallback(async () => {
     try {
-      const res = await productsApi.list({ search: search || undefined, manufacturer_id: mfgFilter || undefined });
-      setRows(res.data);
+      const res = await productsApi.list({ search: search || undefined, manufacturer_id: mfgFilter || undefined, page, pageSize: 25 });
+      setRows(res.data.data);
+      setPagination(res.data.pagination);
     } catch (err) {
       toast.error(apiErrorMessage(err));
     } finally {
       setLoading(false);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [search, mfgFilter]);
+  }, [search, mfgFilter, page]);
 
   useEffect(() => { load(); }, [load]);
   useEffect(() => { mfgApi.list().then((res) => setMfgs(res.data)).catch(() => {}); }, []);
+
+  // A filter change should reset back to page 1 — staying on a now-shorter
+  // result set's page 4 would just show an empty page.
+  const updateFilter = (setter) => (value) => { setter(value); setPage(1); };
 
   const openNew = () => { setForm(EMPTY_FORM); setEditing({}); };
   const openEdit = (p) => { setForm({ ...EMPTY_FORM, ...p }); setEditing(p); };
@@ -98,10 +106,10 @@ export default function ProductsPage() {
 
        <div className="toolbar">
           <div className="toolbar-group">
-            <input id="products-search" type="text" placeholder="Search products…" value={search} onChange={(e) => setSearch(e.target.value)} />
+            <input id="products-search" type="text" placeholder="Search products…" value={search} onChange={(e) => updateFilter(setSearch)(e.target.value)} />
           </div>
           <div className="toolbar-group">
-            <select id="products-manufacturer" value={mfgFilter} onChange={(e) => setMfgFilter(e.target.value)}>
+            <select id="products-manufacturer" value={mfgFilter} onChange={(e) => updateFilter(setMfgFilter)(e.target.value)}>
               <option value="">All manufacturers</option>
               {mfgs.map((m) => <option key={m.id} value={m.id}>{m.name}</option>)}
             </select>
@@ -113,7 +121,32 @@ export default function ProductsPage() {
         {loading ? (
           <TableSkeleton columns={7} rows={5} />
         ) : (
-          <div className="table-wrap page-table-scroll">
+          <>
+          <div className="list-cards">
+            {rows.map((p) => (
+              <div key={p.id} className="list-card" data-status={p.is_active ? 'active' : 'inactive'} onClick={() => openEdit(p)}>
+                <div className="list-card-top">
+                  <span className="list-card-title">{p.name}</span>
+                  {p.is_active ? <span className="badge badge-green">active</span> : <span className="badge badge-neutral">inactive</span>}
+                </div>
+                <div className="list-card-subtitle">{p.manufacturer_name}</div>
+                {p.size_packaging && <div className="list-card-meta">{p.size_packaging}</div>}
+                <div className="list-card-values">
+                  <div>
+                    <span className="list-card-value-label">Retail</span>
+                    <span className="list-card-value-amount">{money(p.retail_price)}</span>
+                  </div>
+                  <div>
+                    <span className="list-card-value-label">Invoice</span>
+                    <span className="list-card-value-amount">{money(p.price)}</span>
+                  </div>
+                </div>
+                <ChevronRight size={16} className="list-card-chevron" />
+              </div>
+            ))}
+            {rows.length === 0 && <div className="empty-state">No products found.</div>}
+          </div>
+          <div className="table-wrap">
             <table className="data-table">
               <thead>
                 <tr>
@@ -147,13 +180,10 @@ export default function ProductsPage() {
               </tbody>
             </table>
           </div>
+          </>
         )}
 
-        {!loading && rows.length > 0 && (
-          <div className="table-footer">
-            Showing 1 to {rows.length} of {rows.length} product{rows.length === 1 ? '' : 's'}
-          </div>
-        )}
+        <Pagination pagination={pagination} onPageChange={setPage} />
       </div>
 
       {editing !== null && (
