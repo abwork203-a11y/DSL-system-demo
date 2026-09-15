@@ -19,6 +19,7 @@ import {
 
 import { apiErrorMessage, downloadFile } from '../api/client';
 import { monthToDateRange } from '../utils/dateRange';
+import { fetchAllPages } from '../utils/fetchAllPages';
 import { useAuth } from '../context/AuthContext';
 import { useToast } from '../context/ToastContext';
 import StatusBadge from '../components/StatusBadge';
@@ -139,11 +140,8 @@ export default function LedgerPage() {
    * Load distributors.
    */
   useEffect(() => {
-    distributorsApi
-      .list()
-      .then((res) => {
-        setDistributorsList(res.data);
-      })
+    fetchAllPages(distributorsApi.list)
+      .then(setDistributorsList)
       .catch(() => {});
   }, []);
 
