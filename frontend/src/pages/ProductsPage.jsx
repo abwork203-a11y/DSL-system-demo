@@ -124,24 +124,23 @@ export default function ProductsPage() {
           <>
           <div className="list-cards">
             {rows.map((p) => (
-              <div key={p.id} className="list-card" data-status={p.is_active ? 'active' : 'inactive'} onClick={() => openEdit(p)}>
-                <div className="list-card-top">
-                  <span className="list-card-title">{p.name}</span>
-                  {p.is_active ? <span className="badge badge-green">active</span> : <span className="badge badge-neutral">inactive</span>}
+              <div key={p.id} className="pill-card" data-status={p.is_active ? 'active' : 'inactive'} onClick={() => openEdit(p)} style={{ cursor: 'pointer' }}>
+                <div className="pill-card-left">
+                  <div className="pill-card-name">{p.name}</div>
+                  <div className="pill-card-sub">{p.manufacturer_name}</div>
+                  {p.size_packaging && <div className="pill-card-meta">{p.size_packaging}</div>}
                 </div>
-                <div className="list-card-subtitle">{p.manufacturer_name}</div>
-                {p.size_packaging && <div className="list-card-meta">{p.size_packaging}</div>}
-                <div className="list-card-values">
-                  <div>
-                    <span className="list-card-value-label">Retail</span>
-                    <span className="list-card-value-amount">{money(p.retail_price)}</span>
+                <div className="pill-card-divider" />
+                <div className="pill-card-rows">
+                  <div className="pill-card-row">
+                    <span className="pill-card-row-label">Retail Price</span>
+                    <span className="pill-card-row-value">{money(p.retail_price)}</span>
                   </div>
-                  <div>
-                    <span className="list-card-value-label">Invoice</span>
-                    <span className="list-card-value-amount">{money(p.price)}</span>
+                  <div className="pill-card-row pill-card-row-muted">
+                    <span className="pill-card-row-label">Invoice Price</span>
+                    <span className="pill-card-row-value">{money(p.price)}</span>
                   </div>
                 </div>
-                <ChevronRight size={16} className="list-card-chevron" />
               </div>
             ))}
             {rows.length === 0 && <div className="empty-state">No products found.</div>}

@@ -3399,3 +3399,128 @@ input[type='password']::-ms-clear {
 }
 
 
+
+/* ==============================================================
+   PILL CARDS
+   Horizontal card: name/subtitle on the left, a vertical divider, then
+   one or more label:value rows on the right. Colored left border encodes
+   status (green = positive/active, red = negative/inactive, amber =
+   pending) using the same fixed --status-* tokens as everywhere else.
+   Used for Products, Orders, and Order Line Items — all app font/colors,
+   nothing new introduced beyond this shape.
+   ============================================================== */
+
+.pill-card {
+  display: flex;
+  align-items: stretch;
+  gap: 16px;
+
+  margin-bottom: 12px;
+  padding: 16px 18px;
+
+  border-radius: 14px;
+  border-left: 5px solid var(--rule-strong);
+
+  background: var(--surface-sunken);
+}
+
+.pill-card:last-child {
+  margin-bottom: 0;
+}
+
+.pill-card[data-status="active"],
+.pill-card[data-status="completed"],
+.pill-card[data-status="paid"] {
+  border-left-color: var(--status-positive);
+}
+
+.pill-card[data-status="inactive"],
+.pill-card[data-status="cancelled"] {
+  border-left-color: var(--status-negative);
+}
+
+.pill-card[data-status="pending"],
+.pill-card[data-status="unpaid"] {
+  border-left-color: var(--status-pending);
+}
+
+.pill-card-left {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  gap: 2px;
+
+  flex-shrink: 0;
+  min-width: 0;
+  max-width: 46%;
+}
+
+.pill-card-name {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+
+  font-size: 16.5px;
+  font-weight: 700;
+  line-height: 1.3;
+}
+
+.pill-card-sub {
+  color: var(--ink-muted);
+  font-size: 12.5px;
+}
+
+.pill-card-meta {
+  margin-top: 1px;
+
+  color: var(--ink-muted);
+  font-size: 12.5px;
+}
+
+.pill-card-divider {
+  width: 1px;
+  flex-shrink: 0;
+
+  background: var(--rule-strong);
+}
+
+.pill-card-rows {
+  display: flex;
+  flex: 1;
+  min-width: 0;
+  flex-direction: column;
+  justify-content: center;
+}
+
+.pill-card-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+
+  padding: 5px 0;
+}
+
+.pill-card-row:not(:last-child) {
+  border-bottom: 1px solid var(--rule);
+}
+
+.pill-card-row-label {
+  font-size: 12.5px;
+  font-weight: 700;
+  color: var(--ink);
+}
+
+.pill-card-row-value {
+  font-family: var(--font-mono);
+  font-weight: 700;
+  font-size: 13.5px;
+  font-variant-numeric: tabular-nums;
+  text-align: right;
+}
+
+.pill-card-row-muted .pill-card-row-label,
+.pill-card-row-muted .pill-card-row-value {
+  color: var(--ink-muted);
+  font-weight: 600;
+}

@@ -212,25 +212,32 @@ export default function OrdersPage() {
                 <Link
                   key={o.id}
                   to={`/orders/${o.id}`}
-                  className="list-card"
+                  className="pill-card"
                   data-status={o.order_status}
-                  style={{ display: 'block', textDecoration: 'none', color: 'inherit' }}
+                  style={{ textDecoration: 'none', color: 'inherit' }}
                 >
-                  <div className="list-card-top">
-                    <span className="list-card-title" style={{ fontFamily: 'var(--font-mono)' }}>{o.order_number}</span>
-                    <StatusBadge value={o.order_status} />
-                  </div>
-                  <div className="list-card-subtitle">{o.distributor_name}</div>
-                  <div className="list-card-meta">
-                    <CalendarDays size={13} /> {new Date(o.order_date).toLocaleDateString()}
-                  </div>
-                  <div className="list-card-values">
-                    <div>
-                      <span className="list-card-value-label">Total</span>
-                      <span className="list-card-value-amount">{money(o.total)}</span>
+                  <div className="pill-card-left">
+                    <div className="pill-card-name">
+                      <span style={{ fontFamily: 'var(--font-mono)' }}>{o.order_number}</span>
+                      <StatusBadge value={o.order_status} />
+                    </div>
+                    <div className="pill-card-sub">{o.distributor_name}</div>
+                    <div className="pill-card-meta">
+                      <CalendarDays size={12} style={{ verticalAlign: -2, marginRight: 4 }} />
+                      {new Date(o.order_date).toLocaleDateString()}
                     </div>
                   </div>
-                  <ChevronRight size={16} className="list-card-chevron" />
+                  <div className="pill-card-divider" />
+                  <div className="pill-card-rows">
+                    <div className="pill-card-row">
+                      <span className="pill-card-row-label">Total</span>
+                      <span className="pill-card-row-value">{money(o.total)}</span>
+                    </div>
+                    <div className="pill-card-row pill-card-row-muted">
+                      <span className="pill-card-row-label">Payment</span>
+                      <span className="pill-card-row-value" style={{ textTransform: 'capitalize' }}>{o.payment_status}</span>
+                    </div>
+                  </div>
                 </Link>
               ))}
               {rows.length === 0 && <div className="empty-state">No orders match these filters.</div>}

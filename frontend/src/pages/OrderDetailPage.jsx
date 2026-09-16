@@ -260,8 +260,6 @@ export default function OrderDetailPage() {
         <button type="button" className={`page-tab${tab === 'items' ? ' active' : ''}`} onClick={() => setTab('items')}>
           Line Items <span className="page-tab-count">{order.items.length}</span>
         </button>
-        <button type="button" className={`page-tab${tab === 'payments' ? ' active' : ''}`} onClick={() => setTab('payments')}>Payments</button>
-        <button type="button" className={`page-tab${tab === 'history' ? ' active' : ''}`} onClick={() => setTab('history')}>History</button>
       </div>
 
       <div className="order-detail-layout">
@@ -327,32 +325,31 @@ export default function OrderDetailPage() {
           {tab === 'items' && (
             <div className="card">
               <h2 style={{ marginBottom: 14 }}>Line Items</h2>
-              <div className="table-wrap">
-                <table className="data-table">
-                  <thead>
-                    <tr>
-                      <th>Manufacturer</th>
-                      <th>Product</th>
-                      <th className="num">Qty</th>
-                      <th className="num">Unit Price</th>
-                      <th className="num">Line Total</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {order.items.map((it) => (
-                      <tr key={it.id}>
-                        <td data-label="Manufacturer">{it.manufacturer_name}</td>
-                        <td data-label="Product">
-                          {it.product_name}
-                          {it.size_packaging ? <span style={{ color: 'var(--ink-muted)' }}> ({it.size_packaging})</span> : ''}
-                        </td>
-                        <td className="num" data-label="Qty">{Number(it.quantity)}</td>
-                        <td className="num" data-label="Unit Price">{money(it.price_at_time_of_order)}</td>
-                        <td className="num" data-label="Line Total">{money(it.line_total)}</td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
+              <div>
+                {order.items.map((it) => (
+                  <div key={it.id} className="pill-card">
+                    <div className="pill-card-left">
+                      <div className="pill-card-name">{it.product_name}</div>
+                      <div className="pill-card-sub">{it.manufacturer_name}</div>
+                      {it.size_packaging && <div className="pill-card-meta">{it.size_packaging}</div>}
+                    </div>
+                    <div className="pill-card-divider" />
+                    <div className="pill-card-rows">
+                      <div className="pill-card-row">
+                        <span className="pill-card-row-label">Qty</span>
+                        <span className="pill-card-row-value">{Number(it.quantity)}</span>
+                      </div>
+                      <div className="pill-card-row">
+                        <span className="pill-card-row-label">Unit Price</span>
+                        <span className="pill-card-row-value">{money(it.price_at_time_of_order)}</span>
+                      </div>
+                      <div className="pill-card-row pill-card-row-muted">
+                        <span className="pill-card-row-label">Line Price</span>
+                        <span className="pill-card-row-value">{money(it.line_total)}</span>
+                      </div>
+                    </div>
+                  </div>
+                ))}
               </div>
               <div style={{ marginTop: 16, marginLeft: 'auto', width: 260, fontSize: 14, lineHeight: 1.9 }}>
                 <div>Subtotal <span className="num" style={{ float: 'right' }}>{money(order.subtotal)}</span></div>
@@ -365,42 +362,14 @@ export default function OrderDetailPage() {
             </div>
           )}
 
-          {tab === 'payments' && (
-            <div className="card">
-              <h2 style={{ marginBottom: 14 }}>Payment Information</h2>
-              <div className="summary-row"><span className="summary-row-label">Total</span><span className="summary-row-value">{money(order.total)}</span></div>
-              <div className="summary-row"><span className="summary-row-label">Paid Amount</span><span className="summary-row-value">{money(order.amount_paid)}</span></div>
-              <div className="summary-row"><span className="summary-row-label">Balance Remaining</span><span className="summary-row-value">{money(balanceRemaining)}</span></div>
-              <div className="summary-row"><span className="summary-row-label">Payment Status</span><span className="summary-row-value"><StatusBadge value={order.payment_status} /></span></div>
-              {balanceRemaining > 0 && (
-                <button
-                  className="btn"
-                  style={{ marginTop: 16, width: '100%', justifyContent: 'center' }}
-                  onClick={() => { setPayAmount(String(balanceRemaining)); setPayOpen(true); }}
-                >
-                  Record Payment
-                </button>
-              )}
-              <p style={{ marginTop: 14, fontSize: 12, color: 'var(--ink-muted)' }}>
-                For this distributor's full payment history across every order, see the{' '}
-                <Link to={`/ledger?distributor_id=${order.distributor_id}`} className="link-btn">Ledger</Link>.
-              </p>
-            </div>
-          )}
-
-          {tab === 'history' && (
-            <div className="card">
-              <h2 style={{ marginBottom: 14 }}>Activity History</h2>
-              <ActivityList entries={activity} />
-            </div>
-          )}
-
         </div>
 
         <div className="order-detail-sidebar">
 
           <div className="card">
             <h3 style={{ marginBottom: 4 }}>Payment Information</h3>
+            <div className="summary-row"><span className="summary-row-label">Discount Amount</span><span className="summary-row-value">{money(order.discount)}</span></div>
+            <div className="summary-row"><span className="summary-row-label">Freight</span><span className="summary-row-value">{money(order.freight_cost)}</span></div>
             <div className="summary-row"><span className="summary-row-label">Balance Remaining</span><span className="summary-row-value">{money(balanceRemaining)}</span></div>
             <div className="summary-row"><span className="summary-row-label">Paid Amount</span><span className="summary-row-value">{money(order.amount_paid)}</span></div>
             {balanceRemaining > 0 && (
@@ -417,16 +386,6 @@ export default function OrderDetailPage() {
           <div className="card">
             <h3 style={{ marginBottom: 10 }}>Recent Activity</h3>
             <ActivityList entries={activity.slice(0, 4)} />
-            {activity.length > 4 && (
-              <button
-                type="button"
-                className="link-btn"
-                style={{ marginTop: 4, background: 'none', border: 'none', cursor: 'pointer', padding: 0, font: 'inherit' }}
-                onClick={() => setTab('history')}
-              >
-                View all activity →
-              </button>
-            )}
           </div>
 
         </div>
