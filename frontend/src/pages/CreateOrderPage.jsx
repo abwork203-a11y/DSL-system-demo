@@ -351,7 +351,7 @@ export default function CreateOrderPage() {
               />
             </div>
 
-                        <div className="order-product-list">
+            <div className="list-cards order-product-list">
               {filteredProducts.map((p) => {
                 const alreadyAdded = items.some((it) => it.product_id === p.id);
                 return (
@@ -391,77 +391,190 @@ export default function CreateOrderPage() {
               )}
             </div>
 
+            <div className="table-wrap" style={{ maxHeight: 260, height: 'auto', marginBottom: 20 }}>
+              <table className="data-table">
+                <thead>
+                  <tr>
+                    <th>Product</th>
+                    <th>Manufacturer</th>
+                    <th>Size/Packaging</th>
+                    <th className="num">Retail Price</th>
+                    <th className="num">Invoice Price</th>
+                    <th></th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {filteredProducts.map((p) => {
+                    const alreadyAdded = items.some((it) => it.product_id === p.id);
+                    return (
+                      <tr key={p.id}>
+                        <td data-label="Product">{p.name}</td>
+                        <td data-label="Manufacturer">{p.manufacturer_name}</td>
+                        <td data-label="Size/Packaging">{p.size_packaging || '—'}</td>
+                        <td className="num" data-label="Retail Price">{money(p.retail_price)}</td>
+                        <td className="num" data-label="Invoice Price">{money(p.price)}</td>
+                        <td>
+                          <button
+                            type="button"
+                            className="btn btn-secondary btn-sm"
+                            disabled={alreadyAdded}
+                            onClick={() => addItem(p)}
+                            title={alreadyAdded ? 'Already on this order' : 'Add to order'}
+                          >
+                            <Plus size={14} />
+                          </button>
+                        </td>
+                      </tr>
+                    );
+                  })}
+                  {filteredProducts.length === 0 && (
+                    <tr><td colSpan={6}><div className="empty-state">No products match "{productSearch}".</div></td></tr>
+                  )}
+                </tbody>
+              </table>
+            </div>
+
             <div className="order-builder-divider">
               <h3>Added to order ({items.length})</h3>
             </div>
 
-                        {items.length > 0 ? (
-              <div className="order-product-list">
-                {items.map((it) => (
-                  <div key={it.product_id} className="pill-card order-product-card added-product-row">
-                    <div className="pill-card-left">
-                      <div className="pill-card-name">{it.name}</div>
-                      <div className="pill-card-sub">{it.manufacturer_name}</div>
-                      {it.size_packaging && <div className="pill-card-meta">{it.size_packaging}</div>}
-                    </div>
-                    <div className="pill-card-divider" />
-                    <div className="pill-card-rows">
-                      <div className="pill-card-row">
-                        <span className="pill-card-row-label">Price</span>
-                        <span className="pill-card-row-value">{money(it.price)}</span>
+            {items.length > 0 ? (
+              <>
+                <div className="list-cards order-product-list">
+                  {items.map((it) => (
+                    <div key={it.product_id} className="pill-card order-product-card added-product-row">
+                      <div className="pill-card-left">
+                        <div className="pill-card-name">{it.name}</div>
+                        <div className="pill-card-sub">{it.manufacturer_name}</div>
+                        {it.size_packaging && <div className="pill-card-meta">{it.size_packaging}</div>}
                       </div>
-                      <div className="pill-card-row pill-card-row-muted">
-                        <span className="pill-card-row-label">Line Total</span>
-                        <span className="pill-card-row-value">{money(it.price * it.quantity)}</span>
+                      <div className="pill-card-divider" />
+                      <div className="pill-card-rows">
+                        <div className="pill-card-row">
+                          <span className="pill-card-row-label">Price</span>
+                          <span className="pill-card-row-value">{money(it.price)}</span>
+                        </div>
+                        <div className="pill-card-row pill-card-row-muted">
+                          <span className="pill-card-row-label">Line Total</span>
+                          <span className="pill-card-row-value">{money(it.price * it.quantity)}</span>
+                        </div>
                       </div>
-                    </div>
-                    <div className="pill-card-divider" />
-                    <div className="order-qty-stepper">
+                      <div className="pill-card-divider" />
+                      <div className="order-qty-stepper">
+                        <button
+                          type="button"
+                          className="btn btn-secondary btn-sm"
+                          aria-label="Decrease quantity"
+                          onClick={() => updateQty(it.product_id, Number(it.quantity) - 1)}
+                        >
+                          <Minus size={14} />
+                        </button>
+                        <input
+                          type="number"
+                          min="1"
+                          className="qty-input"
+                          key={`qty-${it.product_id}-${it.quantity}`}
+                          defaultValue={it.quantity}
+                          aria-label={`Quantity for ${it.name}`}
+                          onFocus={(e) => e.target.select()}
+                          onBlur={(e) => updateQty(it.product_id, Number(e.target.value) || 0)}
+                          onKeyDown={(e) => {
+                            if (e.key === 'Enter') e.target.blur();
+                          }}
+                        />
+                        <button
+                          type="button"
+                          className="btn btn-secondary btn-sm"
+                          aria-label="Increase quantity"
+                          onClick={() => updateQty(it.product_id, Number(it.quantity) + 1)}
+                        >
+                          <Plus size={14} />
+                        </button>
+                      </div>
                       <button
                         type="button"
-                        className="btn btn-secondary btn-sm"
-                        aria-label="Decrease quantity"
-                        onClick={() => updateQty(it.product_id, Number(it.quantity) - 1)}
+                        className="btn-ghost"
+                        aria-label="Remove item"
+                        onClick={() => removeItem(it.product_id)}
                       >
-                        <Minus size={14} />
-                      </button>
-                      <input
-                        type="number"
-                        min="1"
-                        className="qty-input"
-                        key={`qty-${it.product_id}-${it.quantity}`}
-                        defaultValue={it.quantity}
-                        aria-label={`Quantity for ${it.name}`}
-                        onFocus={(e) => e.target.select()}
-                        onBlur={(e) => updateQty(it.product_id, Number(e.target.value) || 0)}
-                        onKeyDown={(e) => {
-                          if (e.key === 'Enter') e.target.blur();
-                        }}
-                      />
-                      <button
-                        type="button"
-                        className="btn btn-secondary btn-sm"
-                        aria-label="Increase quantity"
-                        onClick={() => updateQty(it.product_id, Number(it.quantity) + 1)}
-                      >
-                        <Plus size={14} />
+                        <Trash2 size={16} />
                       </button>
                     </div>
-                    <button
-                      type="button"
-                      className="btn-ghost"
-                      aria-label="Remove item"
-                      onClick={() => removeItem(it.product_id)}
-                    >
-                      <Trash2 size={16} />
-                    </button>
-                  </div>
-                ))}
-              </div>
+                  ))}
+                </div>
+
+                <div className="table-wrap added-products-list">
+                  <table className="data-table">
+                    <thead>
+                      <tr>
+                        <th>Product</th>
+                        <th>Manufacturer</th>
+                        <th className="num">Price</th>
+                        <th className="num">Qty</th>
+                        <th className="num">Line Total</th>
+                        <th></th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {items.map((it) => (
+                        <tr key={it.product_id} className="added-product-row">
+                          <td data-label="Product">{it.name}{it.size_packaging ? <span style={{ color: 'var(--ink-muted)' }}> ({it.size_packaging})</span> : ''}</td>
+                          <td data-label="Manufacturer">{it.manufacturer_name}</td>
+                          <td className="num" data-label="Price">{money(it.price)}</td>
+                          <td className="num" data-label="Qty">
+                            <div style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}>
+                              <button
+                                type="button"
+                                className="btn btn-secondary btn-sm"
+                                aria-label="Decrease quantity"
+                                onClick={() => updateQty(it.product_id, Number(it.quantity) - 1)}
+                              >
+                                <Minus size={14} />
+                              </button>
+                              <input
+                                type="number"
+                                min="1"
+                                className="qty-input"
+                                key={`qty-${it.product_id}-${it.quantity}`}
+                                defaultValue={it.quantity}
+                                aria-label={`Quantity for ${it.name}`}
+                                onFocus={(e) => e.target.select()}
+                                onBlur={(e) => updateQty(it.product_id, Number(e.target.value) || 0)}
+                                onKeyDown={(e) => {
+                                  if (e.key === 'Enter') e.target.blur();
+                                }}
+                              />
+                              <button
+                                type="button"
+                                className="btn btn-secondary btn-sm"
+                                aria-label="Increase quantity"
+                                onClick={() => updateQty(it.product_id, Number(it.quantity) + 1)}
+                              >
+                                <Plus size={14} />
+                              </button>
+                            </div>
+                          </td>
+                          <td className="num" data-label="Line Total">{money(it.price * it.quantity)}</td>
+                          <td>
+                            <button
+                              type="button"
+                              className="btn-ghost btn btn-sm"
+                              aria-label="Remove item"
+                              onClick={() => removeItem(it.product_id)}
+                            >
+                              <Trash2 size={14} />
+                            </button>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </>
             ) : (
               <div className="empty-state">No items added yet.</div>
             )}
-            
+
             {items.length > 0 && (
               <p style={{ textAlign: 'right', marginTop: 14, fontSize: 15 }}>
                 Subtotal: <strong className="num">{money(subtotal)}</strong>
