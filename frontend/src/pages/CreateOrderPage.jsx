@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { useNavigate, useBlocker, useLocation, Link } from 'react-router-dom';
-import { Plus, Minus, Trash2, Loader2, ArrowLeft } from 'lucide-react';
+import { Plus, Minus, Trash2, Loader2, ArrowLeft, X } from 'lucide-react';
 import { distributors as distributorsApi, products as productsApi, orders as ordersApi } from '../api/endpoints';
 import { apiErrorMessage } from '../api/client';
 import { useToast } from '../context/ToastContext';
@@ -355,34 +355,37 @@ export default function CreateOrderPage() {
               {filteredProducts.map((p) => {
                 const alreadyAdded = items.some((it) => it.product_id === p.id);
                 return (
-                  <div key={p.id} className="pill-card order-product-card">
+                  <div
+                    key={p.id}
+                    className={`pill-card order-pick-card${alreadyAdded ? ' order-pick-card-added' : ''}`}
+                    role="button"
+                    tabIndex={alreadyAdded ? -1 : 0}
+                    aria-disabled={alreadyAdded}
+                    title={alreadyAdded ? 'Already on this order' : 'Tap to add to order'}
+                    onClick={() => { if (!alreadyAdded) addItem(p); }}
+                    onKeyDown={(e) => {
+                      if (alreadyAdded) return;
+                      if (e.key === 'Enter' || e.key === ' ') {
+                        e.preventDefault();
+                        addItem(p);
+                      }
+                    }}
+                  >
                     <div className="pill-card-left">
                       <div className="pill-card-name">{p.name}</div>
                       <div className="pill-card-sub">{p.manufacturer_name}</div>
                       {p.size_packaging && <div className="pill-card-meta">{p.size_packaging}</div>}
                     </div>
                     <div className="pill-card-divider" />
-                    <div className="order-product-footer">
-                      <div className="pill-card-rows">
-                        <div className="pill-card-row">
-                          <span className="pill-card-row-label">Retail Price</span>
-                          <span className="pill-card-row-value">{money(p.retail_price)}</span>
-                        </div>
-                        <div className="pill-card-row pill-card-row-muted">
-                          <span className="pill-card-row-label">Invoice Price</span>
-                          <span className="pill-card-row-value">{money(p.price)}</span>
-                        </div>
+                    <div className="pill-card-rows">
+                      <div className="pill-card-row">
+                        <span className="pill-card-row-label">Retail Price</span>
+                        <span className="pill-card-row-value">{money(p.retail_price)}</span>
                       </div>
-                      <button
-                        type="button"
-                        className="order-add-btn"
-                        disabled={alreadyAdded}
-                        onClick={() => addItem(p)}
-                        title={alreadyAdded ? 'Already on this order' : 'Add to order'}
-                        aria-label="Add to order"
-                      >
-                        <Plus size={18} />
-                      </button>
+                      <div className="pill-card-row pill-card-row-muted">
+                        <span className="pill-card-row-label">Invoice Price</span>
+                        <span className="pill-card-row-value">{money(p.price)}</span>
+                      </div>
                     </div>
                   </div>
                 );
@@ -443,26 +446,29 @@ export default function CreateOrderPage() {
               <>
                 <div className="list-cards order-product-list">
                   {items.map((it) => (
-                    <div key={it.product_id} className="pill-card order-product-card added-product-row">
+                    <div key={it.product_id} className="pill-card order-added-card added-product-row">
+                      <button
+                        type="button"
+                        className="order-remove-btn"
+                        aria-label="Remove item"
+                        onClick={() => removeItem(it.product_id)}
+                      >
+                        <X size={14} strokeWidth={3} />
+                      </button>
                       <div className="pill-card-left">
                         <div className="pill-card-name">{it.name}</div>
                         <div className="pill-card-sub">{it.manufacturer_name}</div>
                         {it.size_packaging && <div className="pill-card-meta">{it.size_packaging}</div>}
                       </div>
                       <div className="pill-card-divider" />
-                      <div className="order-product-footer">
-                        <div className="pill-card-rows">
-                          <div className="pill-card-row">
-                            <span className="pill-card-row-label">Price</span>
-                            <span className="pill-card-row-value">{money(it.price)}</span>
-                          </div>
-                          <div className="pill-card-row pill-card-row-muted">
-                            <span className="pill-card-row-label">Line Total</span>
-                            <span className="pill-card-row-value">{money(it.price * it.quantity)}</span>
-                          </div>
+                      <div className="pill-card-rows">
+                        <div className="pill-card-row pill-card-row-muted">
+                          <span className="pill-card-row-label">Invoice Price</span>
+                          <span className="pill-card-row-value">{money(it.price)}</span>
                         </div>
-                        <div className="order-item-actions">
-                          <div className="order-qty-stepper">
+                        <div className="pill-card-row">
+                          <span className="pill-card-row-label">QTY</span>
+                          <div className="pill-card-row-value order-qty-stepper">
                             <button
                               type="button"
                               className="btn btn-secondary btn-sm"
@@ -493,14 +499,10 @@ export default function CreateOrderPage() {
                               <Plus size={14} />
                             </button>
                           </div>
-                          <button
-                            type="button"
-                            className="btn-ghost"
-                            aria-label="Remove item"
-                            onClick={() => removeItem(it.product_id)}
-                          >
-                            <Trash2 size={16} />
-                          </button>
+                        </div>
+                        <div className="pill-card-row">
+                          <span className="pill-card-row-label">Total Price</span>
+                          <span className="pill-card-row-value">{money(it.price * it.quantity)}</span>
                         </div>
                       </div>
                     </div>
