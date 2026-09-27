@@ -955,7 +955,7 @@ table.data-table {
 
   font-size: 13.5px;
 
-  
+  background: var(--surface);
 }
 
 .data-table th {
@@ -3531,6 +3531,22 @@ input[type='password']::-ms-clear {
 
   gap: 2px;
   margin-bottom: 10px;
+}
+.pill-card-row-status[data-status="completed"],
+.pill-card-row-status[data-status="paid"],
+.pill-card-row-status[data-status="active"] {
+  color: var(--status-positive);
+}
+
+.pill-card-row-status[data-status="cancelled"],
+.pill-card-row-status[data-status="inactive"] {
+  color: var(--status-negative);
+}
+
+.pill-card-row-status[data-status="pending"],
+.pill-card-row-status[data-status="unpaid"],
+.pill-card-row-status[data-status="current"] {
+  color: var(--status-pending);
 }
 
 /* ==============================================================

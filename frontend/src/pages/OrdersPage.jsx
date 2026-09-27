@@ -217,28 +217,36 @@ export default function OrdersPage() {
                   style={{ textDecoration: 'none', color: 'inherit' }}
                 >
                   <div className="pill-card-left">
-                    <div className="pill-card-name">
-                      <span style={{ fontFamily: 'var(--font-mono)' }}>{o.order_number}</span>
-                      <StatusBadge value={o.order_status} />
-                    </div>
-                    <div className="pill-card-sub">{o.distributor_name}</div>
-                    <div className="pill-card-meta">
-                      <CalendarDays size={12} style={{ verticalAlign: -2, marginRight: 4 }} />
-                      {new Date(o.order_date).toLocaleDateString()}
-                    </div>
-                  </div>
-                  <div className="pill-card-divider" />
-                  <div className="pill-card-rows">
-                    <div className="pill-card-row">
-                      <span className="pill-card-row-label">Total</span>
-                      <span className="pill-card-row-value">{money(o.total)}</span>
-                    </div>
-                    <div className="pill-card-row pill-card-row-muted">
-                      <span className="pill-card-row-label">Payment</span>
-                      <span className="pill-card-row-value" style={{ textTransform: 'capitalize' }}>{o.payment_status}</span>
-                    </div>
-                  </div>
-                </Link>
+  <div className="pill-card-name">
+    <span style={{ fontFamily: 'var(--font-mono)' }}>{o.order_number}</span>
+  </div>
+  <div className="pill-card-sub">{o.distributor_name}</div>
+  <div className="pill-card-meta">
+    <CalendarDays size={12} style={{ verticalAlign: -2, marginRight: 4 }} />
+    {new Date(o.order_date).toLocaleDateString()}
+  </div>
+</div>
+<div className="pill-card-divider" />
+<div className="pill-card-rows">
+  <div className="pill-card-row">
+    <span className="pill-card-row-label">Status</span>
+    <span
+      className="pill-card-row-value pill-card-row-status"
+      data-status={o.order_status}
+      style={{ textTransform: 'capitalize' }}
+    >
+      {o.order_status}
+    </span>
+  </div>
+  <div className="pill-card-row">
+    <span className="pill-card-row-label">Total</span>
+    <span className="pill-card-row-value">{money(o.total)}</span>
+  </div>
+  <div className="pill-card-row pill-card-row-muted">
+    <span className="pill-card-row-label">Payment</span>
+    <span className="pill-card-row-value" style={{ textTransform: 'capitalize' }}>{o.payment_status}</span>
+  </div>
+</div>                </Link>
               ))}
               {rows.length === 0 && <div className="empty-state">No orders match these filters.</div>}
             </div>
