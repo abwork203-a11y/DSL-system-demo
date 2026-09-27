@@ -2103,7 +2103,7 @@ select.form-control {
 
   border-radius: var(--radius-sm);
 
-
+  background: var(--surface);
   color: var(--ink);
 
 
@@ -3656,7 +3656,7 @@ input[type='password']::-ms-clear {
   height: 24px;
 
   border: none;
-  border-radius: 8px;
+
 
   background: rgba(15, 23, 42, 0.35);
   color: #fff;
@@ -3687,7 +3687,7 @@ input[type='password']::-ms-clear {
   z-index: 45;
 
   box-sizing: border-box;
-  width: min(92vw, 440px);
+  width: min(92vw,500px);
   overflow-y: auto;
   overflow-x: hidden;
 
@@ -3707,7 +3707,7 @@ input[type='password']::-ms-clear {
 
 @media (min-width: 640px) {
   .order-builder-cart {
-    width: min(90vw, 580px);
+    width: min(90vw, 585px);
   }
 }
 
