@@ -2220,7 +2220,9 @@ input[type='password']::-ms-clear {
    ============================================================== */
 
 
-
+.stepper-number {
+    display: none;
+  }
 .stepper-item {
   flex: 1;
   padding: 8px 4px;
@@ -2249,7 +2251,9 @@ input[type='password']::-ms-clear {
   .stepper-label {
     display: none;
   }
-
+  .stepper-number {
+    display: flex;
+  }
   .stepper-item:not(:last-child)::after {
     min-width: 12px;
     margin: 0 6px;
