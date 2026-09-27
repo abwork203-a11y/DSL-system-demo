@@ -607,7 +607,7 @@ export default function CreateOrderPage() {
               )}
 
               {items.length > 0 && (
-                <p style={{ textAlign: 'right', marginTop: 14, fontSize: 15 }}>
+                <p style={{ textAlign: 'right', marginTop: 28, fontSize: 15 }}>
                   Subtotal: <strong className="num">{money(subtotal)}</strong>
                 </p>
               )}

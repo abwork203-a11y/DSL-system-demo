@@ -3139,7 +3139,7 @@ input[type='password']::-ms-clear {
    ============================================================== */
 
 .order-product-list {
-  max-height: 320px;
+  max-height: calc(100vh - 260px);
   overflow-y: auto;
   overflow-x: hidden;
   margin-bottom: 20px;
@@ -3602,7 +3602,7 @@ input[type='password']::-ms-clear {
    ============================================================== */
 
 .order-product-list {
-  max-height: 320px;
+  max-height: calc(100vh - 260px);
   overflow-y: auto;
   overflow-x: hidden;
   margin-bottom: 20px;
@@ -3707,8 +3707,7 @@ input[type='password']::-ms-clear {
   padding: 20px;
   padding-top: 28px;
 
-    background: var(--surface);
-  border-left: 1px solid var(--rule);
+  background: var(--surface);
   box-shadow: var(--shadow-md);
 
   transform: translateX(100%);
