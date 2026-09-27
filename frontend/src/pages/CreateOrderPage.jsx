@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { useNavigate, useBlocker, useLocation, Link } from 'react-router-dom';
-import { Plus, Minus, Trash2, Loader2, Check, ArrowLeft } from 'lucide-react';
+import { Plus, Minus, Trash2, Loader2, ArrowLeft } from 'lucide-react';
 import { distributors as distributorsApi, products as productsApi, orders as ordersApi } from '../api/endpoints';
 import { apiErrorMessage } from '../api/client';
 import { useToast } from '../context/ToastContext';
@@ -279,7 +279,7 @@ export default function CreateOrderPage() {
       <div className="stepper">
         {STEPS.map((label, i) => (
           <div key={label} className={`stepper-item${i === step ? ' active' : i < step ? ' done' : ''}`}>
-            <span className="stepper-number">{i < step ? <Check size={12} strokeWidth={3} /> : i + 1}</span>
+            <span className="stepper-number">{i + 1}</span>
             <span className="stepper-label">{label}</span>
           </div>
         ))}
@@ -362,27 +362,28 @@ export default function CreateOrderPage() {
                       {p.size_packaging && <div className="pill-card-meta">{p.size_packaging}</div>}
                     </div>
                     <div className="pill-card-divider" />
-                    <div className="pill-card-rows">
-                      <div className="pill-card-row">
-                        <span className="pill-card-row-label">Retail Price</span>
-                        <span className="pill-card-row-value">{money(p.retail_price)}</span>
+                    <div className="order-product-footer">
+                      <div className="pill-card-rows">
+                        <div className="pill-card-row">
+                          <span className="pill-card-row-label">Retail Price</span>
+                          <span className="pill-card-row-value">{money(p.retail_price)}</span>
+                        </div>
+                        <div className="pill-card-row pill-card-row-muted">
+                          <span className="pill-card-row-label">Invoice Price</span>
+                          <span className="pill-card-row-value">{money(p.price)}</span>
+                        </div>
                       </div>
-                      <div className="pill-card-row pill-card-row-muted">
-                        <span className="pill-card-row-label">Invoice Price</span>
-                        <span className="pill-card-row-value">{money(p.price)}</span>
-                      </div>
+                      <button
+                        type="button"
+                        className="order-add-btn"
+                        disabled={alreadyAdded}
+                        onClick={() => addItem(p)}
+                        title={alreadyAdded ? 'Already on this order' : 'Add to order'}
+                        aria-label="Add to order"
+                      >
+                        <Plus size={18} />
+                      </button>
                     </div>
-                    <div className="pill-card-divider" />
-                    <button
-                      type="button"
-                      className="order-add-btn"
-                      disabled={alreadyAdded}
-                      onClick={() => addItem(p)}
-                      title={alreadyAdded ? 'Already on this order' : 'Add to order'}
-                      aria-label="Add to order"
-                    >
-                      <Plus size={18} />
-                    </button>
                   </div>
                 );
               })}
@@ -449,56 +450,59 @@ export default function CreateOrderPage() {
                         {it.size_packaging && <div className="pill-card-meta">{it.size_packaging}</div>}
                       </div>
                       <div className="pill-card-divider" />
-                      <div className="pill-card-rows">
-                        <div className="pill-card-row">
-                          <span className="pill-card-row-label">Price</span>
-                          <span className="pill-card-row-value">{money(it.price)}</span>
+                      <div className="order-product-footer">
+                        <div className="pill-card-rows">
+                          <div className="pill-card-row">
+                            <span className="pill-card-row-label">Price</span>
+                            <span className="pill-card-row-value">{money(it.price)}</span>
+                          </div>
+                          <div className="pill-card-row pill-card-row-muted">
+                            <span className="pill-card-row-label">Line Total</span>
+                            <span className="pill-card-row-value">{money(it.price * it.quantity)}</span>
+                          </div>
                         </div>
-                        <div className="pill-card-row pill-card-row-muted">
-                          <span className="pill-card-row-label">Line Total</span>
-                          <span className="pill-card-row-value">{money(it.price * it.quantity)}</span>
+                        <div className="order-item-actions">
+                          <div className="order-qty-stepper">
+                            <button
+                              type="button"
+                              className="btn btn-secondary btn-sm"
+                              aria-label="Decrease quantity"
+                              onClick={() => updateQty(it.product_id, Number(it.quantity) - 1)}
+                            >
+                              <Minus size={14} />
+                            </button>
+                            <input
+                              type="number"
+                              min="1"
+                              className="qty-input"
+                              key={`qty-${it.product_id}-${it.quantity}`}
+                              defaultValue={it.quantity}
+                              aria-label={`Quantity for ${it.name}`}
+                              onFocus={(e) => e.target.select()}
+                              onBlur={(e) => updateQty(it.product_id, Number(e.target.value) || 0)}
+                              onKeyDown={(e) => {
+                                if (e.key === 'Enter') e.target.blur();
+                              }}
+                            />
+                            <button
+                              type="button"
+                              className="btn btn-secondary btn-sm"
+                              aria-label="Increase quantity"
+                              onClick={() => updateQty(it.product_id, Number(it.quantity) + 1)}
+                            >
+                              <Plus size={14} />
+                            </button>
+                          </div>
+                          <button
+                            type="button"
+                            className="btn-ghost"
+                            aria-label="Remove item"
+                            onClick={() => removeItem(it.product_id)}
+                          >
+                            <Trash2 size={16} />
+                          </button>
                         </div>
                       </div>
-                      <div className="pill-card-divider" />
-                      <div className="order-qty-stepper">
-                        <button
-                          type="button"
-                          className="btn btn-secondary btn-sm"
-                          aria-label="Decrease quantity"
-                          onClick={() => updateQty(it.product_id, Number(it.quantity) - 1)}
-                        >
-                          <Minus size={14} />
-                        </button>
-                        <input
-                          type="number"
-                          min="1"
-                          className="qty-input"
-                          key={`qty-${it.product_id}-${it.quantity}`}
-                          defaultValue={it.quantity}
-                          aria-label={`Quantity for ${it.name}`}
-                          onFocus={(e) => e.target.select()}
-                          onBlur={(e) => updateQty(it.product_id, Number(e.target.value) || 0)}
-                          onKeyDown={(e) => {
-                            if (e.key === 'Enter') e.target.blur();
-                          }}
-                        />
-                        <button
-                          type="button"
-                          className="btn btn-secondary btn-sm"
-                          aria-label="Increase quantity"
-                          onClick={() => updateQty(it.product_id, Number(it.quantity) + 1)}
-                        >
-                          <Plus size={14} />
-                        </button>
-                      </div>
-                      <button
-                        type="button"
-                        className="btn-ghost"
-                        aria-label="Remove item"
-                        onClick={() => removeItem(it.product_id)}
-                      >
-                        <Trash2 size={16} />
-                      </button>
                     </div>
                   ))}
                 </div>
