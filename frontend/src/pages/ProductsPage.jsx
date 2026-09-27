@@ -1,5 +1,5 @@
 import { useEffect, useState, useCallback } from 'react';
-import { Plus, Pencil, Trash2, ChevronRight } from 'lucide-react';
+import { Plus, Pencil, Trash2 } from 'lucide-react';
 import { products as productsApi, manufacturers as mfgApi } from '../api/endpoints';
 import { apiErrorMessage } from '../api/client';
 import { useToast } from '../context/ToastContext';
@@ -50,6 +50,18 @@ export default function ProductsPage() {
 
   const openNew = () => { setForm(EMPTY_FORM); setEditing({}); };
   const openEdit = (p) => { setForm({ ...EMPTY_FORM, ...p }); setEditing(p); };
+
+  const toggleActive = async (p) => {
+    const newActive = !p.is_active;
+    setRows((current) => current.map((row) => (row.id === p.id ? { ...row, is_active: newActive } : row)));
+    try {
+      await productsApi.update(p.id, { ...p, is_active: newActive });
+      toast.success(newActive ? 'Product reactivated.' : 'Product marked inactive.');
+    } catch (err) {
+      setRows((current) => current.map((row) => (row.id === p.id ? { ...row, is_active: p.is_active } : row))); // roll back
+      toast.error(apiErrorMessage(err));
+    }
+  };
 
   const handleSave = async (e) => {
     e.preventDefault();
@@ -124,7 +136,7 @@ export default function ProductsPage() {
           <>
           <div className="list-cards">
             {rows.map((p) => (
-              <div key={p.id} className="pill-card" data-status={p.is_active ? 'active' : 'inactive'} onClick={() => openEdit(p)} style={{ cursor: 'pointer' }}>
+              <div key={p.id} className="pill-card" data-status={p.is_active ? 'active' : 'inactive'}>
                 <div className="pill-card-left">
                   <div className="pill-card-name">{p.name}</div>
                   <div className="pill-card-sub">{p.manufacturer_name}</div>
@@ -132,6 +144,14 @@ export default function ProductsPage() {
                 </div>
                 <div className="pill-card-divider" />
                 <div className="pill-card-rows">
+                  <div className="pill-card-actions-top">
+                    <label className="switch" title={p.is_active ? 'Mark inactive' : 'Reactivate'}>
+                      <input type="checkbox" checked={p.is_active} onChange={() => toggleActive(p)} />
+                      <span className="switch-track" />
+                    </label>
+                    <button className="btn-ghost" onClick={() => openEdit(p)} title="Edit" aria-label="Edit"><Pencil size={15} /></button>
+                    <button className="btn-ghost" onClick={() => handleDelete(p)} title="Delete" aria-label="Delete"><Trash2 size={15} /></button>
+                  </div>
                   <div className="pill-card-row">
                     <span className="pill-card-row-label">Retail Price</span>
                     <span className="pill-card-row-value">{money(p.retail_price)}</span>

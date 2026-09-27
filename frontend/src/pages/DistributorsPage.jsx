@@ -1,6 +1,6 @@
 import { useEffect, useState, useCallback } from 'react';
 import { Link } from 'react-router-dom';
-import { Plus, Pencil, Trash2, Eye, Ban, RotateCcw, ChevronRight } from 'lucide-react';
+import { Plus, Pencil, Trash2, Eye, Ban, RotateCcw } from 'lucide-react';
 import { distributors as distributorsApi } from '../api/endpoints';
 import { apiErrorMessage } from '../api/client';
 import { useAuth } from '../context/AuthContext';
@@ -133,30 +133,31 @@ export default function DistributorsPage() {
           <>
           <div className="list-cards">
             {rows.map((d) => (
-              <div key={d.id} className="list-card" data-status={d.status} onClick={() => openEdit(d)}>
-                <div className="list-card-top">
-                  <span className="list-card-title">{d.name}</span>
-                  <StatusBadge value={d.status} />
+              <div key={d.id} className="pill-card" data-status={d.status}>
+                <div className="pill-card-left">
+                  <div className="pill-card-name">{d.name}</div>
+                  <div className="pill-card-sub">{[d.zone, d.city].filter(Boolean).join(' · ') || '—'}</div>
+                  {(d.contact_name || d.contact_phone) && (
+                    <div className="pill-card-meta">
+                      {d.contact_name || '—'}{d.contact_phone ? ` · ${d.contact_phone}` : ''}
+                    </div>
+                  )}
                 </div>
-                <div className="list-card-subtitle">{[d.zone, d.city].filter(Boolean).join(' · ') || '—'}</div>
-                {(d.contact_name || d.contact_phone) && (
-                  <div className="list-card-meta">
-                    {d.contact_name || '—'}{d.contact_phone ? ` · ${d.contact_phone}` : ''}
+                <div className="pill-card-divider" />
+                <div className="pill-card-rows">
+                  <div className="pill-card-actions-top">
+                    <label className="switch" title={d.status === 'active' ? 'Mark inactive' : 'Reactivate'}>
+                      <input type="checkbox" checked={d.status === 'active'} onChange={() => toggleStatus(d)} />
+                      <span className="switch-track" />
+                    </label>
+                    <Link to={`/ledger?distributor_id=${d.id}`} className="btn-ghost" title="View ledger" aria-label="View ledger"><Eye size={15} /></Link>
+                    <button className="btn-ghost" onClick={() => openEdit(d)} title="Edit" aria-label="Edit"><Pencil size={15} /></button>
+                    {isAdmin && <button className="btn-ghost" onClick={() => handleDelete(d)} title="Delete" aria-label="Delete"><Trash2 size={15} /></button>}
                   </div>
-                )}
-                <div className="list-card-values">
-                  <div>
-                    <span className="list-card-value-label">Balance</span>
-                    <span className="list-card-value-amount">{money(d.balance)}</span>
+                  <div className="pill-card-row">
+                    <span className="pill-card-row-label">Balance</span>
+                    <span className="pill-card-row-value">{money(d.balance)}</span>
                   </div>
-                </div>
-                <div className="table-actions" style={{ marginTop: 12 }} onClick={(e) => e.stopPropagation()}>
-                  <Link to={`/ledger?distributor_id=${d.id}`} className="btn-ghost" title="View ledger" aria-label="View ledger"><Eye size={15} /></Link>
-                  <button className="btn-ghost" onClick={() => openEdit(d)} title="Edit" aria-label="Edit"><Pencil size={15} /></button>
-                  <button className="btn-ghost" onClick={() => toggleStatus(d)} title={d.status === 'active' ? 'Mark inactive' : 'Reactivate'} aria-label={d.status === 'active' ? 'Mark inactive' : 'Reactivate'}>
-                    {d.status === 'active' ? <Ban size={15} /> : <RotateCcw size={15} />}
-                  </button>
-                  {isAdmin && <button className="btn-ghost" onClick={() => handleDelete(d)} title="Delete" aria-label="Delete"><Trash2 size={15} /></button>}
                 </div>
               </div>
             ))}
