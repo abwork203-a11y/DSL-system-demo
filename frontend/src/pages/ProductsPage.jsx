@@ -188,6 +188,10 @@ export default function ProductsPage() {
                     <td className="num" data-label="Invoice Price">{money(p.price)}</td>
                     <td data-label="Status">{p.is_active ? <span className="badge badge-green">active</span> : <span className="badge badge-neutral">inactive</span>}</td>
                     <td className="table-actions">
+                    <label className="switch" title={p.is_active ? 'Mark inactive' : 'Reactivate'}>
+                      <input type="checkbox" checked={p.is_active} onChange={() => toggleActive(p)} />
+                      <span className="switch-track" />
+                    </label>
                       <button className="btn-ghost" onClick={() => openEdit(p)} title="Edit" aria-label="Edit"><Pencil size={15} /></button>
                       <button className="btn-ghost" onClick={() => handleDelete(p)} title="Delete" aria-label="Delete"><Trash2 size={15} /></button>
                     </td>

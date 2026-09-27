@@ -3137,6 +3137,55 @@ input[type='password']::-ms-clear {
   text-decoration: underline;
 }
 
+/* ==============================================================
+   ORDER BUILDER — product picker & added-items pill cards
+   ============================================================== */
+
+.order-product-list {
+  max-height: 320px;
+  overflow-y: auto;
+  margin-bottom: 20px;
+}
+
+.order-product-card {
+  align-items: center;
+}
+
+.order-qty-stepper {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-shrink: 0;
+}
+
+.order-add-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+
+  width: 34px;
+  height: 34px;
+
+  border: none;
+  border-radius: 50%;
+
+  background: var(--sidebar-bg);
+  color: #fff;
+
+  cursor: pointer;
+  transition: filter 0.12s;
+}
+
+.order-add-btn:hover {
+  filter: brightness(1.18);
+}
+
+.order-add-btn:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
 
 /* ==============================================================
    ORDER DETAIL — layout, info strip, activity list
@@ -3548,6 +3597,10 @@ input[type='password']::-ms-clear {
 .pill-card-row-status[data-status="current"] {
   color: var(--status-pending);
 }
+
+
+
+
 
 /* ==============================================================
    TOGGLE SWITCH
