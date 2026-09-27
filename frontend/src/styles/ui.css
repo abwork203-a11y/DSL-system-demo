@@ -1930,10 +1930,6 @@ select.form-control {
   font-size: 13.5px;
   font-weight: 500;
 
-  color: #fff;
-
-  box-shadow: var(--shadow-md);
-
   cursor: pointer;
 
   animation:
