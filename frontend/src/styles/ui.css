@@ -3421,7 +3421,7 @@ input[type='password']::-ms-clear {
   border-radius: 14px;
   border-left: 5px solid var(--rule-strong);
 
-  background: var(--surface-sunken);
+ 
 }
 
 .pill-card:last-child {
