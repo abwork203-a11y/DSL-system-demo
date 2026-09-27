@@ -2099,11 +2099,19 @@ select.form-control {
   align-items: center;
   justify-content: center;
 
+  border: none;
+  border-radius: var(--radius-sm);
+  padding: 0;
 
- 
-
+  background: var(--surface);
+  color: var(--ink);
 
   cursor: pointer;
+  transition: background 0.12s;
+}
+
+.hamburger-btn:hover {
+  background: var(--surface-sunken);
 }
 .hamburger-btn.is-hidden {
   display: none;
@@ -3657,15 +3665,15 @@ input[type='password']::-ms-clear {
 
 .order-remove-btn {
   position: absolute;
-  top: -8px;
-  right: -8px;
+  top: -6px;
+  right: -6px;
 
   display: flex;
   align-items: center;
   justify-content: center;
 
-  width: 24px;
-  height: 24px;
+  width: 20px;
+  height: 20px;
 
   border: none;
 
