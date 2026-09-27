@@ -3451,14 +3451,14 @@ input[type='password']::-ms-clear {
   gap: 2px;
 
   flex-shrink: 0;
-  min-width: 46%;
-  max-width: 46%;
+  min-width: 40%;
+  max-width: 40%;
 }
 
 .pill-card-name {
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: 6px;
 
   font-size: 16.5px;
   font-weight: 700;
