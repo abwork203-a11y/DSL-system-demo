@@ -313,7 +313,7 @@ body {
   border: 1px solid var(--rule);
 
   border-radius: var(--radius);
-
+   background: var(--blue);
   padding: 20px;
 
   box-shadow: var(--shadow-sm);
