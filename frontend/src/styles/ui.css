@@ -151,6 +151,10 @@ body {
    ============================================================== */
 
 .topbar {
+  position: sticky;
+  top: 0;
+  z-index: 20;
+
   height: 60px;
 
   display: flex;
@@ -2087,12 +2091,7 @@ select.form-control {
 .hamburger-btn {
   display: none;
 
-  position: fixed;
-
-  top: 14px;
-  left: 14px;
-
-  z-index: 50;
+  flex-shrink: 0;
 
   width: 40px;
   height: 40px;
@@ -2427,14 +2426,16 @@ input[type='password']::-ms-clear {
 
   /* ── Topbar ───────────────────────────────────── */
 
+  .hamburger-btn {
+    display: flex;
+  }
+
   .topbar {
     height: 60px;
 
-    padding:
-      0 20px 0 64px;
+    padding: 0 16px;
 
-    justify-content:
-      flex-end;
+    justify-content: space-between;
   }
 
   .topbar-date-time {
@@ -3652,13 +3653,13 @@ input[type='password']::-ms-clear {
   align-items: center;
   justify-content: center;
 
-  width: 26px;
-  height: 26px;
+  width: 24px;
+  height: 24px;
 
   border: none;
-  border-radius: 50%;
+  border-radius: 8px;
 
-  background: var(--rule-strong);
+  background: rgba(15, 23, 42, 0.35);
   color: #fff;
 
   cursor: pointer;
@@ -3672,91 +3673,78 @@ input[type='password']::-ms-clear {
 
 /* ==============================================================
    ORDER BUILDER — "Add Products" step layout
-   Desktop: browse list on the left, cart always visible on the right.
-   Mobile (≤900px): cart becomes an off-canvas drawer, opened with the
-   tab button pinned to the right edge of the screen.
+   The cart is now always a slide-in drawer, opened with the tab button
+   pinned to the right edge — on every screen size, not just mobile.
+   Only the *content* inside differs by width: pill cards on narrow
+   screens, the data table on wider ones (same rule the rest of the
+   app already uses for list-cards vs. table-wrap).
    ============================================================== */
 
-.order-builder-layout {
-  display: flex;
-  align-items: flex-start;
-  gap: 24px;
-}
-
-.order-builder-main {
-  flex: 1;
-  min-width: 0; /* lets the table/cards shrink instead of overflowing */
-}
-
 .order-builder-cart {
-  width: 320px;
-  flex-shrink: 0;
+  position: fixed;
+  top: 0;
+  right: 0;
+  bottom: 0;
+  z-index: 45;
 
-  position: sticky;
-  top: 20px;
+  box-sizing: border-box;
+  width: min(92vw, 440px);
+  overflow-y: auto;
+  overflow-x: hidden;
+
+  padding: 20px;
+  padding-top: 28px;
+
+  background: var(--surface);
+  box-shadow: var(--shadow-md);
+
+  transform: translateX(100%);
+  transition: transform 0.22s ease;
+}
+
+.order-builder-cart.is-open {
+  transform: translateX(0);
+}
+
+@media (min-width: 640px) {
+  .order-builder-cart {
+    width: min(90vw, 560px);
+  }
 }
 
 .order-cart-toggle {
-  display: none; /* desktop: cart is always visible, no toggle needed */
+  display: flex;
+  align-items: center;
+  justify-content: center;
+
+  position: fixed;
+  top: 50%;
+  right: 0;
+  z-index: 46;
+
+  width: 32px;
+  height: 54px;
+
+  border: none;
+  border-radius: 8px 0 0 8px;
+
+  background: var(--sidebar-bg);
+  color: #fff;
+
+  cursor: pointer;
+  box-shadow: var(--shadow-sm);
+
+  transform: translateY(-50%);
+  transition: right 0.22s ease;
 }
 
-@media (max-width: 900px) {
-  .order-builder-layout {
-    display: block; /* stop being a row — cart becomes an overlay instead */
-  }
+.order-cart-toggle.is-open {
+  right: min(92vw, 440px);
+}
 
-  .order-builder-cart {
-    position: fixed;
-    top: 0;
-    right: 0;
-    bottom: 0;
-    z-index: 45;
-
-    width: min(88vw, 360px);
-    overflow-y: auto;
-
-    padding: 20px;
-    padding-top: 28px;
-
-    background: var(--surface);
-    box-shadow: var(--shadow-md);
-
-    transform: translateX(100%);
-    transition: transform 0.22s ease;
-  }
-
-  .order-builder-cart.is-open {
-    transform: translateX(0);
-  }
-
-  .order-cart-toggle {
-    display: flex;
-    align-items: center;
-    justify-content: center;
-
-    position: fixed;
-    top: 50%;
-    right: 0;
-    z-index: 46;
-
-    width: 32px;
-    height: 54px;
-
-    border: none;
-    border-radius: var(--radius-sm) 0 0 var(--radius-sm);
-
-    background: var(--sidebar-bg);
-    color: #fff;
-
-    cursor: pointer;
-    box-shadow: var(--shadow-sm);
-
-    transform: translateY(-50%);
-    transition: right 0.22s ease;
-  }
-
+@media (min-width: 640px) {
   .order-cart-toggle.is-open {
-    right: min(88vw, 360px);
+    right: min(90vw, 560px);
   }
 }
 
@@ -3781,7 +3769,17 @@ input[type='password']::-ms-clear {
   font-size: 10px;
   font-weight: 700;
 }
-/* ==============================================================
+
+/* Dims the page behind the open drawer; clicking it closes the drawer
+   (the onClick lives in the JSX — this just makes it visible/clickable). */
+.order-cart-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 44;
+
+  background: rgba(15, 23, 42, 0.35);
+  cursor: pointer;
+}/* ==============================================================
    TOGGLE SWITCH
    ============================================================== */
 

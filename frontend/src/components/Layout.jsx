@@ -62,15 +62,6 @@ export default function Layout() {
   return (
     <div className="app-shell">
 
-      {/* Mobile menu button */}
-      <button
-        className={`hamburger-btn${sidebarOpen ? ' is-hidden' : ''}`}
-        onClick={() => setSidebarOpen(!sidebarOpen)}
-        aria-label="Toggle menu"
-      >
-        <Menu size={22} strokeWidth={2} />
-      </button>
-
       {/* Mobile sidebar overlay */}
       {sidebarOpen && (
         <div
@@ -133,6 +124,14 @@ export default function Layout() {
 
         {/* Global topbar */}
         <header className="topbar">
+          <button
+            className={`hamburger-btn${sidebarOpen ? ' is-hidden' : ''}`}
+            onClick={() => setSidebarOpen(!sidebarOpen)}
+            aria-label="Toggle menu"
+          >
+            <Menu size={22} strokeWidth={2} />
+          </button>
+
           <div className="topbar-date-time">
 
             <span className="topbar-date">
