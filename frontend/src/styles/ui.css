@@ -3714,7 +3714,7 @@ input[type='password']::-ms-clear {
   padding: 20px;
   padding-top: 28px;
 
-  background: var(--blue-hover);
+ 
   box-shadow: var(--shadow-md);
 
   transform: translateX(100%);
@@ -3723,6 +3723,7 @@ input[type='password']::-ms-clear {
 
 .order-builder-cart.is-open {
   transform: translateX(0);
+   background: var(--blue-hover);
 }
 
 @media (min-width: 640px) {
