@@ -308,7 +308,7 @@ body {
    ============================================================== */
 
 .card {
-  background: var(--surface);
+
 
   border: 1px solid var(--rule);
 
@@ -2103,10 +2103,9 @@ select.form-control {
 
   border-radius: var(--radius-sm);
 
-  background: var(--surface);
+
   color: var(--ink);
 
-  box-shadow: var(--shadow-sm);
 
   cursor: pointer;
 }
@@ -3708,7 +3707,7 @@ input[type='password']::-ms-clear {
 
 @media (min-width: 640px) {
   .order-builder-cart {
-    width: min(90vw, 560px);
+    width: min(90vw, 580px);
   }
 }
 
