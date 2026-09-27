@@ -553,7 +553,7 @@ export default function CreateOrderPage() {
                             <td data-label="Manufacturer">{it.manufacturer_name}</td>
                             <td className="num" data-label="Invoice Price">{money(it.price)}</td>
                             <td className="num" data-label="Qty">
-                              <div style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}>
+                              <div className="order-qty-stepper" style={{ justifyContent: 'flex-start' }}>
                                 <button
                                   type="button"
                                   className="btn btn-secondary btn-sm"

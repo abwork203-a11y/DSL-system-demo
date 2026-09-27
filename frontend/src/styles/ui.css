@@ -2099,9 +2099,6 @@ select.form-control {
   align-items: center;
   justify-content: center;
 
-  border: 1px solid var(--rule);
-
-  border-radius: var(--radius-sm);
 
   background: var(--surface);
   color: var(--ink);
@@ -3144,6 +3141,7 @@ input[type='password']::-ms-clear {
 .order-product-list {
   max-height: 320px;
   overflow-y: auto;
+  overflow-x: hidden;
   margin-bottom: 20px;
 }
 
@@ -3606,6 +3604,7 @@ input[type='password']::-ms-clear {
 .order-product-list {
   max-height: 320px;
   overflow-y: auto;
+  overflow-x: hidden;
   margin-bottom: 20px;
 }
 
@@ -3630,12 +3629,26 @@ input[type='password']::-ms-clear {
   cursor: not-allowed;
 }
 
-/* Added-to-order card: qty stepper sits inline as a row value */
+/* Added-to-order card: qty stepper sits inline as a row value.
+   The -/+ buttons and input are shrunk here specifically — this doesn't
+   touch .btn-sm or .qty-input's normal size anywhere else in the app. */
 .order-qty-stepper {
   display: flex;
   align-items: center;
   justify-content: flex-end;
-  gap: 6px;
+  gap: 4px;
+}
+
+.order-qty-stepper .btn-sm {
+  width: 24px;
+  height: 24px;
+  padding: 0;
+}
+
+.order-qty-stepper .qty-input {
+  width: 32px;
+  padding: 4px 2px;
+  font-size: 12.5px;
 }
 
 /* Round "remove" badge pinned to the card's top-right corner */
@@ -3687,14 +3700,15 @@ input[type='password']::-ms-clear {
   z-index: 45;
 
   box-sizing: border-box;
-  width: min(92vw,500px);
+  width: min(94vw, 540px);
   overflow-y: auto;
   overflow-x: hidden;
 
   padding: 20px;
   padding-top: 28px;
 
-  background: var(--surface);
+    background: var(--surface);
+  border-left: 1px solid var(--rule);
   box-shadow: var(--shadow-md);
 
   transform: translateX(100%);
@@ -3707,7 +3721,7 @@ input[type='password']::-ms-clear {
 
 @media (min-width: 640px) {
   .order-builder-cart {
-    width: min(90vw, 585px);
+    width: min(92vw, 720px);
   }
 }
 
@@ -3737,13 +3751,16 @@ input[type='password']::-ms-clear {
   transition: right 0.22s ease;
 }
 
+/* These two values must always match .order-builder-cart's width exactly
+   at each breakpoint — this is what makes the toggle tab sit flush
+   against the drawer's edge instead of leaving a gap. */
 .order-cart-toggle.is-open {
-  right: min(92vw, 440px);
+  right: min(94vw, 540px);
 }
 
 @media (min-width: 640px) {
   .order-cart-toggle.is-open {
-    right: min(90vw, 560px);
+    right: min(92vw, 720px);
   }
 }
 
