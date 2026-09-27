@@ -2087,7 +2087,12 @@ select.form-control {
 .hamburger-btn {
   display: none;
 
-  flex-shrink: 0;
+  position: fixed;
+
+  top: 14px;
+  left: 14px;
+
+  z-index: 50;
 
   width: 40px;
   height: 40px;
@@ -2422,16 +2427,14 @@ input[type='password']::-ms-clear {
 
   /* ── Topbar ───────────────────────────────────── */
 
-  .hamburger-btn {
-    display: flex;
-  }
-
   .topbar {
     height: 60px;
 
-    padding: 0 16px;
+    padding:
+      0 20px 0 64px;
 
-    justify-content: space-between;
+    justify-content:
+      flex-end;
   }
 
   .topbar-date-time {
@@ -3665,6 +3668,118 @@ input[type='password']::-ms-clear {
 
 .order-remove-btn:hover {
   background: var(--status-negative);
+}
+
+/* ==============================================================
+   ORDER BUILDER — "Add Products" step layout
+   Desktop: browse list on the left, cart always visible on the right.
+   Mobile (≤900px): cart becomes an off-canvas drawer, opened with the
+   tab button pinned to the right edge of the screen.
+   ============================================================== */
+
+.order-builder-layout {
+  display: flex;
+  align-items: flex-start;
+  gap: 24px;
+}
+
+.order-builder-main {
+  flex: 1;
+  min-width: 0; /* lets the table/cards shrink instead of overflowing */
+}
+
+.order-builder-cart {
+  width: 320px;
+  flex-shrink: 0;
+
+  position: sticky;
+  top: 20px;
+}
+
+.order-cart-toggle {
+  display: none; /* desktop: cart is always visible, no toggle needed */
+}
+
+@media (max-width: 900px) {
+  .order-builder-layout {
+    display: block; /* stop being a row — cart becomes an overlay instead */
+  }
+
+  .order-builder-cart {
+    position: fixed;
+    top: 0;
+    right: 0;
+    bottom: 0;
+    z-index: 45;
+
+    width: min(88vw, 360px);
+    overflow-y: auto;
+
+    padding: 20px;
+    padding-top: 28px;
+
+    background: var(--surface);
+    box-shadow: var(--shadow-md);
+
+    transform: translateX(100%);
+    transition: transform 0.22s ease;
+  }
+
+  .order-builder-cart.is-open {
+    transform: translateX(0);
+  }
+
+  .order-cart-toggle {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+
+    position: fixed;
+    top: 50%;
+    right: 0;
+    z-index: 46;
+
+    width: 32px;
+    height: 54px;
+
+    border: none;
+    border-radius: var(--radius-sm) 0 0 var(--radius-sm);
+
+    background: var(--sidebar-bg);
+    color: #fff;
+
+    cursor: pointer;
+    box-shadow: var(--shadow-sm);
+
+    transform: translateY(-50%);
+    transition: right 0.22s ease;
+  }
+
+  .order-cart-toggle.is-open {
+    right: min(88vw, 360px);
+  }
+}
+
+.order-cart-toggle-badge {
+  position: absolute;
+  top: -6px;
+  left: -6px;
+
+  display: flex;
+  align-items: center;
+  justify-content: center;
+
+  min-width: 18px;
+  height: 18px;
+  padding: 0 4px;
+
+  border-radius: 999px;
+
+  background: var(--status-positive);
+  color: #fff;
+
+  font-size: 10px;
+  font-weight: 700;
 }
 /* ==============================================================
    TOGGLE SWITCH
