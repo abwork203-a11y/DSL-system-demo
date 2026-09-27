@@ -2087,12 +2087,7 @@ select.form-control {
 .hamburger-btn {
   display: none;
 
-  position: fixed;
-
-  top: 14px;
-  left: 14px;
-
-  z-index: 50;
+  flex-shrink: 0;
 
   width: 40px;
   height: 40px;
@@ -2427,14 +2422,16 @@ input[type='password']::-ms-clear {
 
   /* ── Topbar ───────────────────────────────────── */
 
+  .hamburger-btn {
+    display: flex;
+  }
+
   .topbar {
     height: 60px;
 
-    padding:
-      0 20px 0 64px;
+    padding: 0 16px;
 
-    justify-content:
-      flex-end;
+    justify-content: space-between;
   }
 
   .topbar-date-time {
