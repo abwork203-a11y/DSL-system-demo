@@ -2100,8 +2100,7 @@ select.form-control {
   justify-content: center;
 
 
-  background: var(--surface);
-  color: var(--ink);
+ 
 
 
   cursor: pointer;
