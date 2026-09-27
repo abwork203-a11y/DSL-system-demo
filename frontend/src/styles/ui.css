@@ -313,7 +313,7 @@ body {
   border: 1px solid var(--rule);
 
   border-radius: var(--radius);
-   background: var(--blue);
+   background: var(--surface);
   padding: 20px;
 
   box-shadow: var(--shadow-sm);
@@ -3723,7 +3723,7 @@ input[type='password']::-ms-clear {
 
 .order-builder-cart.is-open {
   transform: translateX(0);
-   background: var(--blue-hover);
+   background: var(--surface);
 }
 
 @media (min-width: 640px) {
