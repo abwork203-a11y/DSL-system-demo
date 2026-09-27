@@ -2222,6 +2222,7 @@ input[type='password']::-ms-clear {
 
 .stepper-number {
     display: none;
+     text-align: center;
   }
 .stepper-item {
   flex: 1;
