@@ -806,6 +806,97 @@ export default function LedgerPage() {
           />
         ) : (
 
+          <>
+
+          {/* Small screens: pill cards (shown only below 640px by the
+              .list-cards rule). Must sit directly before .table-wrap. */}
+          <div className="list-cards">
+
+            {entries.map((e) => (
+              <div
+                key={e.id}
+                className="pill-card"
+                data-status={e.type}
+              >
+
+                <div className="pill-card-left">
+
+                  <div className="pill-card-name">
+                    <span style={{ fontFamily: 'var(--font-mono)' }}>
+                      {e.order_number || 'No order'}
+                    </span>
+                  </div>
+
+                  {!distributor && (
+                    <div className="pill-card-sub">
+                      {e.distributor_name}
+                    </div>
+                  )}
+
+                  <div className="pill-card-meta">
+                    <CalendarDays
+                      size={12}
+                      style={{ verticalAlign: -2, marginRight: 4 }}
+                    />
+                    {new Date(e.entry_date).toLocaleDateString()}
+                    {e.payment_term && (
+                      <span className="capitalize"> · {e.payment_term}</span>
+                    )}
+                  </div>
+
+                  {e.note && (
+                    <div className="pill-card-meta ledger-pill-note">
+                      {e.note}
+                    </div>
+                  )}
+
+                </div>
+
+                <div className="pill-card-divider" />
+
+                <div className="pill-card-rows">
+
+                  <div className="pill-card-row">
+                    <span className="pill-card-row-label">Type</span>
+                    <span
+                      className="pill-card-row-value pill-card-row-status"
+                      data-status={e.type}
+                      style={{ textTransform: 'capitalize' }}
+                    >
+                      {e.type}
+                    </span>
+                  </div>
+
+                  <div className="pill-card-row">
+                    <span className="pill-card-row-label">Amount</span>
+                    <span className="pill-card-row-value">
+                      {e.type === 'debit' ? '+' : '−'}
+                      {money(e.amount)}
+                    </span>
+                  </div>
+
+                  <div className="pill-card-row pill-card-row-muted">
+                    <span className="pill-card-row-label">Balance</span>
+                    <span className="pill-card-row-value">
+                      {money(e.running_balance)}
+                    </span>
+                  </div>
+
+                </div>
+
+              </div>
+            ))}
+
+            {entries.length === 0 && (
+              <div className="empty-state">
+                No ledger entries yet.
+              </div>
+            )}
+
+          </div>
+
+
+          {/* Larger screens: the original table, unchanged. */}
           <div className="table-wrap">
 
             <table className="data-table">
@@ -928,6 +1019,8 @@ export default function LedgerPage() {
             </table>
 
           </div>
+
+          </>
 
         )}
 

@@ -65,7 +65,7 @@ export default function ReportsPage() {
           <p>Sales performance and export tools.</p>
         </div>
         <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 8 }}>
-          <div style={{ display: 'flex', gap: 8 }}>
+          <div style={{ display: 'flex', flexWrap: 'wrap', justifyContent: 'flex-end', gap: 8 }}>
             <button className="btn btn-secondary btn-sm" disabled={!!exporting} onClick={() => handleExport('orders')}>
               {exporting === 'orders' && <Loader2 size={14} className="spin" />} Export Orders
             </button>
@@ -125,39 +125,97 @@ export default function ReportsPage() {
       <div className="card">
         <h2 style={{ marginBottom: 14 }}>Sales Rep Performance</h2>
         {loading ? <TableSkeleton columns={3} rows={3} /> : (
-          <div className="table-wrap">
-            <table className="data-table">
-              <thead><tr><th>Rep</th><th className="num">Orders</th><th className="num">Total Sales</th></tr></thead>
-              <tbody>
-                {byRep.map((r) => (
-                  <tr key={r.id}><td>{r.name}</td><td className="num">{r.order_count}</td><td className="num">{money(r.total_sales)}</td></tr>
-                ))}
-                {byRep.length === 0 && <tr><td colSpan={3}><div className="empty-state">No sales reps yet.</div></td></tr>}
-              </tbody>
-            </table>
-          </div>
+          <>
+            {/* Small screens: pill cards (shown only below 640px).
+                Must sit directly before .table-wrap. */}
+            <div className="list-cards">
+              {byRep.map((r) => (
+                <div key={r.id} className="pill-card">
+                  <div className="pill-card-left">
+                    <div className="pill-card-name">{r.name}</div>
+                  </div>
+                  <div className="pill-card-divider" />
+                  <div className="pill-card-rows">
+                    <div className="pill-card-row">
+                      <span className="pill-card-row-label">Orders</span>
+                      <span className="pill-card-row-value">{r.order_count}</span>
+                    </div>
+                    <div className="pill-card-row">
+                      <span className="pill-card-row-label">Total Sales</span>
+                      <span className="pill-card-row-value">{money(r.total_sales)}</span>
+                    </div>
+                  </div>
+                </div>
+              ))}
+              {byRep.length === 0 && <div className="empty-state">No sales reps yet.</div>}
+            </div>
+
+            {/* Larger screens: the original table, unchanged. */}
+            <div className="table-wrap">
+              <table className="data-table">
+                <thead><tr><th>Rep</th><th className="num">Orders</th><th className="num">Total Sales</th></tr></thead>
+                <tbody>
+                  {byRep.map((r) => (
+                    <tr key={r.id}>
+                      <td data-label="Rep">{r.name}</td>
+                      <td className="num" data-label="Orders">{r.order_count}</td>
+                      <td className="num" data-label="Total Sales">{money(r.total_sales)}</td>
+                    </tr>
+                  ))}
+                  {byRep.length === 0 && <tr><td colSpan={3}><div className="empty-state">No sales reps yet.</div></td></tr>}
+                </tbody>
+              </table>
+            </div>
+          </>
         )}
       </div>
 
       <div className="card">
         <h2 style={{ marginBottom: 14 }}>Top Products by Revenue</h2>
         {loading ? <TableSkeleton columns={4} rows={5} /> : (
-          <div className="table-wrap">
-            <table className="data-table">
-              <thead><tr><th>Product</th><th>Manufacturer</th><th className="num">Qty Sold</th><th className="num">Revenue</th></tr></thead>
-              <tbody>
-                {topProducts.map((p) => (
-                  <tr key={p.id}>
-                    <td>{p.name}</td>
-                    <td>{p.manufacturer_name}</td>
-                    <td className="num">{Number(p.total_quantity)}</td>
-                    <td className="num">{money(p.total_revenue)}</td>
-                  </tr>
-                ))}
-                {topProducts.length === 0 && <tr><td colSpan={4}><div className="empty-state">No sales data yet.</div></td></tr>}
-              </tbody>
-            </table>
-          </div>
+          <>
+            {/* Small screens: pill cards (shown only below 640px). */}
+            <div className="list-cards">
+              {topProducts.map((p) => (
+                <div key={p.id} className="pill-card">
+                  <div className="pill-card-left">
+                    <div className="pill-card-name">{p.name}</div>
+                    <div className="pill-card-sub">{p.manufacturer_name}</div>
+                  </div>
+                  <div className="pill-card-divider" />
+                  <div className="pill-card-rows">
+                    <div className="pill-card-row">
+                      <span className="pill-card-row-label">Qty Sold</span>
+                      <span className="pill-card-row-value">{Number(p.total_quantity)}</span>
+                    </div>
+                    <div className="pill-card-row">
+                      <span className="pill-card-row-label">Revenue</span>
+                      <span className="pill-card-row-value">{money(p.total_revenue)}</span>
+                    </div>
+                  </div>
+                </div>
+              ))}
+              {topProducts.length === 0 && <div className="empty-state">No sales data yet.</div>}
+            </div>
+
+            {/* Larger screens: the original table, unchanged. */}
+            <div className="table-wrap">
+              <table className="data-table">
+                <thead><tr><th>Product</th><th>Manufacturer</th><th className="num">Qty Sold</th><th className="num">Revenue</th></tr></thead>
+                <tbody>
+                  {topProducts.map((p) => (
+                    <tr key={p.id}>
+                      <td data-label="Product">{p.name}</td>
+                      <td data-label="Manufacturer">{p.manufacturer_name}</td>
+                      <td className="num" data-label="Qty Sold">{Number(p.total_quantity)}</td>
+                      <td className="num" data-label="Revenue">{money(p.total_revenue)}</td>
+                    </tr>
+                  ))}
+                  {topProducts.length === 0 && <tr><td colSpan={4}><div className="empty-state">No sales data yet.</div></td></tr>}
+                </tbody>
+              </table>
+            </div>
+          </>
         )}
       </div>
     </div>

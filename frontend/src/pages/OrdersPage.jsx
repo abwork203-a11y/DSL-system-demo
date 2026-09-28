@@ -8,6 +8,7 @@ import { useConfirm } from '../context/ConfirmContext';
 import { useLiveOrderEvents } from '../context/SocketContext';
 import StatusBadge from '../components/StatusBadge';
 import Pagination from '../components/Pagination';
+import FilterToolbar from '../components/FilterToolbar';
 import { TableSkeleton } from '../components/Skeleton';
 import { listDrafts, deleteDraft, formatRelativeTime, ORDER_STEPS } from '../utils/orderDrafts';
 import { fetchAllPages } from '../utils/fetchAllPages';
@@ -89,6 +90,18 @@ export default function OrdersPage() {
   // now-different, shorter result set would just show an empty page.
   const updateFilter = (setter) => (value) => { setter(value); setPage(1); };
 
+  // Badge count + reset for the mobile "Filters" panel (search is not a filter)
+  const activeFilterCount = [distributorId, orderStatus, paymentStatus].filter(Boolean).length;
+  const resetOrderFilters = () => {
+    setDistributorId('');
+    setOrderStatus('');
+    setPaymentStatus('');
+    setPage(1);
+  };
+
+  const draftActiveFilterCount = draftDistributorId ? 1 : 0;
+  const resetDraftFilters = () => setDraftDistributorId('');
+
   const filteredDrafts = drafts.filter((d) => {
     const matchesSearch = !draftSearch
       || (d.distributorName || '').toLowerCase().includes(draftSearch.toLowerCase());
@@ -150,11 +163,17 @@ export default function OrdersPage() {
       </div>
 
       {activeTab === 'orders' ? (
-        <div className="toolbar">
-          <div className="toolbar-group">
-            <label htmlFor="orders-search">Search</label>
-            <input id="orders-search" type="text" placeholder="Search order # or distributor…" value={search} onChange={(e) => updateFilter(setSearch)(e.target.value)} style={{ minWidth: 220 }} />
-          </div>
+        <FilterToolbar
+          key="orders-toolbar"
+          activeCount={activeFilterCount}
+          onReset={resetOrderFilters}
+          search={
+            <div className="toolbar-group toolbar-search">
+              <label htmlFor="orders-search">Search</label>
+              <input id="orders-search" type="text" placeholder="Search order # or distributor…" value={search} onChange={(e) => updateFilter(setSearch)(e.target.value)} />
+            </div>
+          }
+        >
           <div className="toolbar-group">
             <label htmlFor="orders-distributor">Distributor</label>
             <select id="orders-distributor" value={distributorId} onChange={(e) => updateFilter(setDistributorId)(e.target.value)}>
@@ -181,13 +200,19 @@ export default function OrdersPage() {
               <option value="paid">Paid</option>
             </select>
           </div>
-        </div>
+        </FilterToolbar>
       ) : (
-        <div className="toolbar">
-          <div className="toolbar-group">
-            <label htmlFor="drafts-search">Search</label>
-            <input id="drafts-search" type="text" placeholder="Search by distributor…" value={draftSearch} onChange={(e) => setDraftSearch(e.target.value)} style={{ minWidth: 220 }} />
-          </div>
+        <FilterToolbar
+          key="drafts-toolbar"
+          activeCount={draftActiveFilterCount}
+          onReset={resetDraftFilters}
+          search={
+            <div className="toolbar-group toolbar-search">
+              <label htmlFor="drafts-search">Search</label>
+              <input id="drafts-search" type="text" placeholder="Search by distributor…" value={draftSearch} onChange={(e) => setDraftSearch(e.target.value)} />
+            </div>
+          }
+        >
           <div className="toolbar-group">
             <label htmlFor="drafts-distributor">Distributor</label>
             <select id="drafts-distributor" value={draftDistributorId} onChange={(e) => setDraftDistributorId(e.target.value)}>
@@ -195,7 +220,7 @@ export default function OrdersPage() {
               {distributorsList.map((d) => <option key={d.id} value={d.id}>{d.name}</option>)}
             </select>
           </div>
-        </div>
+        </FilterToolbar>
       )}
 
       {activeTab === 'orders' ? (

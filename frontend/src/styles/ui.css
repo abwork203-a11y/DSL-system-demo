@@ -937,6 +937,181 @@ body {
 
 
 /* ==============================================================
+   COLLAPSIBLE TOOLBAR (search + "Filters" button)
+   Used via <FilterToolbar>. Desktop looks exactly like a normal
+   .toolbar; at <=768px the filters tuck into a panel that opens
+   from a button sitting next to the search box.
+   ============================================================== */
+
+/* Desktop: wrappers vanish so search + filters lay out as before */
+.toolbar-search-row,
+.toolbar-filters,
+.toolbar-filters-inner {
+  display: contents;
+}
+
+.toolbar-filter-btn,
+.toolbar-filters-footer {
+  display: none;
+}
+
+.toolbar-search input {
+  min-width: 220px;
+}
+
+@media (max-width: 768px) {
+
+  .toolbar.toolbar-collapsible {
+    gap: 0; /* spacing is handled inside the panel so a closed panel adds none */
+  }
+
+  /* ── Search row ─────────────────────────────────── */
+
+  .toolbar-collapsible .toolbar-search-row {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+  }
+
+  .toolbar-collapsible .toolbar-search {
+    flex: 1;
+    min-width: 0;
+    width: auto;
+  }
+
+  .toolbar-collapsible .toolbar-search input {
+    min-width: 0;
+  }
+
+  /* Placeholder already says what it is; keep the label for screen readers */
+  .toolbar-collapsible .toolbar-search > label {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip: rect(0 0 0 0);
+    white-space: nowrap;
+  }
+
+  /* ── Filters button ─────────────────────────────── */
+
+  .toolbar-collapsible .toolbar-filter-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+
+    flex-shrink: 0;
+
+    height: 38px;
+    padding: 0 12px;
+
+    border: 1px solid var(--rule);
+    border-radius: var(--radius-sm);
+
+    background: var(--surface);
+    color: var(--ink);
+
+    font-family: var(--font-body);
+    font-size: 13.5px;
+    font-weight: 600;
+
+    cursor: pointer;
+  }
+
+  .toolbar-collapsible .toolbar-filter-btn:hover {
+    border-color: var(--rule-strong);
+  }
+
+  .toolbar-collapsible .toolbar-filter-btn:focus-visible {
+    border-color: var(--brass);
+    outline: 2px solid rgba(150, 116, 42, 0.20);
+    outline-offset: 0;
+  }
+
+  .toolbar-collapsible .toolbar-filter-btn.is-open,
+  .toolbar-collapsible .toolbar-filter-btn.has-active {
+    border-color: var(--brass);
+  }
+
+  .toolbar-filter-badge {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+
+    min-width: 18px;
+    height: 18px;
+    padding: 0 5px;
+
+    border-radius: 9px;
+
+    background: var(--brass);
+    color: #fff;
+
+    font-size: 11px;
+    font-weight: 700;
+    line-height: 1;
+  }
+
+  /* ── Collapsible panel ──────────────────────────── */
+
+  .toolbar-collapsible .toolbar-filters {
+    display: grid;
+    grid-template-rows: 0fr;
+
+    /* closed panel must not be tabbable */
+    visibility: hidden;
+
+    transition:
+      grid-template-rows 0.22s ease,
+      visibility 0s linear 0.22s;
+  }
+
+  .toolbar-collapsible .toolbar-filters.is-open {
+    grid-template-rows: 1fr;
+
+    visibility: visible;
+
+    transition-delay: 0s;
+  }
+
+  .toolbar-collapsible .toolbar-filters-inner {
+    display: flex;
+    flex-direction: column;
+    gap: 14px;
+
+    min-height: 0;
+    overflow: hidden;
+
+    /* room so focus rings aren't clipped by overflow */
+    padding: 0 3px;
+  }
+
+  /* margins (not padding) so a collapsed panel measures 0 tall */
+  .toolbar-collapsible .toolbar-filters-inner > :first-child {
+    margin-top: 14px;
+  }
+
+  .toolbar-collapsible .toolbar-filters-inner > :last-child {
+    margin-bottom: 3px;
+  }
+
+  .toolbar-collapsible .toolbar-filters-footer {
+    display: flex;
+  }
+
+  .toolbar-collapsible .toolbar-filters-footer .btn {
+    width: 100%;
+  }
+}
+
+@media (max-width: 768px) and (prefers-reduced-motion: reduce) {
+  .toolbar-collapsible .toolbar-filters {
+    transition: none;
+  }
+}
+
+
+/* ==============================================================
    TABLE CARD
    ============================================================== */
 
@@ -3891,4 +4066,35 @@ input[type='password']::-ms-clear {
 .switch input:focus-visible + .switch-track {
   outline: 2px solid var(--brass);
   outline-offset: 2px;
+}
+
+
+/* ==============================================================
+   LEDGER — pill card status colors (debit / credit)
+   Credit (payment, reduces the balance) reads green; debit
+   (charge, increases the balance) reads amber.
+   ============================================================== */
+
+.pill-card[data-status="credit"] {
+  border-left-color: var(--status-positive);
+}
+
+.pill-card[data-status="debit"] {
+  border-left-color: var(--status-pending);
+}
+
+.pill-card-row-status[data-status="credit"] {
+  color: var(--status-positive);
+}
+
+.pill-card-row-status[data-status="debit"] {
+  color: var(--status-pending);
+}
+
+/* Long notes: show at most two lines on the card */
+.ledger-pill-note {
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
 }

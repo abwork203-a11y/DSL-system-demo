@@ -6,6 +6,7 @@ import { useToast } from '../context/ToastContext';
 import { useConfirm } from '../context/ConfirmContext';
 import Modal from '../components/Modal';
 import Pagination from '../components/Pagination';
+import FilterToolbar from '../components/FilterToolbar';
 import { TableSkeleton } from '../components/Skeleton';
 
 const EMPTY_FORM = { manufacturer_id: '', name: '', size_packaging: '', price: '', retail_price: '' };
@@ -47,6 +48,10 @@ export default function ProductsPage() {
   // A filter change should reset back to page 1 — staying on a now-shorter
   // result set's page 4 would just show an empty page.
   const updateFilter = (setter) => (value) => { setter(value); setPage(1); };
+
+  // Badge count + reset for the mobile "Filters" panel (search is not a filter)
+  const activeFilterCount = mfgFilter ? 1 : 0;
+  const resetFilters = () => { setMfgFilter(''); setPage(1); };
 
   const openNew = () => { setForm(EMPTY_FORM); setEditing({}); };
   const openEdit = (p) => { setForm({ ...EMPTY_FORM, ...p }); setEditing(p); };
@@ -105,7 +110,7 @@ export default function ProductsPage() {
       <div className="page-header">
         <div>
           <h1>Products</h1>
-          <p>{rows.length} total</p>
+          <p>{pagination?.total ?? '…'} total</p>
         </div>
         <button className="btn" onClick={openNew} disabled={mfgs.length === 0}><Plus size={16} /> Add Product</button>
       </div>
@@ -116,17 +121,22 @@ export default function ProductsPage() {
         </div>
       )}
 
-       <div className="toolbar">
-          <div className="toolbar-group">
-            <input id="products-search" type="text" placeholder="Search products…" value={search} onChange={(e) => updateFilter(setSearch)(e.target.value)} />
+      <FilterToolbar
+        activeCount={activeFilterCount}
+        onReset={resetFilters}
+        search={
+          <div className="toolbar-group toolbar-search">
+            <input id="products-search" type="text" aria-label="Search products" placeholder="Search products…" value={search} onChange={(e) => updateFilter(setSearch)(e.target.value)} />
           </div>
-          <div className="toolbar-group">
-            <select id="products-manufacturer" value={mfgFilter} onChange={(e) => updateFilter(setMfgFilter)(e.target.value)}>
-              <option value="">All manufacturers</option>
-              {mfgs.map((m) => <option key={m.id} value={m.id}>{m.name}</option>)}
-            </select>
-          </div>
+        }
+      >
+        <div className="toolbar-group">
+          <select id="products-manufacturer" aria-label="Manufacturer" value={mfgFilter} onChange={(e) => updateFilter(setMfgFilter)(e.target.value)}>
+            <option value="">All manufacturers</option>
+            {mfgs.map((m) => <option key={m.id} value={m.id}>{m.name}</option>)}
+          </select>
         </div>
+      </FilterToolbar>
 
       <div className="card">
         
