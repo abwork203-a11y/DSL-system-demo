@@ -1,5 +1,5 @@
 import { useEffect, useState, useCallback } from 'react';
-import { Plus, Pencil, Trash2 } from 'lucide-react';
+import { Plus, Pencil, Trash2, Ban, RotateCcw } from 'lucide-react';
 import { usersApi, distributors as distributorsApi } from '../api/endpoints';
 import { apiErrorMessage, apiErrorFields } from '../api/client';
 import { useAuth } from '../context/AuthContext';
@@ -138,25 +138,34 @@ export default function UsersPage() {
           <>
           <div className="list-cards">
             {rows.map((u) => (
-              <div key={u.id} className="list-card" data-status={u.is_active ? 'active' : 'inactive'}>
-                <div className="list-card-top">
-                  <span className="list-card-title">{u.name}</span>
-                  {u.is_active ? <span className="badge badge-green">active</span> : <span className="badge badge-neutral">inactive</span>}
+              <div key={u.id} className="pill-card" data-status={u.is_active ? 'active' : 'inactive'}>
+                <div className="pill-card-left">
+                  <div className="pill-card-name">{u.name}</div>
+                  <div className="pill-card-sub">{u.email}</div>
+                  <div className="pill-card-meta" style={{ textTransform: 'capitalize' }}>
+                    {u.role.replace('_', ' ')}{u.assigned_zone ? ` · ${u.assigned_zone}` : ''}
+                  </div>
                 </div>
-                <div className="list-card-subtitle">{u.email}</div>
-                <div className="list-card-meta" style={{ textTransform: 'capitalize' }}>
-                  {u.role.replace('_', ' ')}{u.assigned_zone ? ` · ${u.assigned_zone}` : ''}
-                </div>
-                <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginTop: 4 }}>
-                  <button className="btn btn-secondary btn-sm" onClick={() => openEdit(u)}><Pencil size={14} /> Edit</button>
-                  {u.id !== currentUser.id && (
-                    <button className="btn btn-secondary btn-sm" onClick={() => toggleActive(u)}>
-                      {u.is_active ? 'Deactivate' : 'Reactivate'}
-                    </button>
-                  )}
-                  {u.id !== currentUser.id && (
-                    <button className="btn btn-danger btn-sm" onClick={() => handleDelete(u)}><Trash2 size={14} /> Delete</button>
-                  )}
+                <div className="pill-card-divider" />
+                <div className="pill-card-rows">
+                  <div className="pill-card-actions-top">
+                    {u.id !== currentUser.id && (
+                      <label className="switch" title={u.is_active ? 'Deactivate' : 'Reactivate'}>
+                        <input type="checkbox" checked={!!u.is_active} onChange={() => toggleActive(u)} />
+                        <span className="switch-track" />
+                      </label>
+                    )}
+                    <button className="btn-ghost" onClick={() => openEdit(u)} title="Edit" aria-label="Edit"><Pencil size={15} /></button>
+                    {u.id !== currentUser.id && (
+                      <button className="btn-ghost" onClick={() => handleDelete(u)} title="Delete" aria-label="Delete"><Trash2 size={15} /></button>
+                    )}
+                  </div>
+                  <div className="pill-card-row">
+                    <span className="pill-card-row-label">Status</span>
+                    <span className="pill-card-row-value pill-card-row-status" data-status={u.is_active ? 'active' : 'inactive'}>
+                      {u.is_active ? 'Active' : 'Inactive'}
+                    </span>
+                  </div>
                 </div>
               </div>
             ))}
@@ -175,15 +184,15 @@ export default function UsersPage() {
                     <td data-label="Role" style={{ textTransform: 'capitalize' }}>{u.role.replace('_', ' ')}</td>
                     <td data-label="Zone">{u.assigned_zone || '—'}</td>
                     <td data-label="Status">{u.is_active ? <span className="badge badge-green">active</span> : <span className="badge badge-neutral">inactive</span>}</td>
-                    <td style={{ display: 'flex', gap: 6, justifyContent: 'flex-end' }}>
-                      <button className="btn btn-secondary btn-sm" onClick={() => openEdit(u)}><Pencil size={14} /> Edit</button>
+                    <td className="table-actions">
+                      <button className="btn-ghost" onClick={() => openEdit(u)} title="Edit" aria-label="Edit"><Pencil size={15} /></button>
                       {u.id !== currentUser.id && (
-                        <button className="btn btn-secondary btn-sm" onClick={() => toggleActive(u)}>
-                          {u.is_active ? 'Deactivate' : 'Reactivate'}
+                        <button className="btn-ghost" onClick={() => toggleActive(u)} title={u.is_active ? 'Deactivate' : 'Reactivate'} aria-label={u.is_active ? 'Deactivate' : 'Reactivate'}>
+                          {u.is_active ? <Ban size={15} /> : <RotateCcw size={15} />}
                         </button>
                       )}
                       {u.id !== currentUser.id && (
-                        <button className="btn btn-danger btn-sm" onClick={() => handleDelete(u)}><Trash2 size={14} /> Delete</button>
+                        <button className="btn-ghost" onClick={() => handleDelete(u)} title="Delete" aria-label="Delete"><Trash2 size={15} /></button>
                       )}
                     </td>
                   </tr>

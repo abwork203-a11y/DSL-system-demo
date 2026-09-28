@@ -155,6 +155,12 @@ export default function DistributorsPage() {
                     {isAdmin && <button className="btn-ghost" onClick={() => handleDelete(d)} title="Delete" aria-label="Delete"><Trash2 size={15} /></button>}
                   </div>
                   <div className="pill-card-row">
+                    <span className="pill-card-row-label">Status</span>
+                    <span className="pill-card-row-value pill-card-row-status" data-status={d.status}>
+                      {d.status === 'active' ? 'Active' : 'Inactive'}
+                    </span>
+                  </div>
+                  <div className="pill-card-row">
                     <span className="pill-card-row-label">Balance</span>
                     <span className="pill-card-row-value">{money(d.balance)}</span>
                   </div>

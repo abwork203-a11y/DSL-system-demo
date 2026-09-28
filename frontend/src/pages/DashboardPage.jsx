@@ -4,7 +4,7 @@ import {
   ArrowRight,
   FileText,
   Plus,
-  CalendarDays,
+  Eye,
 } from 'lucide-react';
 
 import { reports, orders as ordersApi } from '../api/endpoints';
@@ -340,24 +340,36 @@ export default function DashboardPage() {
               </div>
             ) : (
               recentOrders.map((order) => (
-                <div key={order.id} className="recent-order-card" data-status={order.order_status}>
-                  <div className="recent-order-card-top">
-                    <Link to={`/orders/${order.id}`} className="dashboard-order-number">
-                      {order.order_number}
-                    </Link>
-                    <StatusBadge value={order.order_status} />
+                <div key={order.id} className="pill-card" data-status={order.order_status}>
+                  <div className="pill-card-left">
+                    <div className="pill-card-name">
+                      <Link to={`/orders/${order.id}`} className="dashboard-order-number">
+                        {order.order_number}
+                      </Link>
+                    </div>
+                    <div className="pill-card-sub">{order.distributor_name || '—'}</div>
+                    <div className="pill-card-meta">{formatDate(order.order_date)}</div>
                   </div>
-                  <div className="recent-order-card-distributor">{order.distributor_name || '—'}</div>
-                  <div className="recent-order-card-row">
-                    <span className="recent-order-card-date">
-                      <CalendarDays size={13} />
-                      {formatDate(order.order_date)}
-                    </span>
-                    <span className="recent-order-card-amount">{money(order.total)}</span>
+                  <div className="pill-card-divider" />
+                  <div className="pill-card-rows">
+                    <div className="pill-card-actions-top">
+                      <Link to={`/orders/${order.id}`} className="btn-ghost" title="View order" aria-label="View order"><Eye size={15} /></Link>
+                    </div>
+                    <div className="pill-card-row">
+                      <span className="pill-card-row-label">Status</span>
+                      <span
+                        className="pill-card-row-value pill-card-row-status"
+                        data-status={order.order_status}
+                        style={{ textTransform: 'capitalize' }}
+                      >
+                        {order.order_status}
+                      </span>
+                    </div>
+                    <div className="pill-card-row">
+                      <span className="pill-card-row-label">Total</span>
+                      <span className="pill-card-row-value">{money(order.total)}</span>
+                    </div>
                   </div>
-                  <Link to={`/orders/${order.id}`} className="recent-order-card-link">
-                    View details <ArrowRight size={13} />
-                  </Link>
                 </div>
               ))
             )}

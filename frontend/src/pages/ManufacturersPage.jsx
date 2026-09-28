@@ -1,5 +1,5 @@
 import { useEffect, useState, useCallback } from 'react';
-import { Plus, Pencil, Trash2, ChevronRight } from 'lucide-react';
+import { Plus, Pencil, Trash2, ChevronRight, Ban, RotateCcw } from 'lucide-react';
 import { manufacturers as mfgApi } from '../api/endpoints';
 import { apiErrorMessage } from '../api/client';
 import { useToast } from '../context/ToastContext';
@@ -60,6 +60,21 @@ export default function ManufacturersPage() {
     }
   };
 
+  const toggleActive = async (m) => {
+    const newActive = !m.is_active;
+    // Optimistic: flip this one row on screen right away, then tell the server.
+    // If the server says no, put the row back the way it was.
+    setRows((current) => current.map((row) => (row.id === m.id ? { ...row, is_active: newActive } : row)));
+
+    try {
+      await mfgApi.update(m.id, { is_active: newActive });
+      toast.success(newActive ? 'Reactivated.' : 'Marked inactive.');
+    } catch (err) {
+      setRows((current) => current.map((row) => (row.id === m.id ? { ...row, is_active: m.is_active } : row))); // roll back
+      toast.error(apiErrorMessage(err));
+    }
+  };
+
   const handleDelete = async (m) => {
     if (!await confirm({
       title: 'Delete Manufacturer?',
@@ -99,23 +114,35 @@ export default function ManufacturersPage() {
           <>
           <div className="list-cards">
             {rows.map((m) => (
-              <div key={m.id} className="list-card" data-status={m.is_active ? 'active' : 'inactive'} onClick={() => openEdit(m)}>
-                <div className="list-card-top">
-                  <span className="list-card-title">{m.name}</span>
-                  {m.is_active ? <span className="badge badge-green">active</span> : <span className="badge badge-neutral">inactive</span>}
+              <div key={m.id} className="pill-card" data-status={m.is_active ? 'active' : 'inactive'}>
+                <div className="pill-card-left">
+                  <div className="pill-card-name">{m.name}</div>
+                  {(m.contact_name || m.contact_phone) && (
+                    <div className="pill-card-sub">
+                      {m.contact_name || '—'}{m.contact_phone ? ` · ${m.contact_phone}` : ''}
+                    </div>
+                  )}
                 </div>
-                {(m.contact_name || m.contact_phone) && (
-                  <div className="list-card-subtitle">{m.contact_name || '—'}{m.contact_phone ? ` · ${m.contact_phone}` : ''}</div>
-                )}
-                <div className="list-card-values">
-                  <div>
-                    <span className="list-card-value-label">Balance Owed</span>
-                    <span className="list-card-value-amount">{money(m.balance)}</span>
+                <div className="pill-card-divider" />
+                <div className="pill-card-rows">
+                  <div className="pill-card-actions-top">
+                    <label className="switch" title={m.is_active ? 'Mark inactive' : 'Reactivate'}>
+                      <input type="checkbox" checked={!!m.is_active} onChange={() => toggleActive(m)} />
+                      <span className="switch-track" />
+                    </label>
+                    <button className="btn-ghost" onClick={() => openEdit(m)} title="Edit" aria-label="Edit"><Pencil size={15} /></button>
+                    <button className="btn-ghost" onClick={() => handleDelete(m)} title="Delete" aria-label="Delete"><Trash2 size={15} /></button>
                   </div>
-                </div>
-                <div className="table-actions" style={{ marginTop: 12 }} onClick={(e) => e.stopPropagation()}>
-                  <button className="btn-ghost" onClick={() => openEdit(m)} title="Edit" aria-label="Edit"><Pencil size={15} /></button>
-                  <button className="btn-ghost" onClick={() => handleDelete(m)} title="Delete" aria-label="Delete"><Trash2 size={15} /></button>
+                  <div className="pill-card-row">
+                    <span className="pill-card-row-label">Status</span>
+                    <span className="pill-card-row-value pill-card-row-status" data-status={m.is_active ? 'active' : 'inactive'}>
+                      {m.is_active ? 'Active' : 'Inactive'}
+                    </span>
+                  </div>
+                  <div className="pill-card-row">
+                    <span className="pill-card-row-label">Balance Owed</span>
+                    <span className="pill-card-row-value">{money(m.balance)}</span>
+                  </div>
                 </div>
               </div>
             ))}
@@ -141,6 +168,9 @@ export default function ManufacturersPage() {
                     <td data-label="Status">{m.is_active ? <span className="badge badge-green">active</span> : <span className="badge badge-neutral">inactive</span>}</td>
                     <td className="table-actions">
                       <button className="btn-ghost" onClick={() => openEdit(m)} title="Edit" aria-label="Edit"><Pencil size={15} /></button>
+                      <button className="btn-ghost" onClick={() => toggleActive(m)} title={m.is_active ? 'Mark inactive' : 'Reactivate'} aria-label={m.is_active ? 'Mark inactive' : 'Reactivate'}>
+                        {m.is_active ? <Ban size={15} /> : <RotateCcw size={15} />}
+                      </button>
                       <button className="btn-ghost" onClick={() => handleDelete(m)} title="Delete" aria-label="Delete"><Trash2 size={15} /></button>
                     </td>
                   </tr>
