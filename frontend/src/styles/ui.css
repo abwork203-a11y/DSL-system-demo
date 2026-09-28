@@ -2958,18 +2958,33 @@ input[type='password']::-ms-clear {
   min-width: 0;
 }
 
+/* Profile tab: form card + avatar card.
+   flex-wrap lets the avatar card drop below the form on its own when the
+   panel is too narrow for both, no matter how wide the sidebar/tabs are. */
 .settings-profile-grid {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) minmax(240px, 300px);
+  display: flex;
+  flex-wrap: wrap;
   gap: 16px;
-  align-items: start;
+  align-items: flex-start;
 }
 
 .settings-profile-grid > .card + .card {
   margin-top: 0;
 }
 
+/* Form card: ideal width 320px, may grow to 520px, never wider. */
+.settings-profile-card {
+  flex: 1 1 320px;
+  max-width: 520px;
+  min-width: 0;
+}
+
+
+/* Avatar card: ideal width 240px, may grow to 300px, never wider. */
 .settings-avatar-card {
+  flex: 1 1 240px;
+  max-width: 300px;
+  min-width: 0;
   text-align: center;
 }
 
@@ -3027,8 +3042,10 @@ input[type='password']::-ms-clear {
     overflow-x: auto;
   }
 
-  .settings-profile-grid {
-    grid-template-columns: 1fr;
+  .settings-profile-card,
+  .settings-avatar-card {
+    flex-basis: 100%;
+    max-width: none;
   }
 
 }
@@ -3478,7 +3495,8 @@ input[type='password']::-ms-clear {
   padding: 16px 18px;
   box-shadow: var(--shadow-sm);
   border-radius: 10px;
-  border-left: 3px solid var(--rule-strong);
+  border: 1px solid var(--rule-strong);      /* outline on all four sides */
+  border-left: 3px solid var(--rule-strong); /* thicker left edge = status color (must stay AFTER the line above) */
 
  
 }
@@ -3512,6 +3530,7 @@ input[type='password']::-ms-clear {
   flex-shrink: 0;
   min-width: 40%;
   max-width: 40%;
+  overflow-wrap: anywhere;
 }
 
 .pill-card-name {
@@ -3670,8 +3689,8 @@ input[type='password']::-ms-clear {
 
 .order-remove-btn {
   position: absolute;
-  top: 0px;
-  right: 0px;
+  top: -1px;    /* -1px = the card's new 1px border, so the badge stays flush with the corner */
+  right: -1px;
 
   display: flex;
   align-items: center;
