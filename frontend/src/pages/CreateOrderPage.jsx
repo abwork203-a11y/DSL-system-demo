@@ -269,7 +269,7 @@ export default function CreateOrderPage() {
   const selectedDistributor = distributorsList.find((d) => d.id === Number(distributorId));
 
   return (
-    <div className="content" style={{ maxWidth: step === 1 ? 980 : 760 }}>
+    <div className="content" style={{ maxWidth:980 }}>
       <div className="page-header">
         <div>
           <Link to="/orders" className="link-btn" style={{ display: 'inline-flex', alignItems: 'center', gap: 4, marginBottom: 10, fontSize: 13 }}>
@@ -308,7 +308,7 @@ export default function CreateOrderPage() {
                 }}
               />
             </div>
-            <div className="table-wrap" style={{ maxHeight: 280, height: 'auto' }}>
+            <div className="table-wrap" style={{ maxHeight: 260, height: 'auto' }}>
               <table className="data-table">
                 <tbody>
                   {filteredDistributors.map((d) => (
