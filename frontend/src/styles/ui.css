@@ -3786,7 +3786,7 @@ input[type='password']::-ms-clear {
    at each breakpoint — this is what makes the toggle tab sit flush
    against the drawer's edge instead of leaving a gap. */
 .order-cart-toggle.is-open {
-  right: min(94vw, 540px);
+  right: min(93vw, 540px);
 }
 
 @media (min-width: 640px) {
@@ -3867,7 +3867,7 @@ input[type='password']::-ms-clear {
   content: '';
   position: absolute;
 
-  top: 2px;
+  top: 1px;
   left: 2px;
 
   width: 12px;
