@@ -400,10 +400,12 @@ export default function CreateOrderPage() {
                     >
                       <div className="pill-card-left">
                         <div className="pill-card-name">
-                          {topSellerRank.has(p.id) && (
-                            <Star size={14} className="favourite-star" aria-label="Best seller" />
-                          )}
-                          {p.name}
+                          <span>
+                            {p.name}
+                            {topSellerRank.has(p.id) && (
+                              <Star size={14} className="favourite-star favourite-star-inline" aria-label="Best seller" />
+                            )}
+                          </span>
                         </div>
                         <div className="pill-card-sub">{p.manufacturer_name}</div>
                         {p.size_packaging && <div className="pill-card-meta">{p.size_packaging}</div>}

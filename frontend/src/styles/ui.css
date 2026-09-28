@@ -4156,7 +4156,11 @@ input[type='password']::-ms-clear {
   color: var(--brass);
   fill: currentColor;
 }
-
+.favourite-star-inline {
+  display: inline;
+  vertical-align: -2px;
+  margin-left: 6px;
+}
 .favourite-name {
   display: inline-flex;
   align-items: center;
