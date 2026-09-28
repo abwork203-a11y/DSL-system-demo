@@ -2472,15 +2472,16 @@ input[type='password']::-ms-clear {
 
 @media (max-width: 640px) {
 
+  .stepper-item:not(:last-child)::after {
+    min-width: 12px;
+    margin: 0 6px;
+  }
   .stepper-label {
     display: none;
   }
   .stepper-number {
     display: flex;
-  }
-  .stepper-item:not(:last-child)::after {
-    min-width: 12px;
-    margin: 0 6px;
+    justify-content: center;
   }
 
 }
