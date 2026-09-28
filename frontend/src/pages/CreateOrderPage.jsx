@@ -305,7 +305,7 @@ export default function CreateOrderPage() {
       <div className="stepper">
         {STEPS.map((label, i) => (
           <div key={label} className={`stepper-item${i === step ? ' active' : i < step ? ' done' : ''}`}>
-            <span className="stepper-number" style={{ justifyContent: 'center' }}>{i + 1}</span>
+            <span className="stepper-number">{i + 1}</span>
             <span className="stepper-label">{label}</span>
           </div>
         ))}
@@ -773,35 +773,58 @@ export default function CreateOrderPage() {
         )}
       </div>
 
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 10, marginTop: 20 }}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: 20 }}>
         <button className="btn btn-secondary" disabled={step === 0} onClick={() => setStep(step - 1)}>Back</button>
-
-        <button
-          className="btn btn-secondary"
-          disabled={savingDraft || !hasUnsavedProgress()}
-          onClick={() => confirm({
-            title: 'Discard this order?',
-            message: 'Your progress will not be saved. This cannot be undone.',
-            confirmLabel: 'Discard',
-            danger: true,
-            onConfirm: async () => {
-              if (draftIdRef.current) await deleteDraft(draftIdRef.current).catch(() => {});
-              submittedRef.current = true; // already handled — don't also trigger the leave-blocker on this navigation
-              navigate('/orders');
-            },
-          })}
-        >
-          Discard
-        </button>
-
-        {step < STEPS.length - 1 ? (
-          <button className="btn" disabled={!canProceed()} onClick={() => setStep(step + 1)}>Continue</button>
-        ) : (
-          <button className="btn" disabled={submitting} onClick={handleSubmit}>
-            {submitting && <Loader2 size={16} className="spin" />}
-            {submitting ? 'Creating order…' : 'Create Order & Generate Invoice'}
-          </button>
-        )}
+        <div style={{ display: 'flex', gap: 10 }}>
+          {hasUnsavedProgress() && (
+            <button
+              className="btn btn-secondary"
+              disabled={savingDraft}
+              onClick={() => confirm({
+                title: 'Discard this order?',
+                message: 'Your progress will not be saved. This cannot be undone.',
+                confirmLabel: 'Discard',
+                danger: true,
+                onConfirm: async () => {
+                  if (draftIdRef.current) await deleteDraft(draftIdRef.current).catch(() => {});
+                  submittedRef.current = true; // already handled — don't also trigger the leave-blocker on this navigation
+                  navigate('/orders');
+                },
+              })}
+            >
+              Discard
+            </button>
+          )}
+          {hasUnsavedProgress() && (
+            <button
+              className="btn btn-secondary"
+              disabled={savingDraft}
+              onClick={async () => {
+                setSavingDraft(true);
+                try {
+                  await saveDraftNow();
+                  submittedRef.current = true; // already saved deliberately — don't also block this navigation
+                  toast.success('Draft saved.');
+                  navigate('/orders', { state: { tab: 'drafts' } });
+                } catch (err) {
+                  toast.error(apiErrorMessage(err));
+                  setSavingDraft(false); // stay put — nothing was actually saved, don't pretend otherwise
+                }
+              }}
+            >
+              {savingDraft && <Loader2 size={16} className="spin" />}
+              {savingDraft ? 'Saving…' : 'Save as Draft'}
+            </button>
+          )}
+          {step < STEPS.length - 1 ? (
+            <button className="btn" disabled={!canProceed()} onClick={() => setStep(step + 1)}>Continue</button>
+          ) : (
+            <button className="btn" disabled={submitting} onClick={handleSubmit}>
+              {submitting && <Loader2 size={16} className="spin" />}
+              {submitting ? 'Creating order…' : 'Create Order & Generate Invoice'}
+            </button>
+          )}
+        </div>
       </div>
 
       {blocker.state === 'blocked' && !savingDraft && !discarding && (
@@ -854,6 +877,3 @@ export default function CreateOrderPage() {
     </div>
   );
 }
-
-///jdje  ejejd ed 
-
