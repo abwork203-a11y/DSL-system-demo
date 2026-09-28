@@ -9,6 +9,7 @@ import { useConfirm } from '../context/ConfirmContext';
 import StatusBadge from '../components/StatusBadge';
 import Modal from '../components/Modal';
 import Pagination from '../components/Pagination';
+import FilterToolbar from '../components/FilterToolbar';
 import { TableSkeleton } from '../components/Skeleton';
 
 const EMPTY_FORM = { name: '', contact_name: '', contact_phone: '', contact_email: '', zone: '', region: '', city: '', area: '', address: '' };
@@ -47,6 +48,10 @@ export default function DistributorsPage() {
   useEffect(() => { load(); }, [load]);
 
   const updateFilter = (setter) => (value) => { setter(value); setPage(1); };
+
+  // Badge count + reset for the mobile "Filters" panel (search is not a filter)
+  const activeFilterCount = status ? 1 : 0;
+  const resetFilters = () => { setStatus(''); setPage(1); };
 
   const openNew = () => { setForm(EMPTY_FORM); setEditing({}); };
   const openEdit = (d) => { setForm({ ...EMPTY_FORM, ...d }); setEditing(d); };
@@ -108,23 +113,28 @@ export default function DistributorsPage() {
       <div className="page-header">
         <div>
           <h1>Distributors</h1>
-          <p>{rows.length} total</p>
+          <p>{pagination?.total ?? '…'} total</p>
         </div>
         <button className="btn" onClick={openNew}><Plus size={16} /> Add Distributor</button>
       </div>
 
-        <div className="toolbar">
-          <div className="toolbar-group">
-            <input id="distributors-search" type="text" placeholder="Search distributors…" value={search} onChange={(e) => updateFilter(setSearch)(e.target.value)} />
+      <FilterToolbar
+        activeCount={activeFilterCount}
+        onReset={resetFilters}
+        search={
+          <div className="toolbar-group toolbar-search">
+            <input id="distributors-search" type="text" aria-label="Search distributors" placeholder="Search distributors…" value={search} onChange={(e) => updateFilter(setSearch)(e.target.value)} />
           </div>
-          <div className="toolbar-group">
-            <select id="distributors-status" value={status} onChange={(e) => updateFilter(setStatus)(e.target.value)}>
-              <option value="">All statuses</option>
-              <option value="active">Active</option>
-              <option value="inactive">Inactive</option>
-            </select>
-          </div>
+        }
+      >
+        <div className="toolbar-group">
+          <select id="distributors-status" aria-label="Status" value={status} onChange={(e) => updateFilter(setStatus)(e.target.value)}>
+            <option value="">All statuses</option>
+            <option value="active">Active</option>
+            <option value="inactive">Inactive</option>
+          </select>
         </div>
+      </FilterToolbar>
 
       <div className="card">
         {loading ? (

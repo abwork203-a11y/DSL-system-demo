@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { useNavigate, useBlocker, useLocation, Link } from 'react-router-dom';
-import { Plus, Minus, Loader2, ArrowLeft, X, ChevronLeft, ChevronRight } from 'lucide-react';
-import { distributors as distributorsApi, products as productsApi, orders as ordersApi } from '../api/endpoints';
+import { Plus, Minus, Loader2, ArrowLeft, X, ChevronLeft, ChevronRight, Star } from 'lucide-react';
+import { distributors as distributorsApi, products as productsApi, orders as ordersApi, reports } from '../api/endpoints';
 import { apiErrorMessage } from '../api/client';
 import { useToast } from '../context/ToastContext';
 import { useConfirm } from '../context/ConfirmContext';
@@ -22,6 +22,9 @@ export default function CreateOrderPage() {
   const [step, setStep] = useState(0);
   const [distributorsList, setDistributorsList] = useState([]);
   const [productsList, setProductsList] = useState([]);
+  // IDs of the best-selling products, best first. Used to float them to the
+  // top of the product picker and mark them with a star.
+  const [topSellerIds, setTopSellerIds] = useState([]);
   const [submitting, setSubmitting] = useState(false);
   // Only meaningful on narrow screens, where the "Added to Order" panel
   // becomes a slide-in drawer instead of a fixed side column — see the
@@ -159,6 +162,9 @@ export default function CreateOrderPage() {
   useEffect(() => {
     fetchAllPages(distributorsApi.list, { status: 'active' }).then(setDistributorsList).catch((err) => toast.error(apiErrorMessage(err)));
     fetchAllPages(productsApi.list, { is_active: 'true' }).then(setProductsList).catch((err) => toast.error(apiErrorMessage(err)));
+    // Nice-to-have only: if this fails (e.g. no permission), the picker just
+    // shows products in their normal order, so no error toast here.
+    reports.topProducts(5).then((res) => setTopSellerIds(res.data.map((row) => row.id))).catch(() => {});
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
@@ -187,11 +193,27 @@ export default function CreateOrderPage() {
     return distributorsList.filter((d) => d.name.toLowerCase().includes(q));
   }, [distributorsList, distributorSearch]);
 
+  // id -> rank (0 = best seller). A Map makes "is this a favourite?" a fast lookup.
+  const topSellerRank = useMemo(
+    () => new Map(topSellerIds.map((id, index) => [id, index])),
+    [topSellerIds]
+  );
+
   const filteredProducts = useMemo(() => {
     const q = productSearch.trim().toLowerCase();
-    if (!q) return productsList;
-    return productsList.filter((p) => p.name.toLowerCase().includes(q));
-  }, [productsList, productSearch]);
+    const matches = q ? productsList.filter((p) => p.name.toLowerCase().includes(q)) : productsList;
+    if (topSellerRank.size === 0) return matches;
+
+    // Favourites first (best seller at the very top), everyone else keeps
+    // their existing order. Array.sort is stable, so returning 0 for two
+    // non-favourites leaves them exactly where they were.
+    return [...matches].sort((a, b) => {
+      const rankA = topSellerRank.has(a.id) ? topSellerRank.get(a.id) : Infinity;
+      const rankB = topSellerRank.has(b.id) ? topSellerRank.get(b.id) : Infinity;
+      if (rankA === rankB) return 0;
+      return rankA - rankB;
+    });
+  }, [productsList, productSearch, topSellerRank]);
 
   const selectDistributor = (d) => {
     setDistributorId(String(d.id));
@@ -377,7 +399,12 @@ export default function CreateOrderPage() {
                       }}
                     >
                       <div className="pill-card-left">
-                        <div className="pill-card-name">{p.name}</div>
+                        <div className="pill-card-name">
+                          {topSellerRank.has(p.id) && (
+                            <Star size={14} className="favourite-star" aria-label="Best seller" />
+                          )}
+                          {p.name}
+                        </div>
                         <div className="pill-card-sub">{p.manufacturer_name}</div>
                         {p.size_packaging && <div className="pill-card-meta">{p.size_packaging}</div>}
                       </div>
@@ -417,7 +444,14 @@ export default function CreateOrderPage() {
                       const alreadyAdded = items.some((it) => it.product_id === p.id);
                       return (
                         <tr key={p.id}>
-                          <td data-label="Product">{p.name}</td>
+                          <td data-label="Product">
+                            <span className="favourite-name">
+                              {topSellerRank.has(p.id) && (
+                                <Star size={14} className="favourite-star" aria-label="Best seller" />
+                              )}
+                              {p.name}
+                            </span>
+                          </td>
                           <td data-label="Manufacturer">{p.manufacturer_name}</td>
                           <td data-label="Size/Packaging">{p.size_packaging || '—'}</td>
                           <td className="num" data-label="Retail Price">{money(p.retail_price)}</td>

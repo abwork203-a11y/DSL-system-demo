@@ -1,5 +1,5 @@
 import { useId, useState } from 'react';
-import { SlidersHorizontal } from 'lucide-react';
+import { SlidersHorizontal, FilterX } from 'lucide-react';
 
 /**
  * Search + filters bar.
@@ -46,8 +46,14 @@ export default function FilterToolbar({ search, children, activeCount = 0, onRes
           {children}
 
           <div className="toolbar-filters-footer">
-            <button type="button" className="btn btn-secondary" onClick={handleReset}>
-              Reset
+            <button
+              type="button"
+              className="toolbar-reset-btn"
+              onClick={handleReset}
+              disabled={activeCount === 0}
+            >
+              <FilterX size={15} strokeWidth={2} />
+              Reset filters
             </button>
           </div>
         </div>

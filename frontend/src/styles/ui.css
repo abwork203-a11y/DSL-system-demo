@@ -1097,10 +1097,58 @@ body {
 
   .toolbar-collapsible .toolbar-filters-footer {
     display: flex;
+
+    padding-top: 12px;
+    margin-top: 2px;
+
+    border-top: 1px dashed var(--rule);
   }
 
-  .toolbar-collapsible .toolbar-filters-footer .btn {
+  .toolbar-collapsible .toolbar-reset-btn {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+
     width: 100%;
+    height: 36px;
+
+    border: none;
+    border-radius: var(--radius-sm);
+
+    background: none;
+    color: var(--ink-muted);
+
+    font-family: var(--font-body);
+    font-size: 13px;
+    font-weight: 600;
+    letter-spacing: 0.01em;
+
+    cursor: pointer;
+
+    transition: color 0.12s, background 0.12s;
+  }
+
+  .toolbar-collapsible .toolbar-reset-btn:hover {
+    background: var(--status-negative-tint, rgba(190, 60, 50, 0.08));
+    color: var(--status-negative);
+  }
+
+  .toolbar-collapsible .toolbar-reset-btn:focus-visible {
+    outline: 2px solid rgba(150, 116, 42, 0.20);
+    outline-offset: 0;
+  }
+
+  .toolbar-collapsible .toolbar-reset-btn svg {
+    flex-shrink: 0;
+  }
+
+  /* only meaningful to hit reset once a filter is actually set */
+  .toolbar-collapsible .toolbar-reset-btn:disabled {
+    color: var(--ink-muted);
+    opacity: 0.45;
+    cursor: default;
+    pointer-events: none;
   }
 }
 
@@ -4097,4 +4145,20 @@ input[type='password']::-ms-clear {
   -webkit-line-clamp: 2;
   -webkit-box-orient: vertical;
   overflow: hidden;
+}
+
+/* ==============================================================
+   FAVOURITE (best-selling) PRODUCT STAR
+   ============================================================== */
+
+.favourite-star {
+  flex-shrink: 0;
+  color: var(--brass);
+  fill: currentColor;
+}
+
+.favourite-name {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
 }
