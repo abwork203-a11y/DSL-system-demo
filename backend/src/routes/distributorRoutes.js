@@ -3,6 +3,7 @@ const { body } = require('express-validator');
 const { requireAuth, requireRole } = require('../middleware/auth');
 const { validate } = require('../middleware/validate');
 const controller = require('../controllers/distributorController');
+const { withRls } = require('../middleware/rls');
 
 const router = express.Router();
 router.use(requireAuth);
@@ -17,10 +18,10 @@ const writeRules = [
   .isLength({ max: 500 }),
 ];
 
-router.get('/', controller.list);
-router.get('/:id', controller.getOne);
-router.post('/', writeRules, validate, controller.create); // admin + sales_rep, per PRD
-router.put('/:id', writeRules, validate, controller.update); // admin + sales_rep, per PRD (includes marking inactive)
-router.delete('/:id', requireRole('admin'), controller.remove);
+router.get('/', withRls(controller.list));
+router.get('/:id', withRls(controller.getOne));
+router.post('/', writeRules, validate, withRls(controller.create)); // admin + sales_rep, per PRD
+router.put('/:id', writeRules, validate, withRls(controller.update)); // admin + sales_rep, per PRD (includes marking inactive)
+router.delete('/:id', requireRole('admin'), withRls(controller.remove));
 
 module.exports = router;
