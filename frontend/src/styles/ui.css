@@ -3849,9 +3849,19 @@ input[type='password']::-ms-clear {
 .pill-card-row-status[data-status="unpaid"],
 .pill-card-row-status[data-status="current"] {
   color: var(--status-pending);
+  
 }
 
+.pill-card-actions-row {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
 
+  gap: 8px;
+
+  width: 100%;
+  padding-top: 6px;
+}
 /* ==============================================================
    ORDER BUILDER — pill card list (mobile only)
    ============================================================== */

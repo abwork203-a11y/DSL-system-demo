@@ -317,6 +317,44 @@ export default function OrdersPage() {
           {draftsLoading ? (
             <TableSkeleton columns={5} rows={4} />
           ) : (
+            <>
+            {/* Small screens: pill cards (shown only below 640px by the
+                .list-cards rule). Must sit directly before .table-wrap. */}
+            <div className="list-cards">
+              {filteredDrafts.map((d) => (
+                <div key={d.id} className="pill-card">
+                  <div className="pill-card-left">
+                    <div className="pill-card-name">{d.distributorName || 'No distributor selected'}</div>
+                    <div className="pill-card-meta">
+                      <CalendarDays size={12} style={{ verticalAlign: -2, marginRight: 4 }} />
+                      {formatRelativeTime(d.updatedAt)}
+                    </div>
+                  </div>
+                  <div className="pill-card-divider" />
+                  <div className="pill-card-rows">
+                    <div className="pill-card-row">
+                      <span className="pill-card-row-label">Progress</span>
+                      <span className="pill-card-row-value">{ORDER_STEPS[d.step] || ORDER_STEPS[0]}</span>
+                    </div>
+                    <div className="pill-card-row pill-card-row-muted">
+                      <span className="pill-card-row-label">Items</span>
+                      <span className="pill-card-row-value">{d.items?.length || 0} item{(d.items?.length || 0) === 1 ? '' : 's'}</span>
+                    </div>
+                    <div className="pill-card-actions-row">
+                      <button className="btn btn-secondary btn-sm" onClick={() => handleResume(d)}>Resume</button>
+                      <button className="btn-ghost" onClick={() => handleDiscard(d)} title="Discard draft" aria-label="Discard draft"><Trash2 size={15} /></button>
+                    </div>
+                  </div>
+                </div>
+              ))}
+              {filteredDrafts.length === 0 && (
+                <div className="empty-state">
+                  {drafts.length === 0 ? 'No drafts.' : 'No drafts match these filters.'}
+                </div>
+              )}
+            </div>
+
+            {/* Larger screens: the original table, unchanged. */}
             <div className="table-wrap">
             <table className="data-table">
               <thead>
@@ -349,6 +387,7 @@ export default function OrdersPage() {
               </tbody>
             </table>
           </div>
+            </>
           )}
 
           {!draftsLoading && drafts.length > 0 && (
