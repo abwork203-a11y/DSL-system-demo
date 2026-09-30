@@ -34,7 +34,16 @@ function invalidatePrefix(prefix) {
 // entries automatically).
 function cacheRoute(ttlMs) {
   return (req, res, next) => {
-    const key = `route:${req.originalUrl}`;
+    // Keyed per-user, not just per-URL: several of these routes (dashboard,
+    // in particular) now return RLS-scoped data that legitimately differs
+    // by caller — a rep in one zone and a rep in another zone hitting the
+    // same URL should never share a cache entry, and neither should a rep
+    // and an admin. A plain req.user.id is enough (not e.g. their zone
+    // list) since it's a strict superset of every axis a caller could
+    // differ on. One cache entry per user instead of one per route is a
+    // non-issue at this app's scale — same "deliberately simple" call as
+    // the rest of this file.
+    const key = `route:${req.originalUrl}:${req.user?.id ?? 'anon'}`;
     const cached = get(key);
     if (cached !== undefined) {
       res.setHeader('X-Cache', 'HIT');
