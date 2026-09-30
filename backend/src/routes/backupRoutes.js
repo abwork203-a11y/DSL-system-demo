@@ -3,7 +3,7 @@ const { body } = require('express-validator');
 const { requireAuth, requireRole } = require('../middleware/auth');
 const { validate } = require('../middleware/validate');
 const controller = require('../controllers/backupController');
-
+const { withRls } = require('../middleware/rls');
 const router = express.Router();
 router.use(requireAuth, requireRole('admin')); // matches BackupPage, which is admin-only in the frontend
 
