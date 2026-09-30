@@ -3,6 +3,7 @@ const { body } = require('express-validator');
 const { requireAuth } = require('../middleware/auth');
 const { validate } = require('../middleware/validate');
 const controller = require('../controllers/orderDraftController');
+const { withRls } = require('../middleware/rls');
 
 const router = express.Router();
 router.use(requireAuth); // any authenticated role — every role that can create orders can also draft one
@@ -14,8 +15,8 @@ const saveRules = [
   body('items').optional().isArray(),
 ];
 
-router.get('/', controller.list);
-router.post('/', saveRules, validate, controller.save);
+router.get('/', withRls(controller.list));
+router.post('/', saveRules, validate, withRls(controller.save));
 
 // CSRF-exempt (see middleware/csrf.js CSRF_EXEMPT_PATHS) — the only path
 // navigator.sendBeacon() can hit, since it can't attach the CSRF header.
@@ -24,8 +25,8 @@ router.post('/', saveRules, validate, controller.save);
 // a 400 back to the user anyway — better to have the controller's own
 // `id` check fail closed than to 400 on a slightly-malformed beacon payload
 // for no one to ever see.
-router.post('/beacon', controller.save);
+router.post('/beacon', withRls(controller.save));
 
-router.delete('/:id', controller.remove);
+router.delete('/:id', withRls(controller.remove));
 
 module.exports = router;
