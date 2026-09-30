@@ -1,13 +1,12 @@
-const { pool } = require('../config/db');
 const { asyncHandler } = require('../utils/asyncHandler');
 
 // Dashboard: high-level counts + this month's totals
 const dashboardSummary = asyncHandler(async (req, res) => {
   const [orders, receivables, distributors, monthSales] = await Promise.all([
-    pool.query(`SELECT order_status, COUNT(*)::int AS count FROM orders GROUP BY order_status`),
-    pool.query(`SELECT COALESCE(SUM(balance), 0) AS total_outstanding FROM distributors WHERE balance > 0`),
-    pool.query(`SELECT status, COUNT(*)::int AS count FROM distributors GROUP BY status`),
-    pool.query(`
+    req.db.query(`SELECT order_status, COUNT(*)::int AS count FROM orders GROUP BY order_status`),
+    req.db.query(`SELECT COALESCE(SUM(balance), 0) AS total_outstanding FROM distributors WHERE balance > 0`),
+    req.db.query(`SELECT status, COUNT(*)::int AS count FROM distributors GROUP BY status`),
+    req.db.query(`
       SELECT COALESCE(SUM(total), 0) AS total, COUNT(*)::int AS order_count
       FROM orders
       WHERE date_trunc('month', order_date) = date_trunc('month', CURRENT_DATE)
@@ -16,7 +15,7 @@ const dashboardSummary = asyncHandler(async (req, res) => {
     `),
   ]);
 
-  res.json({
+  req.respond(200, {
     ordersByStatus: orders.rows,
     totalOutstanding: Number(receivables.rows[0].total_outstanding),
     distributorsByStatus: distributors.rows,
@@ -28,9 +27,11 @@ const dashboardSummary = asyncHandler(async (req, res) => {
 });
 
 // Monthly sales trend, last N months (default 12)
+// admin-only route (see reportRoutes.js) — RLS is a no-op for the only
+// caller who can reach this, so no zone behavior to reason about here.
 const monthlySales = asyncHandler(async (req, res) => {
   const months = Number(req.query.months) || 12;
-  const result = await pool.query(
+  const result = await req.db.query(
     `SELECT
        date_trunc('month', order_date) AS month,
        COALESCE(SUM(total), 0) AS total_sales,
@@ -42,10 +43,10 @@ const monthlySales = asyncHandler(async (req, res) => {
      ORDER BY 1`,
     [months]
   );
-  res.json(result.rows);
+  req.respond(200, result.rows);
 });
 
-// Sales performance by distributor
+// Sales performance by distributor — admin-only route (see reportRoutes.js)
 const performanceByDistributor = asyncHandler(async (req, res) => {
   const { date_from, date_to } = req.query;
   const clauses = ["o.order_status != 'cancelled'"];
@@ -59,7 +60,7 @@ const performanceByDistributor = asyncHandler(async (req, res) => {
     clauses.push(`o.order_date <= $${params.length}`);
   }
 
-  const result = await pool.query(
+  const result = await req.db.query(
     `SELECT d.id, d.name, d.zone, d.balance,
             COUNT(o.id)::int AS order_count,
             COALESCE(SUM(o.total), 0) AS total_sales
@@ -69,12 +70,19 @@ const performanceByDistributor = asyncHandler(async (req, res) => {
      ORDER BY total_sales DESC`,
     params
   );
-  res.json(result.rows);
+  req.respond(200, result.rows);
 });
 
-// Sales performance by sales rep
+// Sales performance by sales rep — admin-only route (see reportRoutes.js).
+// Deliberately kept that way rather than opened up to reps: this compares
+// every rep against every other rep company-wide, which only means
+// something to someone who can see the whole company. A rep viewing this
+// would have every other rep's row zone-filtered down to just the orders
+// that happen to overlap their own zones — silently wrong, not just
+// restricted, so this isn't a "loosen the role check" candidate later
+// without redesigning the query itself.
 const performanceByRep = asyncHandler(async (req, res) => {
-  const result = await pool.query(
+  const result = await req.db.query(
     `SELECT u.id, u.name,
             COUNT(o.id)::int AS order_count,
             COALESCE(SUM(o.total), 0) AS total_sales
@@ -84,13 +92,13 @@ const performanceByRep = asyncHandler(async (req, res) => {
      GROUP BY u.id
      ORDER BY total_sales DESC`
   );
-  res.json(result.rows);
+  req.respond(200, result.rows);
 });
 
-// Top products by revenue
+// Top products by revenue — admin-only route (see reportRoutes.js)
 const topProducts = asyncHandler(async (req, res) => {
   const limit = Number(req.query.limit) || 10;
-  const result = await pool.query(
+  const result = await req.db.query(
     `SELECT p.id, p.name, m.name AS manufacturer_name,
             SUM(oi.quantity)::numeric AS total_quantity,
             SUM(oi.line_total)::numeric AS total_revenue
@@ -103,7 +111,7 @@ const topProducts = asyncHandler(async (req, res) => {
      LIMIT $1`,
     [limit]
   );
-  res.json(result.rows);
+  req.respond(200, result.rows);
 });
 
 module.exports = { dashboardSummary, monthlySales, performanceByDistributor, performanceByRep, topProducts };
