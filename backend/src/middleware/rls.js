@@ -39,7 +39,24 @@ function withRls(handler) {
       return next(new Error('withRls used without requireAuth running first.'));
     }
 
-    const client = await pool.connect();
+    let client;
+    try {
+      client = await pool.connect();
+    } catch (err) {
+      // Acquiring a connection itself failed — e.g. config/db.js's
+      // connectionTimeoutMillis fired under a network stall. Nothing to
+      // roll back or release, since no client was ever obtained. This MUST
+      // be caught right here: left to reject on its own, this becomes an
+      // unhandled promise rejection — which crashes the entire Node
+      // process, not just this one request. That's a far worse failure
+      // than a clean error response: every other in-flight or incoming
+      // request gets hit with a 502 while Render restarts the process,
+      // which looks exactly like what we've been chasing — inconsistent,
+      // table-agnostic failures that depend on timing rather than on
+      // which route was actually called.
+      return next(err);
+    }
+
     let settled = false;
     let pendingResponse = null; // { status, body?, hasBody }
     const afterCommitCallbacks = [];
