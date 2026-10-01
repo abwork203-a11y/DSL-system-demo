@@ -1,19 +1,27 @@
 const { asyncHandler } = require('../utils/asyncHandler');
 
 // Dashboard: high-level counts + this month's totals
+//
+// Was Promise.all([pool.query(...), pool.query(...), ...]) — fine with
+// `pool`, since each call transparently checks out its own connection and
+// they genuinely run in parallel. req.db is a single checked-out client
+// for this whole transaction, not a pool — it can only run one query at a
+// time, so firing four at once against it doesn't parallelize anything,
+// it just races them against the same connection (hence the
+// "client is already executing a query" deprecation warning). Sequential
+// awaits below — four small queries in series costs nothing worth
+// preserving the old concurrency for for a dashboard fetch.
 const dashboardSummary = asyncHandler(async (req, res) => {
-  const [orders, receivables, distributors, monthSales] = await Promise.all([
-    req.db.query(`SELECT order_status, COUNT(*)::int AS count FROM orders GROUP BY order_status`),
-    req.db.query(`SELECT COALESCE(SUM(balance), 0) AS total_outstanding FROM distributors WHERE balance > 0`),
-    req.db.query(`SELECT status, COUNT(*)::int AS count FROM distributors GROUP BY status`),
-    req.db.query(`
+  const orders = await req.db.query(`SELECT order_status, COUNT(*)::int AS count FROM orders GROUP BY order_status`);
+  const receivables = await req.db.query(`SELECT COALESCE(SUM(balance), 0) AS total_outstanding FROM distributors WHERE balance > 0`);
+  const distributors = await req.db.query(`SELECT status, COUNT(*)::int AS count FROM distributors GROUP BY status`);
+  const monthSales = await req.db.query(`
       SELECT COALESCE(SUM(total), 0) AS total, COUNT(*)::int AS order_count
       FROM orders
       WHERE date_trunc('month', order_date) = date_trunc('month', CURRENT_DATE)
         AND order_status != 'cancelled'
         AND payment_status != 'unpaid'
-    `),
-  ]);
+    `);
 
   req.respond(200, {
     ordersByStatus: orders.rows,
