@@ -3,7 +3,6 @@ const { body } = require('express-validator');
 const { requireAuth, requireRole } = require('../middleware/auth');
 const { validate } = require('../middleware/validate');
 const controller = require('../controllers/orderController');
-const { withRls } = require('../middleware/rls');
 
 const router = express.Router();
 router.use(requireAuth);
@@ -25,13 +24,13 @@ const payRules = [
   body('amount').isFloat({ gt: 0 }).withMessage('Payment amount must be greater than 0.'),
 ];
 
-router.get('/', withRls(controller.list));
-router.get('/:id', withRls(controller.getOne));
-router.get('/:id/activity', withRls(controller.getActivity));
-router.post('/', createRules, validate, withRls(controller.create)); // admin + sales_rep
-router.patch('/:id/status', requireRole('admin'), withRls(controller.updateStatus));
-router.patch('/:id/cancel', withRls(controller.cancel)); // admin + sales_rep — same access level as create, no extra role check
-router.post('/:id/pay', payRules, validate, withRls(controller.pay)); // admin + sales_rep can record a payment
-router.delete('/:id', requireRole('admin'), withRls(controller.remove)); // admin-only hard delete
+router.get('/', controller.list);
+router.get('/:id', controller.getOne);
+router.get('/:id/activity', controller.getActivity);
+router.post('/', createRules, validate, controller.create); // admin + sales_rep
+router.patch('/:id/status', requireRole('admin'), controller.updateStatus);
+router.patch('/:id/cancel', controller.cancel); // admin + sales_rep — same access level as create, no extra role check
+router.post('/:id/pay', payRules, validate, controller.pay); // admin + sales_rep can record a payment
+router.delete('/:id', requireRole('admin'), controller.remove); // admin-only hard delete
 
 module.exports = router;
