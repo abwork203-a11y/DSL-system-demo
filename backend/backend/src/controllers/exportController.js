@@ -1,0 +1,610 @@
+const ExcelJS = require('exceljs');
+const PDFDocument = require('pdfkit');
+const { pool } = require('../config/db');
+const { asyncHandler } = require('../utils/asyncHandler');
+const { ApiError } = require('../utils/ApiError');
+
+// Excel (and other spreadsheet apps) treat a cell starting with =, +, -, or @
+// as a formula. If a distributor/product/manufacturer name or a note field
+// were ever set to something like `=HYPERLINK("http://evil","click")`, an
+// export could hand back a live, executing formula to whoever opens it —
+// this is the well-known "CSV/formula injection" class of vulnerability.
+// Prefixing such values with a leading apostrophe forces spreadsheet software
+// to treat them as plain text instead of evaluating them.
+const FORMULA_TRIGGER_CHARS = ['=', '+', '-', '@'];
+function sanitizeCellValue(value) {
+  if (typeof value !== 'string') return value;
+  return FORMULA_TRIGGER_CHARS.includes(value[0]) ? `'${value}` : value;
+}
+function sanitizeRow(row) {
+  if (Array.isArray(row)) return row.map(sanitizeCellValue);
+  const out = {};
+  for (const [key, val] of Object.entries(row)) out[key] = sanitizeCellValue(val);
+  return out;
+}
+
+async function getOrderWithItems(orderId) {
+  const orderResult = await pool.query(
+    `SELECT o.*, d.name AS distributor_name, d.contact_name AS distributor_contact,
+            d.contact_phone AS distributor_phone, d.city, d.area, d.zone,
+            u.name AS created_by_name
+     FROM orders o
+     JOIN distributors d ON d.id = o.distributor_id
+     LEFT JOIN users u ON u.id = o.created_by
+     WHERE o.id = $1`,
+    [orderId]
+  );
+  if (orderResult.rows.length === 0) return null;
+
+  const itemsResult = await pool.query(
+    `SELECT oi.*, p.name AS product_name, p.size_packaging, m.name AS manufacturer_name
+     FROM order_items oi
+     JOIN products p ON p.id = oi.product_id
+     JOIN manufacturers m ON m.id = oi.manufacturer_id
+     WHERE oi.order_id = $1
+     ORDER BY oi.id`,
+    [orderId]
+  );
+
+  return { ...orderResult.rows[0], items: itemsResult.rows };
+}
+
+// Given an order row, compute the actual dollar discount amount, regardless
+// of whether the order stores a flat amount or a percentage.
+function computeDiscountAmount(order, grossValue) {
+  const rawDiscount = Number(order.discount) || 0;
+  if (order.discount_type === 'percentage') {
+    return grossValue * (rawDiscount / 100);
+  }
+  return rawDiscount;
+}
+
+// ── Invoice: Excel ──────────────────────────────────────────
+const invoiceExcel = asyncHandler(async (req, res) => {
+  const order = await getOrderWithItems(req.params.id);
+  if (!order) throw new ApiError(404, 'Order not found.');
+
+  const workbook = new ExcelJS.Workbook();
+  const sheet = workbook.addWorksheet('Invoice');
+
+  sheet.mergeCells('A1:F1');
+  sheet.getCell('A1').value = `Invoice ${order.order_number}`;
+  sheet.getCell('A1').font = { size: 16, bold: true };
+
+  sheet.getCell('A3').value = 'Distributor:';
+  sheet.getCell('B3').value = sanitizeCellValue(order.distributor_name);
+  sheet.getCell('A4').value = 'City:';
+  sheet.getCell('B4').value = sanitizeCellValue(order.city || '—');
+  sheet.getCell('A5').value = 'Date:';
+  sheet.getCell('B5').value = new Date(order.order_date).toLocaleDateString();
+  sheet.getCell('A6').value = 'Payment Term:';
+  sheet.getCell('B6').value = order.payment_term;
+  sheet.getCell('A7').value = 'Payment Status:';
+  sheet.getCell('B7').value = order.payment_status;
+
+  sheet.addRow([]);
+  const headerRow = sheet.addRow(['Sr#', 'Product', 'Retail Price', 'Invoice Price', 'Qty', 'Value']);
+  headerRow.font = { bold: true };
+
+  let grossValue = 0;
+  order.items.forEach((item, index) => {
+    const qty = Number(item.quantity);
+    const invoicePrice = Number(item.price_at_time_of_order);
+    const retailPrice = Number(item.retail_price_at_time_of_order);
+    const value = invoicePrice * qty;
+    grossValue += value;
+
+    const productLabel = item.size_packaging
+      ? `${item.product_name} (${item.size_packaging})`
+      : item.product_name;
+
+    sheet.addRow(sanitizeRow([
+      index + 1,
+      productLabel,
+      retailPrice,
+      invoicePrice,
+      qty,
+      value,
+    ]));
+  });
+
+  const discount = computeDiscountAmount(order, grossValue);
+  const freight = Number(order.freight_cost) || 0;
+  const netValue = Number(order.total);
+
+  sheet.addRow([]);
+  sheet.addRow(['', '', '', '', 'Gross Value', grossValue]);
+  sheet.addRow(['', '', '', '', 'Discount', discount]);
+  sheet.addRow(['', '', '', '', 'Freight', freight]);
+  const totalRow = sheet.addRow(['', '', '', '', 'Net Value', netValue]);
+  totalRow.font = { bold: true };
+
+  sheet.columns.forEach((col) => { col.width = 20; });
+
+  res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+  res.setHeader('Content-Disposition', `attachment; filename=invoice-${order.order_number}.xlsx`);
+  await workbook.xlsx.write(res);
+  res.end();
+});
+
+// ── Invoice: PDF ────────────────────────────────────────────
+const invoicePdf = asyncHandler(async (req, res) => {
+  const order = await getOrderWithItems(req.params.id);
+  if (!order) throw new ApiError(404, 'Order not found.');
+
+  res.setHeader('Content-Type', 'application/pdf');
+  res.setHeader('Content-Disposition', `attachment; filename=invoice-${order.order_number}.pdf`);
+
+  const doc = new PDFDocument({ margin: 50 });
+  doc.pipe(res);
+
+  doc.fontSize(20).text(`Invoice ${order.order_number}`, { align: 'left' });
+  doc.moveDown();
+  doc.fontSize(11)
+    .text(`Distributor: ${order.distributor_name}`)
+    .text(`City: ${order.city || '—'}`)
+    .text(`Date: ${new Date(order.order_date).toLocaleDateString()}`)
+    .text(`Payment Term: ${order.payment_term}`)
+    .text(`Payment Status: ${order.payment_status}`);
+  doc.moveDown();
+
+  const tableTop = doc.y;
+  const cols = { sr: 50, product: 90, retail: 280, invoice: 360, qty: 440, value: 480 };
+  doc.fontSize(10).font('Helvetica-Bold');
+  doc.text('Sr#', cols.sr, tableTop);
+  doc.text('Product', cols.product, tableTop);
+  doc.text('Retail Price', cols.retail, tableTop);
+  doc.text('Invoice Price', cols.invoice, tableTop);
+  doc.text('Qty', cols.qty, tableTop);
+  doc.text('Value', cols.value, tableTop);
+  doc.moveDown(0.5);
+  doc.font('Helvetica');
+
+  let grossValue = 0;
+  order.items.forEach((item, index) => {
+    const y = doc.y;
+    const qty = Number(item.quantity);
+    const invoicePrice = Number(item.price_at_time_of_order);
+    const retailPrice = Number(item.retail_price_at_time_of_order);
+    const value = invoicePrice * qty;
+    grossValue += value;
+
+    doc.text(String(index + 1), cols.sr, y);
+    doc.text(`${item.product_name}${item.size_packaging ? ` (${item.size_packaging})` : ''}`, cols.product, y, { width: 180 });
+    doc.text(retailPrice.toFixed(2), cols.retail, y);
+    doc.text(invoicePrice.toFixed(2), cols.invoice, y);
+    doc.text(String(qty), cols.qty, y);
+    doc.text(value.toFixed(2), cols.value, y);
+    doc.moveDown();
+  });
+
+  const discount = computeDiscountAmount(order, grossValue);
+  const freight = Number(order.freight_cost) || 0;
+  const netValue = Number(order.total);
+
+  // Explicit x/y for both the label and the value on every summary line —
+  // deliberately not relying on PDFKit's internal text cursor (which the
+  // item loop above left at an arbitrary x position) or on { align: 'right' }
+  // without a bounded width (which right-aligns against whatever width
+  // happens to be left on the current line, wrapping long label+value
+  // strings onto two lines when that's narrow). Passing the same explicit y
+  // to both calls guarantees the label and its value always sit side by
+  // side on one line, regardless of string length.
+  const summaryLabelX = 370;
+  const summaryValueX = 470;
+  const summaryValueWidth = 92; // 470 + 92 = 562 = the page's right content edge (612 - 50 margin)
+
+  doc.moveDown();
+  doc.font('Helvetica-Bold').fontSize(10);
+  [
+    ['Gross Value:', grossValue],
+    ['Discount:', discount],
+    ['Freight:', freight],
+    ['Net Value:', netValue],
+  ].forEach(([label, value]) => {
+    const y = doc.y;
+    doc.text(label, summaryLabelX, y);
+    doc.text(value.toFixed(2), summaryValueX, y, { width: summaryValueWidth, align: 'right' });
+    doc.moveDown(0.6);
+  });
+
+  doc.end();
+});
+
+// ── Generic bulk export helper: rows -> xlsx ───────────────
+async function sendExcel(res, filename, columns, rows) {
+  const workbook = new ExcelJS.Workbook();
+  const sheet = workbook.addWorksheet('Export');
+  sheet.columns = columns;
+  sheet.getRow(1).font = { bold: true };
+  rows.forEach((row) => sheet.addRow(sanitizeRow(row)));
+  sheet.columns.forEach((col) => { col.width = Math.max(col.width || 10, 18); });
+
+  res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+  res.setHeader('Content-Disposition', `attachment; filename=${filename}`);
+  await workbook.xlsx.write(res);
+  res.end();
+}
+
+const exportProducts = asyncHandler(async (req, res) => {
+  const result = await pool.query(
+    `SELECT p.name, m.name AS manufacturer, p.size_packaging, p.price, p.is_active
+     FROM products p JOIN manufacturers m ON m.id = p.manufacturer_id ORDER BY p.name`
+  );
+  await sendExcel(res, 'products.xlsx', [
+    { header: 'Product', key: 'name' },
+    { header: 'Manufacturer', key: 'manufacturer' },
+    { header: 'Size/Packaging', key: 'size_packaging' },
+    { header: 'Price', key: 'price' },
+    { header: 'Active', key: 'is_active' },
+  ], result.rows);
+});
+
+const exportDistributors = asyncHandler(async (req, res) => {
+  const result = await pool.query('SELECT name, zone, city, contact_name, contact_phone, balance, status FROM distributors ORDER BY name');
+  await sendExcel(res, 'distributors.xlsx', [
+    { header: 'Distributor', key: 'name' },
+    { header: 'Zone', key: 'zone' },
+    { header: 'City', key: 'city' },
+    { header: 'Contact', key: 'contact_name' },
+    { header: 'Phone', key: 'contact_phone' },
+    { header: 'Balance', key: 'balance' },
+    { header: 'Status', key: 'status' },
+  ], result.rows);
+});
+
+const exportOrders = asyncHandler(async (req, res) => {
+  const result = await pool.query(
+    `SELECT o.order_number, d.name AS distributor, o.order_date, o.total, o.payment_term,
+            o.payment_status, o.order_status
+     FROM orders o JOIN distributors d ON d.id = o.distributor_id
+     ORDER BY o.order_date DESC`
+  );
+  await sendExcel(res, 'orders.xlsx', [
+    { header: 'Order #', key: 'order_number' },
+    { header: 'Distributor', key: 'distributor' },
+    { header: 'Date', key: 'order_date' },
+    { header: 'Total', key: 'total' },
+    { header: 'Payment Term', key: 'payment_term' },
+    { header: 'Payment Status', key: 'payment_status' },
+    { header: 'Order Status', key: 'order_status' },
+  ], result.rows);
+});
+
+// ── Ledger: shared row-fetching for the bulk (all/filtered distributors)
+// export. Used by both exportLedgerExcel and exportLedgerPdf so the two
+// formats can never silently drift apart on what counts as "this month's
+// entries" — one query, two renderers.
+async function fetchBulkLedgerEntries({ distributorId, startDate, endDate }) {
+  const params = [];
+  const clauses = [];
+  if (distributorId) {
+    params.push(distributorId);
+    clauses.push(`l.distributor_id = $${params.length}`);
+  }
+  if (startDate) {
+    params.push(startDate);
+    clauses.push(`l.entry_date >= $${params.length}`);
+  }
+  if (endDate) {
+    params.push(endDate);
+    clauses.push(`l.entry_date <= $${params.length}`);
+  }
+  const where = clauses.length ? `WHERE ${clauses.join(' AND ')}` : '';
+
+  const result = await pool.query(
+    `SELECT d.name AS distributor, l.entry_date, l.type, l.amount, l.running_balance, l.note, o.payment_term
+     FROM ledger l
+     JOIN distributors d ON d.id = l.distributor_id
+     LEFT JOIN orders o ON o.id = l.order_id
+     ${where}
+     ORDER BY l.entry_date ASC`,
+    params
+  );
+  return result.rows;
+}
+
+// ── Ledger: generic bulk export (all distributors, or filtered) — Excel ──
+const exportLedgerExcel = asyncHandler(async (req, res) => {
+  const { distributor_id, start_date, end_date } = req.query;
+  const entries = await fetchBulkLedgerEntries({ distributorId: distributor_id, startDate: start_date, endDate: end_date });
+
+  const rows = entries.map((entry) => ({
+    distributor: entry.distributor,
+    entry_date: new Date(entry.entry_date).toLocaleDateString(),
+    payment_term: entry.payment_term || '',
+    type: entry.type,
+    debit: entry.type === 'debit' ? Number(entry.amount) : '',
+    credit: entry.type === 'credit' ? Number(entry.amount) : '',
+    running_balance: Number(entry.running_balance),
+    note: entry.note,
+  }));
+
+  await sendExcel(res, 'ledger.xlsx', [
+    { header: 'Distributor', key: 'distributor' },
+    { header: 'Date', key: 'entry_date' },
+    { header: 'Payment Term', key: 'payment_term' },
+    { header: 'Type', key: 'type' },
+    { header: 'Debit', key: 'debit' },
+    { header: 'Credit', key: 'credit' },
+    { header: 'Running Balance', key: 'running_balance' },
+    { header: 'Note', key: 'note' },
+  ], rows);
+});
+
+// ── Ledger: generic bulk export (all distributors, or filtered) — PDF ──
+// Mirrors invoicePdf's explicit x/y column layout — deliberately not relying
+// on PDFKit's text cursor or unbounded { align: 'right' }, same reasoning as
+// documented on invoicePdf's summary rows: keeps every column lined up
+// regardless of how long a distributor name or note happens to be.
+const exportLedgerPdf = asyncHandler(async (req, res) => {
+  const { distributor_id, start_date, end_date } = req.query;
+  const entries = await fetchBulkLedgerEntries({ distributorId: distributor_id, startDate: start_date, endDate: end_date });
+
+  res.setHeader('Content-Type', 'application/pdf');
+  res.setHeader('Content-Disposition', 'attachment; filename=ledger.pdf');
+
+  const doc = new PDFDocument({ margin: 50, size: 'A4', layout: 'landscape' });
+  doc.pipe(res);
+
+  doc.fontSize(18).text('Ledger', { align: 'left' });
+  doc.fontSize(10).fillColor('#555');
+  if (start_date && end_date) doc.text(`${start_date} to ${end_date}`);
+  else if (start_date) doc.text(`From ${start_date}`);
+  else if (end_date) doc.text(`To ${end_date}`);
+  else doc.text('All activity');
+  doc.fillColor('#000');
+  doc.moveDown();
+
+  const cols = { dist: 50, date: 200, term: 280, debit: 360, credit: 440, balance: 520, note: 600 };
+  const pageBottom = doc.page.height - doc.page.margins.bottom;
+
+  function drawHeader() {
+    const y = doc.y;
+    doc.font('Helvetica-Bold').fontSize(9);
+    doc.text('Distributor', cols.dist, y);
+    doc.text('Date', cols.date, y);
+    doc.text('Term', cols.term, y);
+    doc.text('Debit', cols.debit, y);
+    doc.text('Credit', cols.credit, y);
+    doc.text('Balance', cols.balance, y);
+    doc.text('Note', cols.note, y, { width: 140 });
+    doc.moveDown(0.6);
+    doc.font('Helvetica').fontSize(9);
+  }
+
+  drawHeader();
+
+  let totalDebit = 0;
+  let totalCredit = 0;
+
+  entries.forEach((entry) => {
+    if (doc.y > pageBottom - 30) {
+      doc.addPage();
+      drawHeader();
+    }
+    const isDebit = entry.type === 'debit';
+    const amount = Number(entry.amount);
+    if (isDebit) totalDebit += amount; else totalCredit += amount;
+
+    const y = doc.y;
+    doc.text(entry.distributor, cols.dist, y, { width: 145 });
+    doc.text(new Date(entry.entry_date).toLocaleDateString(), cols.date, y);
+    doc.text(entry.payment_term || '—', cols.term, y);
+    doc.text(isDebit ? amount.toFixed(2) : '', cols.debit, y);
+    doc.text(isDebit ? '' : amount.toFixed(2), cols.credit, y);
+    doc.text(Number(entry.running_balance).toFixed(2), cols.balance, y);
+    doc.text(entry.note || '—', cols.note, y, { width: 140 });
+    doc.moveDown(0.6);
+  });
+
+  doc.moveDown();
+  doc.font('Helvetica-Bold');
+  doc.text(`Total Debit: ${totalDebit.toFixed(2)}`, cols.debit, doc.y);
+  doc.text(`Total Credit: ${totalCredit.toFixed(2)}`, cols.credit, doc.y);
+
+  doc.end();
+});
+
+// ── Ledger: single-distributor "Customer Ledger" — shared data fetch ──
+// NOTE: this mirrors the query shape used by ledgerController.js's
+// `distributorSummary` (distributor lookup + ledger entries filtered by
+// distributor_id and an optional date range). If `distributorSummary` sources
+// its data differently (e.g. a different running-balance calculation or a
+// view/materialized table instead of the raw `ledger` table), point this
+// query at the same source before shipping — it wasn't available to check
+// against here.
+async function fetchDistributorLedger(distributorId, { start_date, end_date }) {
+  const distributorResult = await pool.query(
+    'SELECT id, name FROM distributors WHERE id = $1',
+    [distributorId]
+  );
+  if (distributorResult.rows.length === 0) throw new ApiError(404, 'Distributor not found.');
+  const distributor = distributorResult.rows[0];
+
+  const params = [distributorId];
+  let dateWhere = '';
+  if (start_date) {
+    params.push(start_date);
+    dateWhere += ` AND l.entry_date >= $${params.length}`;
+  }
+  if (end_date) {
+    params.push(end_date);
+    dateWhere += ` AND l.entry_date <= $${params.length}`;
+  }
+
+  const entriesResult = await pool.query(
+    `SELECT l.entry_date, l.type, l.amount, l.running_balance, l.note, o.payment_term
+     FROM ledger l
+     LEFT JOIN orders o ON o.id = l.order_id
+     WHERE l.distributor_id = $1 ${dateWhere}
+     ORDER BY l.entry_date ASC`,
+    params
+  );
+
+  return { distributor, entries: entriesResult.rows };
+}
+
+function dateRangeLabel(start_date, end_date) {
+  if (start_date && end_date) return `From ${start_date} to ${end_date}`;
+  if (start_date) return `From ${start_date}`;
+  if (end_date) return `To ${end_date}`;
+  return 'All activity';
+}
+
+// ── Ledger: single-distributor "Customer Ledger" statement — Excel ────
+const exportDistributorLedgerExcel = asyncHandler(async (req, res) => {
+  const { id: distributorId } = req.params;
+  const { start_date, end_date } = req.query;
+  const { distributor, entries } = await fetchDistributorLedger(distributorId, { start_date, end_date });
+
+  const workbook = new ExcelJS.Workbook();
+  const sheet = workbook.addWorksheet('Customer Ledger');
+
+  sheet.mergeCells('A1:G1');
+  sheet.getCell('A1').value = 'Customer Ledger';
+  sheet.getCell('A1').font = { size: 16, bold: true };
+
+  sheet.mergeCells('A2:G2');
+  sheet.getCell('A2').value = sanitizeCellValue(distributor.name);
+  sheet.getCell('A2').font = { size: 12, bold: true };
+
+  sheet.mergeCells('A3:G3');
+  sheet.getCell('A3').value = dateRangeLabel(start_date, end_date);
+
+  sheet.addRow([]);
+  const headerRow = sheet.addRow(['Date', 'Description', 'Payment Term', 'Debit', 'Credit', 'Balance', 'Remarks']);
+  headerRow.font = { bold: true };
+
+  let totalDebit = 0;
+  let totalCredit = 0;
+  let lastBalance = 0;
+
+  entries.forEach((entry) => {
+    const isDebit = entry.type === 'debit';
+    const amount = Number(entry.amount);
+    const runningBalance = Number(entry.running_balance);
+    lastBalance = runningBalance;
+    if (isDebit) totalDebit += amount; else totalCredit += amount;
+
+    const remarks = runningBalance > 0 ? 'Dr' : runningBalance < 0 ? 'Cr' : '';
+
+    sheet.addRow(sanitizeRow([
+      new Date(entry.entry_date).toLocaleDateString(),
+      entry.note,
+      entry.payment_term || '',
+      isDebit ? amount : '',
+      isDebit ? '' : amount,
+      runningBalance,
+      remarks,
+    ]));
+  });
+
+  const finalRemarks = lastBalance > 0 ? 'Dr' : lastBalance < 0 ? 'Cr' : '';
+  const totalRow = sheet.addRow(['Total', '', '', totalDebit, totalCredit, lastBalance, finalRemarks]);
+  totalRow.font = { bold: true };
+
+  sheet.columns.forEach((col) => { col.width = 20; });
+
+  res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+  res.setHeader('Content-Disposition', `attachment; filename=ledger-${distributor.name.replace(/[^a-z0-9]+/gi, '-')}.xlsx`);
+  await workbook.xlsx.write(res);
+  res.end();
+});
+
+// ── Ledger: single-distributor "Customer Ledger" statement — PDF ─────
+// Same explicit x/y summary-row technique as invoicePdf, for the same
+// reason documented there: guarantees label+value always sit on one line.
+const exportDistributorLedgerPdf = asyncHandler(async (req, res) => {
+  const { id: distributorId } = req.params;
+  const { start_date, end_date } = req.query;
+  const { distributor, entries } = await fetchDistributorLedger(distributorId, { start_date, end_date });
+
+  res.setHeader('Content-Type', 'application/pdf');
+  res.setHeader('Content-Disposition', `attachment; filename=ledger-${distributor.name.replace(/[^a-z0-9]+/gi, '-')}.pdf`);
+
+  const doc = new PDFDocument({ margin: 50 });
+  doc.pipe(res);
+
+  doc.fontSize(18).text('Customer Ledger', { align: 'left' });
+  doc.fontSize(13).font('Helvetica-Bold').text(distributor.name);
+  doc.font('Helvetica').fontSize(10).fillColor('#555').text(dateRangeLabel(start_date, end_date));
+  doc.fillColor('#000');
+  doc.moveDown();
+
+  const cols = { date: 50, desc: 130, term: 290, debit: 360, credit: 430, balance: 500 };
+  const pageBottom = doc.page.height - doc.page.margins.bottom;
+
+  function drawHeader() {
+    const y = doc.y;
+    doc.font('Helvetica-Bold').fontSize(9);
+    doc.text('Date', cols.date, y);
+    doc.text('Description', cols.desc, y);
+    doc.text('Term', cols.term, y);
+    doc.text('Debit', cols.debit, y);
+    doc.text('Credit', cols.credit, y);
+    doc.text('Balance', cols.balance, y);
+    doc.moveDown(0.6);
+    doc.font('Helvetica').fontSize(9);
+  }
+
+  drawHeader();
+
+  let totalDebit = 0;
+  let totalCredit = 0;
+  let lastBalance = 0;
+
+  entries.forEach((entry) => {
+    if (doc.y > pageBottom - 30) {
+      doc.addPage();
+      drawHeader();
+    }
+    const isDebit = entry.type === 'debit';
+    const amount = Number(entry.amount);
+    const runningBalance = Number(entry.running_balance);
+    lastBalance = runningBalance;
+    if (isDebit) totalDebit += amount; else totalCredit += amount;
+
+    const y = doc.y;
+    doc.text(new Date(entry.entry_date).toLocaleDateString(), cols.date, y);
+    doc.text(entry.note || '—', cols.desc, y, { width: 150 });
+    doc.text(entry.payment_term || '—', cols.term, y);
+    doc.text(isDebit ? amount.toFixed(2) : '', cols.debit, y);
+    doc.text(isDebit ? '' : amount.toFixed(2), cols.credit, y);
+    doc.text(runningBalance.toFixed(2), cols.balance, y);
+    doc.moveDown(0.6);
+  });
+
+  doc.moveDown();
+  const summaryLabelX = 360;
+  const summaryValueX = 470;
+  const summaryValueWidth = 92;
+  const finalRemarks = lastBalance > 0 ? 'Dr' : lastBalance < 0 ? 'Cr' : '';
+
+  doc.font('Helvetica-Bold').fontSize(10);
+  [
+    ['Total Debit:', totalDebit],
+    ['Total Credit:', totalCredit],
+    ['Balance:', lastBalance],
+  ].forEach(([label, value]) => {
+    const y = doc.y;
+    doc.text(label, summaryLabelX, y);
+    doc.text(value.toFixed(2), summaryValueX, y, { width: summaryValueWidth, align: 'right' });
+    doc.moveDown(0.6);
+  });
+  doc.text(`Status: ${finalRemarks}`, summaryLabelX, doc.y);
+
+  doc.end();
+});
+
+module.exports = {
+  invoiceExcel,
+  invoicePdf,
+  exportProducts,
+  exportDistributors,
+  exportOrders,
+  exportLedgerExcel,
+  exportLedgerPdf,
+  exportDistributorLedgerExcel,
+  exportDistributorLedgerPdf,
+};
