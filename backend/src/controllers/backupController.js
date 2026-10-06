@@ -1,3 +1,4 @@
+const { pool } = require('../config/db');
 const { asyncHandler } = require('../utils/asyncHandler');
 const { ApiError } = require('../utils/ApiError');
 
@@ -11,7 +12,7 @@ const create = asyncHandler(async (req, res) => {
     throw new ApiError(400, 'folder_name and folder_url are required.');
   }
 
-  const result = await req.db.query(
+  const result = await pool.query(
     `INSERT INTO backups (user_id, folder_name, folder_url, period_start, period_end, file_count, failed_count)
      VALUES ($1, $2, $3, $4, $5, $6, $7)
      RETURNING *`,
@@ -26,7 +27,7 @@ const create = asyncHandler(async (req, res) => {
     ]
   );
 
-  req.respond(201, result.rows[0]);
+  res.status(201).json(result.rows[0]);
 });
 
 // Recent backup history, most recent first. Kept simple (no pagination) —
@@ -34,7 +35,7 @@ const create = asyncHandler(async (req, res) => {
 // orders or the audit log.
 const list = asyncHandler(async (req, res) => {
   const limit = Math.min(100, Number(req.query.limit) || 20);
-  const result = await req.db.query(
+  const result = await pool.query(
     `SELECT b.*, u.name AS user_name
      FROM backups b
      LEFT JOIN users u ON u.id = b.user_id
@@ -42,7 +43,7 @@ const list = asyncHandler(async (req, res) => {
      LIMIT $1`,
     [limit]
   );
-  req.respond(200, result.rows);
+  res.json(result.rows);
 });
 
 module.exports = { create, list };

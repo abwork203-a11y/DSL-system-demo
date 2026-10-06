@@ -1,3 +1,4 @@
+const { pool } = require('../config/db');
 const { asyncHandler } = require('../utils/asyncHandler');
 const { ApiError } = require('../utils/ApiError');
 const { parsePagination, paginatedResponse } = require('../utils/pagination');
@@ -27,10 +28,10 @@ const list = asyncHandler(async (req, res) => {
 
   const where = clauses.length ? `WHERE ${clauses.join(' AND ')}` : '';
 
-  const countResult = await req.db.query(`SELECT COUNT(*)::int AS total FROM ledger l ${where}`, params);
+  const countResult = await pool.query(`SELECT COUNT(*)::int AS total FROM ledger l ${where}`, params);
 
   const dataParams = [...params, pageSize, offset];
-  const result = await req.db.query(
+  const result = await pool.query(
     `SELECT l.*, d.name AS distributor_name, o.order_number, o.payment_term
      FROM ledger l
      JOIN distributors d ON d.id = l.distributor_id
@@ -40,7 +41,7 @@ const list = asyncHandler(async (req, res) => {
      LIMIT $${dataParams.length - 1} OFFSET $${dataParams.length}`,
     dataParams
   );
-  req.respond(200, paginatedResponse(result.rows, countResult.rows[0].total, page, pageSize));
+  res.json(paginatedResponse(result.rows, countResult.rows[0].total, page, pageSize));
 });
 
 // A single distributor's full ledger history stays unpaginated for now —
@@ -50,10 +51,10 @@ const list = asyncHandler(async (req, res) => {
 // distributor's history grows large enough to matter.
 const distributorSummary = asyncHandler(async (req, res) => {
   const { id } = req.params;
-  const distResult = await req.db.query('SELECT id, name, balance FROM distributors WHERE id = $1', [id]);
+  const distResult = await pool.query('SELECT id, name, balance FROM distributors WHERE id = $1', [id]);
   if (distResult.rows.length === 0) throw new ApiError(404, 'Distributor not found.');
 
-  const entriesResult = await req.db.query(
+  const entriesResult = await pool.query(
     `SELECT l.*, o.order_number, o.payment_term
      FROM ledger l
      LEFT JOIN orders o ON o.id = l.order_id
@@ -62,7 +63,7 @@ const distributorSummary = asyncHandler(async (req, res) => {
     [id]
   );
 
-  req.respond(200, { distributor: distResult.rows[0], entries: entriesResult.rows });
+  res.json({ distributor: distResult.rows[0], entries: entriesResult.rows });
 });
 
 module.exports = { list, distributorSummary };

@@ -1,7 +1,6 @@
 const express = require('express');
 const { requireAuth, requireRole } = require('../middleware/auth');
 const { cacheRoute } = require('../utils/cache');
-const { withRls } = require('../middleware/rls');
 const controller = require('../controllers/reportController');
 
 const router = express.Router();
@@ -13,16 +12,10 @@ router.use(requireAuth);
 // back a minute later). Explicitly invalidated on order/payment writes too
 // (see orderController.js) so a just-created order shows up immediately
 // rather than waiting out the TTL.
-//
-// cacheRoute's key now includes req.user.id (see utils/cache.js) — required
-// here specifically, since this is the one route below open to both roles,
-// and a rep's numbers are genuinely different (and narrower) than an
-// admin's or another rep's, via RLS. The other four routes are admin-only,
-// where that per-user keying is harmless overhead rather than a fix.
-router.get('/dashboard', cacheRoute(30_000), withRls(controller.dashboardSummary));
-router.get('/monthly-sales', requireRole('admin'), cacheRoute(30_000), withRls(controller.monthlySales));
-router.get('/performance/distributors', requireRole('admin'), cacheRoute(30_000), withRls(controller.performanceByDistributor));
-router.get('/performance/reps', requireRole('admin'), cacheRoute(30_000), withRls(controller.performanceByRep));
-router.get('/top-products', requireRole('admin'), cacheRoute(30_000), withRls(controller.topProducts));
+router.get('/dashboard', cacheRoute(30_000), controller.dashboardSummary);
+router.get('/monthly-sales', requireRole('admin'), cacheRoute(30_000), controller.monthlySales);
+router.get('/performance/distributors', requireRole('admin'), cacheRoute(30_000), controller.performanceByDistributor);
+router.get('/performance/reps', requireRole('admin'), cacheRoute(30_000), controller.performanceByRep);
+router.get('/top-products', requireRole('admin'), cacheRoute(30_000), controller.topProducts);
 
 module.exports = router;
