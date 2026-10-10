@@ -79,6 +79,9 @@ export const zonesApi = {
 };
 
 export const exportApi = {
+  // which: 'products' | 'orders' | 'distributors'; format: 'excel' | 'pdf'.
+  // Excel keeps the original URLs (/export/products); PDF adds /pdf on the end.
+  tableUrl: (which, format) => (format === 'pdf' ? `/export/${which}/pdf` : `/export/${which}`),
   invoiceUrl: (id, format) => `/export/invoice/${id}/${format}`,
   productsUrl: () => `/export/products`,
   distributorsUrl: () => `/export/distributors`,

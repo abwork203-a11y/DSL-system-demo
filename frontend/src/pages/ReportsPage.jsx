@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { LineChart, Line, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid, BarChart, Bar } from 'recharts';
-import { Loader2, Calendar } from 'lucide-react';
+import { Loader2, Calendar, Download, FileText, FileSpreadsheet } from 'lucide-react';
 import { reports, exportApi } from '../api/endpoints';
 import { apiErrorMessage, downloadFile } from '../api/client';
 import { useToast } from '../context/ToastContext';
@@ -8,6 +8,13 @@ import { TableSkeleton } from '../components/Skeleton';
 import Modal from '../components/Modal';
 import MonthPicker from '../components/MonthPicker';
 import { monthLabel } from '../utils/months';
+
+// The three lists offered in the Download popup (keys match the backend routes).
+const DOWNLOADS = [
+  { key: 'products', label: 'Products' },
+  { key: 'orders', label: 'Orders' },
+  { key: 'distributors', label: 'Distributors' },
+];
 
 function money(n) {
   return Number(n || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
@@ -22,7 +29,8 @@ export default function ReportsPage() {
   const [loading, setLoading] = useState(true);
   const [month, setMonth] = useState(''); // 'YYYY-MM', or '' = all time (the old behaviour)
   const [pickerOpen, setPickerOpen] = useState(false);
-  const [exporting, setExporting] = useState(''); // '' | 'orders' | 'distributors' | 'products'
+  const [downloadOpen, setDownloadOpen] = useState(false);
+  const [exporting, setExporting] = useState(''); // '' or e.g. 'orders:pdf' (which list : which format)
   const [exportProgress, setExportProgress] = useState(null);
   const exportingRef = useRef(false);
 
@@ -48,15 +56,15 @@ export default function ReportsPage() {
 
   const periodSuffix = month ? ` — ${monthLabel(month, true)}` : '';
 
-  const handleExport = async (which) => {
+  const handleExport = async (which, format) => {
     if (exportingRef.current) return; // one export at a time — all three buttons are disabled while this is true, but a fast double-click on the same button could still slip through without this
     exportingRef.current = true;
-    setExporting(which);
+    setExporting(`${which}:${format}`);
     setExportProgress(null);
     try {
-      const url = which === 'orders' ? exportApi.ordersUrl() : which === 'distributors' ? exportApi.distributorsUrl() : exportApi.productsUrl();
-      await downloadFile(url, `${which}.xlsx`, setExportProgress);
-      toast.success(`${which[0].toUpperCase()}${which.slice(1)} exported.`);
+      const url = exportApi.tableUrl(which, format);
+      await downloadFile(url, `${which}.${format === 'pdf' ? 'pdf' : 'xlsx'}`, setExportProgress);
+      toast.success(`${which[0].toUpperCase()}${which.slice(1)} ${format === 'pdf' ? 'PDF' : 'Excel'} downloaded.`);
     } catch (err) {
       toast.error(apiErrorMessage(err));
     } finally {
@@ -73,41 +81,20 @@ export default function ReportsPage() {
           <h1>Reports</h1>
           <p>Sales performance and export tools.</p>
         </div>
-        <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 8 }}>
-          <div style={{ display: 'flex', flexWrap: 'wrap', justifyContent: 'flex-end', gap: 8 }}>
-            <button
-              type="button"
-              className="btn btn-secondary btn-sm"
-              onClick={() => setPickerOpen(true)}
-              title="Choose month"
-              aria-label={`Choose month (showing ${monthLabel(month)})`}
-            >
-              <Calendar size={14} />
-              {month && <span>{monthLabel(month, true)}</span>}
-            </button>
-            <button className="btn btn-secondary btn-sm" disabled={!!exporting} onClick={() => handleExport('orders')}>
-              {exporting === 'orders' && <Loader2 size={14} className="spin" />} Export Orders
-            </button>
-            <button className="btn btn-secondary btn-sm" disabled={!!exporting} onClick={() => handleExport('distributors')}>
-              {exporting === 'distributors' && <Loader2 size={14} className="spin" />} Export Distributors
-            </button>
-            <button className="btn btn-secondary btn-sm" disabled={!!exporting} onClick={() => handleExport('products')}>
-              {exporting === 'products' && <Loader2 size={14} className="spin" />} Export Products
-            </button>
-          </div>
-          {exporting && (
-            <div style={{ width: 220 }}>
-              <div className="progress-track">
-                <div
-                  className={`progress-fill${exportProgress == null ? ' indeterminate' : ''}`}
-                  style={exportProgress != null ? { width: `${exportProgress}%` } : undefined}
-                />
-              </div>
-              <p style={{ color: 'var(--ink-muted)', fontSize: 11.5, marginTop: 4, marginBottom: 0, textAlign: 'right' }}>
-                Downloading your file{exportProgress != null ? `… ${exportProgress}%` : '…'}
-              </p>
-            </div>
-          )}
+        <div style={{ display: 'flex', flexWrap: 'wrap', justifyContent: 'flex-end', gap: 8 }}>
+          <button
+            type="button"
+            className="btn btn-secondary btn-sm"
+            onClick={() => setPickerOpen(true)}
+            title="Choose month"
+            aria-label={`Choose month (showing ${monthLabel(month)})`}
+          >
+            <Calendar size={14} />
+            {month && <span>{monthLabel(month, true)}</span>}
+          </button>
+          <button type="button" className="btn btn-secondary btn-sm" onClick={() => setDownloadOpen(true)}>
+            <Download size={14} /> Download
+          </button>
         </div>
       </div>
 
@@ -237,6 +224,56 @@ export default function ReportsPage() {
           </>
         )}
       </div>
+
+      {downloadOpen && (
+        <Modal title="Download" onClose={() => setDownloadOpen(false)}>
+          <div className="download-list">
+            {DOWNLOADS.map((item) => (
+              <div key={item.key} className="download-row">
+                <span className="download-row-label">{item.label}</span>
+                <div className="download-row-actions">
+                  <button
+                    type="button"
+                    className="download-icon-btn download-icon-pdf"
+                    disabled={!!exporting}
+                    onClick={() => handleExport(item.key, 'pdf')}
+                    title={`Download ${item.label} as PDF`}
+                    aria-label={`Download ${item.label} as PDF`}
+                  >
+                    {exporting === `${item.key}:pdf` ? <Loader2 size={18} className="spin" /> : <FileText size={18} />}
+                    <span>PDF</span>
+                  </button>
+                  <button
+                    type="button"
+                    className="download-icon-btn download-icon-excel"
+                    disabled={!!exporting}
+                    onClick={() => handleExport(item.key, 'excel')}
+                    title={`Download ${item.label} as Excel`}
+                    aria-label={`Download ${item.label} as Excel`}
+                  >
+                    {exporting === `${item.key}:excel` ? <Loader2 size={18} className="spin" /> : <FileSpreadsheet size={18} />}
+                    <span>Excel</span>
+                  </button>
+                </div>
+              </div>
+            ))}
+          </div>
+
+          {exporting && (
+            <div style={{ marginTop: 14 }}>
+              <div className="progress-track">
+                <div
+                  className={`progress-fill${exportProgress == null ? ' indeterminate' : ''}`}
+                  style={exportProgress != null ? { width: `${exportProgress}%` } : undefined}
+                />
+              </div>
+              <p className="period-note" style={{ marginTop: 6 }}>
+                Downloading your file{exportProgress != null ? `… ${exportProgress}%` : '…'}
+              </p>
+            </div>
+          )}
+        </Modal>
+      )}
 
       {pickerOpen && (
         <Modal title="Select Month" onClose={() => setPickerOpen(false)}>
