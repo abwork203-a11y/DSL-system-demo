@@ -4283,3 +4283,10 @@ input[type='password']::-ms-clear {
   font-size: 12px;
   color: var(--ink-muted);
 }
+
+/* ---- Dashboard: calendar icon button beside "New Order" ---- */
+.dashboard-period-btn {
+  min-height: 40px;
+  padding: 0 12px;
+  gap: 7px;
+}

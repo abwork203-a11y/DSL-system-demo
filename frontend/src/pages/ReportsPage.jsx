@@ -1,10 +1,11 @@
 import { useEffect, useRef, useState } from 'react';
 import { LineChart, Line, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid, BarChart, Bar } from 'recharts';
-import { Loader2 } from 'lucide-react';
+import { Loader2, Calendar } from 'lucide-react';
 import { reports, exportApi } from '../api/endpoints';
 import { apiErrorMessage, downloadFile } from '../api/client';
 import { useToast } from '../context/ToastContext';
 import { TableSkeleton } from '../components/Skeleton';
+import Modal from '../components/Modal';
 import MonthPicker from '../components/MonthPicker';
 import { monthLabel } from '../utils/months';
 
@@ -20,6 +21,7 @@ export default function ReportsPage() {
   const [topProducts, setTopProducts] = useState([]);
   const [loading, setLoading] = useState(true);
   const [month, setMonth] = useState(''); // 'YYYY-MM', or '' = all time (the old behaviour)
+  const [pickerOpen, setPickerOpen] = useState(false);
   const [exporting, setExporting] = useState(''); // '' | 'orders' | 'distributors' | 'products'
   const [exportProgress, setExportProgress] = useState(null);
   const exportingRef = useRef(false);
@@ -73,6 +75,16 @@ export default function ReportsPage() {
         </div>
         <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 8 }}>
           <div style={{ display: 'flex', flexWrap: 'wrap', justifyContent: 'flex-end', gap: 8 }}>
+            <button
+              type="button"
+              className="btn btn-secondary btn-sm"
+              onClick={() => setPickerOpen(true)}
+              title="Choose month"
+              aria-label={`Choose month (showing ${monthLabel(month)})`}
+            >
+              <Calendar size={14} />
+              {month && <span>{monthLabel(month, true)}</span>}
+            </button>
             <button className="btn btn-secondary btn-sm" disabled={!!exporting} onClick={() => handleExport('orders')}>
               {exporting === 'orders' && <Loader2 size={14} className="spin" />} Export Orders
             </button>
@@ -97,13 +109,6 @@ export default function ReportsPage() {
             </div>
           )}
         </div>
-      </div>
-
-      <div className="period-bar">
-        <MonthPicker value={month} onChange={setMonth} allowAll />
-        <p className="period-note">
-          Applies to distributors, reps and products. The monthly trend always shows the last 12 months, and exports are not filtered.
-        </p>
       </div>
 
       <div className="card">
@@ -232,6 +237,24 @@ export default function ReportsPage() {
           </>
         )}
       </div>
+
+      {pickerOpen && (
+        <Modal title="Select Month" onClose={() => setPickerOpen(false)}>
+          <MonthPicker value={month} onChange={setMonth} allowAll />
+          <p className="period-note" style={{ margin: '14px 0 16px' }}>
+            Applies to distributors, reps and products. The monthly trend always shows the last 12 months, and exports are not filtered.
+          </p>
+          <button
+            type="button"
+            className="btn"
+            onClick={() => setPickerOpen(false)}
+            style={{ width: '100%', justifyContent: 'center' }}
+          >
+            Done
+          </button>
+        </Modal>
+      )}
+
     </div>
   );
 }

@@ -5,6 +5,7 @@ import {
   FileText,
   Plus,
   Eye,
+  Calendar,
 } from 'lucide-react';
 
 import { reports, orders as ordersApi } from '../api/endpoints';
@@ -14,6 +15,7 @@ import { useToast } from '../context/ToastContext';
 import { useLiveOrderEvents } from '../context/SocketContext';
 
 import StatusBadge from '../components/StatusBadge';
+import Modal from '../components/Modal';
 import MonthPicker from '../components/MonthPicker';
 import { currentMonthValue, monthLabel } from '../utils/months';
 import { StatSkeleton, TableSkeleton } from '../components/Skeleton';
@@ -87,6 +89,7 @@ export default function DashboardPage() {
   const [recentOrders, setRecentOrders] = useState([]);
   const [loading, setLoading] = useState(true);
   const [month, setMonth] = useState(currentMonthValue()); // 'YYYY-MM'
+  const [pickerOpen, setPickerOpen] = useState(false);
 
 
   const load = useCallback(async () => {
@@ -171,22 +174,29 @@ export default function DashboardPage() {
           <p>Here's what's happening across your distribution network.</p>
         </div>
 
-        <Link
-          to="/orders/new"
-          className="btn dashboard-new-order"
-        >
-          <Plus size={17} strokeWidth={2} />
-          New Order
-        </Link>
+        <div className="page-header-actions">
 
-      </div>
+          <button
+            type="button"
+            className="btn btn-secondary dashboard-period-btn"
+            onClick={() => setPickerOpen(true)}
+            title="Choose month"
+            aria-label={`Choose month (showing ${monthLabel(month)})`}
+          >
+            <Calendar size={17} strokeWidth={2} />
+            {!isCurrentMonth && <span>{periodShort}</span>}
+          </button>
 
+          <Link
+            to="/orders/new"
+            className="btn dashboard-new-order"
+          >
+            <Plus size={17} strokeWidth={2} />
+            New Order
+          </Link>
 
-      <div className="period-bar">
-        <MonthPicker value={month} onChange={setMonth} />
-        <p className="period-note">
-          Sales and order counts follow the selected month. Receivables, distributors and order status always show current figures.
-        </p>
+        </div>
+
       </div>
 
 
@@ -397,6 +407,24 @@ export default function DashboardPage() {
         )}
 
       </div>
+
+
+      {pickerOpen && (
+        <Modal title="Select Month" onClose={() => setPickerOpen(false)}>
+          <MonthPicker value={month} onChange={setMonth} />
+          <p className="period-note" style={{ margin: '14px 0 16px' }}>
+            Sales and order counts follow the selected month. Receivables, distributors and order status always show current figures.
+          </p>
+          <button
+            type="button"
+            className="btn"
+            onClick={() => setPickerOpen(false)}
+            style={{ width: '100%', justifyContent: 'center' }}
+          >
+            Done
+          </button>
+        </Modal>
+      )}
 
     </div>
   );
