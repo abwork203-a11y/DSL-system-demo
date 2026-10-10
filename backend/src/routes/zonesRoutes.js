@@ -3,7 +3,6 @@ const { body } = require('express-validator');
 const { requireAuth, requireRole } = require('../middleware/auth');
 const { validate } = require('../middleware/validate');
 const { withRls } = require('../middleware/rls');
-const { requireRole } = require('../middleware/auth');
 const controller = require('../controllers/zonesController');
 
 const router = express.Router();
