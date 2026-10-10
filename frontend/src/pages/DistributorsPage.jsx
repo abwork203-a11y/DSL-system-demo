@@ -11,6 +11,7 @@ import Modal from '../components/Modal';
 import Pagination from '../components/Pagination';
 import FilterToolbar from '../components/FilterToolbar';
 import { TableSkeleton } from '../components/Skeleton';
+import { scrollToTop } from '../utils/scrollToTop';
 
 const EMPTY_FORM = { name: '', contact_name: '', contact_phone: '', contact_email: '', zone_id: '', region: '', city: '', area: '', address: '' };
 
@@ -57,6 +58,9 @@ export default function DistributorsPage() {
   useEffect(() => { load(); }, [load]);
 
   const updateFilter = (setter) => (value) => { setter(value); setPage(1); };
+
+  // Used by the pagination buttons: switch page, then jump back to the top of the list.
+  const changePage = (nextPage) => { setPage(nextPage); scrollToTop(); };
 
   // Badge count + reset for the mobile "Filters" panel (search is not a filter)
   const activeFilterCount = status ? 1 : 0;
@@ -239,7 +243,7 @@ export default function DistributorsPage() {
           </>
         )}
 
-        <Pagination pagination={pagination} onPageChange={setPage} />
+        <Pagination pagination={pagination} onPageChange={changePage} />
       </div>
 
       {editing !== null && (

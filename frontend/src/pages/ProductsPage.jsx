@@ -8,6 +8,7 @@ import Modal from '../components/Modal';
 import Pagination from '../components/Pagination';
 import FilterToolbar from '../components/FilterToolbar';
 import { TableSkeleton } from '../components/Skeleton';
+import { scrollToTop } from '../utils/scrollToTop';
 
 const EMPTY_FORM = { manufacturer_id: '', name: '', size_packaging: '', price: '', retail_price: '' };
 
@@ -28,6 +29,9 @@ export default function ProductsPage() {
   const [editing, setEditing] = useState(null);
   const [form, setForm] = useState(EMPTY_FORM);
   const [saving, setSaving] = useState(false);
+
+  // Used by the pagination buttons: switch page, then jump back to the top of the list.
+  const changePage = (nextPage) => { setPage(nextPage); scrollToTop(); };
 
   const load = useCallback(async () => {
     try {
@@ -216,7 +220,7 @@ export default function ProductsPage() {
           </>
         )}
 
-        <Pagination pagination={pagination} onPageChange={setPage} />
+        <Pagination pagination={pagination} onPageChange={changePage} />
       </div>
 
       {editing !== null && (
