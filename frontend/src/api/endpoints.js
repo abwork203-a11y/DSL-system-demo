@@ -71,6 +71,11 @@ export const usersApi = {
   remove: (id) => client.delete(`/users/${id}`),
 };
 
+export const zonesApi = {
+  list: () => client.get('/zones'),
+  create: (name) => client.post('/zones', { name }),
+};
+
 export const exportApi = {
   invoiceUrl: (id, format) => `/export/invoice/${id}/${format}`,
   productsUrl: () => `/export/products`,

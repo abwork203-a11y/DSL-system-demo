@@ -31,10 +31,12 @@ function invalidatePrefix(prefix) {
 
 // Express middleware: caches a GET route's JSON response for ttlMs, keyed by
 // the full URL (so different query params/filters get separate cache
-// entries automatically).
+// entries automatically) AND the requesting user — RLS-scoped routes return
+// different data per user at the same URL, so a shared key would serve one
+// rep's cached numbers to another. Requires requireAuth to run first.
 function cacheRoute(ttlMs) {
   return (req, res, next) => {
-    const key = `route:${req.originalUrl}`;
+    const key = `route:${req.originalUrl}:${req.user?.id ?? 'anon'}`;
     const cached = get(key);
     if (cached !== undefined) {
       res.setHeader('X-Cache', 'HIT');

@@ -39,14 +39,27 @@ async function seed() {
       );
     }
 
-    await client.query(
-      `INSERT INTO distributors (name, contact_name, zone, city, status)
-       VALUES ('Sample Distributor Co.', 'Jane Doe', 'North', 'Springfield', 'active')
-       ON CONFLICT DO NOTHING`
+    // distributors is under FORCE ROW LEVEL SECURITY: with no app.role set,
+    // the insert is rejected for any role subject to RLS. Seed as admin, in
+    // one transaction so the setting is local to it.
+    await client.query('BEGIN');
+    await client.query(`SELECT set_config('app.role', 'admin', true), set_config('app.user_id', '', true)`);
+    const zone = await client.query(
+      `INSERT INTO zones (name) VALUES ('North')
+       ON CONFLICT (name) DO UPDATE SET name = EXCLUDED.name
+       RETURNING id`
     );
+    await client.query(
+      `INSERT INTO distributors (name, contact_name, zone_id, city, status)
+       VALUES ('Sample Distributor Co.', 'Jane Doe', $1, 'Springfield', 'active')
+       ON CONFLICT DO NOTHING`,
+      [zone.rows[0].id]
+    );
+    await client.query('COMMIT');
 
     console.log('✔ Seed complete.');
   } catch (err) {
+    await client.query('ROLLBACK').catch(() => {});
     console.error('✗ Seed failed:', err.message);
     process.exitCode = 1;
   } finally {

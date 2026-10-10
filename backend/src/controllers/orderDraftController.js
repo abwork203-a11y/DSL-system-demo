@@ -1,4 +1,3 @@
-const { pool } = require('../config/db');
 const { asyncHandler } = require('../utils/asyncHandler');
 const { ApiError } = require('../utils/ApiError');
 
@@ -19,11 +18,11 @@ function toClientShape(row) {
 // Most-recently-edited first — matches the old localStorage listDrafts()
 // ordering, which the Drafts tab's "recent work" framing depends on.
 const list = asyncHandler(async (req, res) => {
-  const result = await pool.query(
+  const result = await req.db.query(
     `SELECT * FROM order_drafts WHERE user_id = $1 ORDER BY updated_at DESC`,
     [req.user.id]
   );
-  res.json(result.rows.map(toClientShape));
+  req.respond(200, result.rows.map(toClientShape));
 });
 
 // Upsert, shared by both the normal (CSRF-protected) route and the
@@ -45,7 +44,7 @@ const save = asyncHandler(async (req, res) => {
     throw new ApiError(400, 'id is required.');
   }
 
-  const result = await pool.query(
+  const result = await req.db.query(
     `INSERT INTO order_drafts (id, user_id, distributor_id, data)
      VALUES ($1, $2, $3, $4)
      ON CONFLICT (id) DO UPDATE
@@ -62,12 +61,12 @@ const save = asyncHandler(async (req, res) => {
     throw new ApiError(409, 'This draft could not be saved.');
   }
 
-  res.json(toClientShape(result.rows[0]));
+  req.respond(200, toClientShape(result.rows[0]));
 });
 
 const remove = asyncHandler(async (req, res) => {
-  await pool.query(`DELETE FROM order_drafts WHERE id = $1 AND user_id = $2`, [req.params.id, req.user.id]);
-  res.status(204).end();
+  await req.db.query(`DELETE FROM order_drafts WHERE id = $1 AND user_id = $2`, [req.params.id, req.user.id]);
+  req.respondEnd(204);
 });
 
 module.exports = { list, save, remove };

@@ -1,6 +1,5 @@
 const ExcelJS = require('exceljs');
 const PDFDocument = require('pdfkit');
-const { pool } = require('../config/db');
 const { asyncHandler } = require('../utils/asyncHandler');
 const { ApiError } = require('../utils/ApiError');
 
@@ -23,8 +22,8 @@ function sanitizeRow(row) {
   return out;
 }
 
-async function getOrderWithItems(orderId) {
-  const orderResult = await pool.query(
+async function getOrderWithItems(db, orderId) {
+  const orderResult = await db.query(
     `SELECT o.*, d.name AS distributor_name, d.contact_name AS distributor_contact,
             d.contact_phone AS distributor_phone, d.city, d.area, d.zone,
             u.name AS created_by_name
@@ -36,7 +35,7 @@ async function getOrderWithItems(orderId) {
   );
   if (orderResult.rows.length === 0) return null;
 
-  const itemsResult = await pool.query(
+  const itemsResult = await db.query(
     `SELECT oi.*, p.name AS product_name, p.size_packaging, m.name AS manufacturer_name
      FROM order_items oi
      JOIN products p ON p.id = oi.product_id
@@ -61,7 +60,7 @@ function computeDiscountAmount(order, grossValue) {
 
 // ── Invoice: Excel ──────────────────────────────────────────
 const invoiceExcel = asyncHandler(async (req, res) => {
-  const order = await getOrderWithItems(req.params.id);
+  const order = await getOrderWithItems(req.db, req.params.id);
   if (!order) throw new ApiError(404, 'Order not found.');
 
   const workbook = new ExcelJS.Workbook();
@@ -129,7 +128,7 @@ const invoiceExcel = asyncHandler(async (req, res) => {
 
 // ── Invoice: PDF ────────────────────────────────────────────
 const invoicePdf = asyncHandler(async (req, res) => {
-  const order = await getOrderWithItems(req.params.id);
+  const order = await getOrderWithItems(req.db, req.params.id);
   if (!order) throw new ApiError(404, 'Order not found.');
 
   res.setHeader('Content-Type', 'application/pdf');
@@ -227,7 +226,7 @@ async function sendExcel(res, filename, columns, rows) {
 }
 
 const exportProducts = asyncHandler(async (req, res) => {
-  const result = await pool.query(
+  const result = await req.db.query(
     `SELECT p.name, m.name AS manufacturer, p.size_packaging, p.price, p.is_active
      FROM products p JOIN manufacturers m ON m.id = p.manufacturer_id ORDER BY p.name`
   );
@@ -241,7 +240,7 @@ const exportProducts = asyncHandler(async (req, res) => {
 });
 
 const exportDistributors = asyncHandler(async (req, res) => {
-  const result = await pool.query('SELECT name, zone, city, contact_name, contact_phone, balance, status FROM distributors ORDER BY name');
+  const result = await req.db.query('SELECT name, zone, city, contact_name, contact_phone, balance, status FROM distributors ORDER BY name');
   await sendExcel(res, 'distributors.xlsx', [
     { header: 'Distributor', key: 'name' },
     { header: 'Zone', key: 'zone' },
@@ -254,7 +253,7 @@ const exportDistributors = asyncHandler(async (req, res) => {
 });
 
 const exportOrders = asyncHandler(async (req, res) => {
-  const result = await pool.query(
+  const result = await req.db.query(
     `SELECT o.order_number, d.name AS distributor, o.order_date, o.total, o.payment_term,
             o.payment_status, o.order_status
      FROM orders o JOIN distributors d ON d.id = o.distributor_id
@@ -275,7 +274,7 @@ const exportOrders = asyncHandler(async (req, res) => {
 // export. Used by both exportLedgerExcel and exportLedgerPdf so the two
 // formats can never silently drift apart on what counts as "this month's
 // entries" — one query, two renderers.
-async function fetchBulkLedgerEntries({ distributorId, startDate, endDate }) {
+async function fetchBulkLedgerEntries(db, { distributorId, startDate, endDate }) {
   const params = [];
   const clauses = [];
   if (distributorId) {
@@ -292,7 +291,7 @@ async function fetchBulkLedgerEntries({ distributorId, startDate, endDate }) {
   }
   const where = clauses.length ? `WHERE ${clauses.join(' AND ')}` : '';
 
-  const result = await pool.query(
+  const result = await db.query(
     `SELECT d.name AS distributor, l.entry_date, l.type, l.amount, l.running_balance, l.note, o.payment_term
      FROM ledger l
      JOIN distributors d ON d.id = l.distributor_id
@@ -307,7 +306,7 @@ async function fetchBulkLedgerEntries({ distributorId, startDate, endDate }) {
 // ── Ledger: generic bulk export (all distributors, or filtered) — Excel ──
 const exportLedgerExcel = asyncHandler(async (req, res) => {
   const { distributor_id, start_date, end_date } = req.query;
-  const entries = await fetchBulkLedgerEntries({ distributorId: distributor_id, startDate: start_date, endDate: end_date });
+  const entries = await fetchBulkLedgerEntries(req.db, { distributorId: distributor_id, startDate: start_date, endDate: end_date });
 
   const rows = entries.map((entry) => ({
     distributor: entry.distributor,
@@ -339,7 +338,7 @@ const exportLedgerExcel = asyncHandler(async (req, res) => {
 // regardless of how long a distributor name or note happens to be.
 const exportLedgerPdf = asyncHandler(async (req, res) => {
   const { distributor_id, start_date, end_date } = req.query;
-  const entries = await fetchBulkLedgerEntries({ distributorId: distributor_id, startDate: start_date, endDate: end_date });
+  const entries = await fetchBulkLedgerEntries(req.db, { distributorId: distributor_id, startDate: start_date, endDate: end_date });
 
   res.setHeader('Content-Type', 'application/pdf');
   res.setHeader('Content-Disposition', 'attachment; filename=ledger.pdf');
@@ -414,8 +413,8 @@ const exportLedgerPdf = asyncHandler(async (req, res) => {
 // view/materialized table instead of the raw `ledger` table), point this
 // query at the same source before shipping — it wasn't available to check
 // against here.
-async function fetchDistributorLedger(distributorId, { start_date, end_date }) {
-  const distributorResult = await pool.query(
+async function fetchDistributorLedger(db, distributorId, { start_date, end_date }) {
+  const distributorResult = await db.query(
     'SELECT id, name FROM distributors WHERE id = $1',
     [distributorId]
   );
@@ -433,7 +432,7 @@ async function fetchDistributorLedger(distributorId, { start_date, end_date }) {
     dateWhere += ` AND l.entry_date <= $${params.length}`;
   }
 
-  const entriesResult = await pool.query(
+  const entriesResult = await db.query(
     `SELECT l.entry_date, l.type, l.amount, l.running_balance, l.note, o.payment_term
      FROM ledger l
      LEFT JOIN orders o ON o.id = l.order_id
@@ -456,7 +455,7 @@ function dateRangeLabel(start_date, end_date) {
 const exportDistributorLedgerExcel = asyncHandler(async (req, res) => {
   const { id: distributorId } = req.params;
   const { start_date, end_date } = req.query;
-  const { distributor, entries } = await fetchDistributorLedger(distributorId, { start_date, end_date });
+  const { distributor, entries } = await fetchDistributorLedger(req.db, distributorId, { start_date, end_date });
 
   const workbook = new ExcelJS.Workbook();
   const sheet = workbook.addWorksheet('Customer Ledger');
@@ -518,7 +517,7 @@ const exportDistributorLedgerExcel = asyncHandler(async (req, res) => {
 const exportDistributorLedgerPdf = asyncHandler(async (req, res) => {
   const { id: distributorId } = req.params;
   const { start_date, end_date } = req.query;
-  const { distributor, entries } = await fetchDistributorLedger(distributorId, { start_date, end_date });
+  const { distributor, entries } = await fetchDistributorLedger(req.db, distributorId, { start_date, end_date });
 
   res.setHeader('Content-Type', 'application/pdf');
   res.setHeader('Content-Disposition', `attachment; filename=ledger-${distributor.name.replace(/[^a-z0-9]+/gi, '-')}.pdf`);

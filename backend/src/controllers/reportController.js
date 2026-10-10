@@ -1,22 +1,21 @@
-const { pool } = require('../config/db');
 const { asyncHandler } = require('../utils/asyncHandler');
 
 // Dashboard: high-level counts + this month's totals
 const dashboardSummary = asyncHandler(async (req, res) => {
-  const [orders, receivables, distributors, monthSales] = await Promise.all([
-    pool.query(`SELECT order_status, COUNT(*)::int AS count FROM orders GROUP BY order_status`),
-    pool.query(`SELECT COALESCE(SUM(balance), 0) AS total_outstanding FROM distributors WHERE balance > 0`),
-    pool.query(`SELECT status, COUNT(*)::int AS count FROM distributors GROUP BY status`),
-    pool.query(`
-      SELECT COALESCE(SUM(total), 0) AS total, COUNT(*)::int AS order_count
-      FROM orders
-      WHERE date_trunc('month', order_date) = date_trunc('month', CURRENT_DATE)
-        AND order_status != 'cancelled'
-        AND payment_status != 'unpaid'
-    `),
-  ]);
+  // Sequential, not Promise.all: req.db is a single transaction-scoped client
+  // (from withRls), and a single pg client can only run one query at a time.
+  const orders = await req.db.query(`SELECT order_status, COUNT(*)::int AS count FROM orders GROUP BY order_status`);
+  const receivables = await req.db.query(`SELECT COALESCE(SUM(balance), 0) AS total_outstanding FROM distributors WHERE balance > 0`);
+  const distributors = await req.db.query(`SELECT status, COUNT(*)::int AS count FROM distributors GROUP BY status`);
+  const monthSales = await req.db.query(`
+    SELECT COALESCE(SUM(total), 0) AS total, COUNT(*)::int AS order_count
+    FROM orders
+    WHERE date_trunc('month', order_date) = date_trunc('month', CURRENT_DATE)
+      AND order_status != 'cancelled'
+      AND payment_status != 'unpaid'
+  `);
 
-  res.json({
+  req.respond(200, {
     ordersByStatus: orders.rows,
     totalOutstanding: Number(receivables.rows[0].total_outstanding),
     distributorsByStatus: distributors.rows,
@@ -30,7 +29,7 @@ const dashboardSummary = asyncHandler(async (req, res) => {
 // Monthly sales trend, last N months (default 12)
 const monthlySales = asyncHandler(async (req, res) => {
   const months = Number(req.query.months) || 12;
-  const result = await pool.query(
+  const result = await req.db.query(
     `SELECT
        date_trunc('month', order_date) AS month,
        COALESCE(SUM(total), 0) AS total_sales,
@@ -42,7 +41,7 @@ const monthlySales = asyncHandler(async (req, res) => {
      ORDER BY 1`,
     [months]
   );
-  res.json(result.rows);
+  req.respond(200, result.rows);
 });
 
 // Sales performance by distributor
@@ -59,8 +58,8 @@ const performanceByDistributor = asyncHandler(async (req, res) => {
     clauses.push(`o.order_date <= $${params.length}`);
   }
 
-  const result = await pool.query(
-    `SELECT d.id, d.name, d.zone, d.balance,
+  const result = await req.db.query(
+    `SELECT d.id, d.name, d.zone, d.zone_id, d.balance,
             COUNT(o.id)::int AS order_count,
             COALESCE(SUM(o.total), 0) AS total_sales
      FROM distributors d
@@ -69,12 +68,17 @@ const performanceByDistributor = asyncHandler(async (req, res) => {
      ORDER BY total_sales DESC`,
     params
   );
-  res.json(result.rows);
+  req.respond(200, result.rows);
 });
 
-// Sales performance by sales rep
+// IMPORTANT: this handler must remain admin-only (enforced in reportRoutes.js
+// via requireRole('admin') before withRls). Under RLS, if a sales rep called
+// this endpoint, the underlying `orders` query is already zone-filtered to
+// ONLY that rep's own visible orders — so every OTHER rep's numbers would
+// silently come back as zero, not as an access-denied error. A
+// silently-wrong report is worse than a blocked one.
 const performanceByRep = asyncHandler(async (req, res) => {
-  const result = await pool.query(
+  const result = await req.db.query(
     `SELECT u.id, u.name,
             COUNT(o.id)::int AS order_count,
             COALESCE(SUM(o.total), 0) AS total_sales
@@ -84,13 +88,13 @@ const performanceByRep = asyncHandler(async (req, res) => {
      GROUP BY u.id
      ORDER BY total_sales DESC`
   );
-  res.json(result.rows);
+  req.respond(200, result.rows);
 });
 
 // Top products by revenue
 const topProducts = asyncHandler(async (req, res) => {
   const limit = Number(req.query.limit) || 10;
-  const result = await pool.query(
+  const result = await req.db.query(
     `SELECT p.id, p.name, m.name AS manufacturer_name,
             SUM(oi.quantity)::numeric AS total_quantity,
             SUM(oi.line_total)::numeric AS total_revenue
@@ -103,7 +107,7 @@ const topProducts = asyncHandler(async (req, res) => {
      LIMIT $1`,
     [limit]
   );
-  res.json(result.rows);
+  req.respond(200, result.rows);
 });
 
 module.exports = { dashboardSummary, monthlySales, performanceByDistributor, performanceByRep, topProducts };

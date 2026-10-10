@@ -2,6 +2,7 @@ const express = require('express');
 const { body } = require('express-validator');
 const { requireAuth, requireRole } = require('../middleware/auth');
 const { validate } = require('../middleware/validate');
+const { withRls } = require('../middleware/rls');
 const controller = require('../controllers/backupController');
 
 const router = express.Router();
@@ -16,7 +17,7 @@ const createRules = [
   body('failed_count').optional().isInt({ min: 0 }),
 ];
 
-router.get('/', controller.list);
-router.post('/', createRules, validate, controller.create);
+router.get('/', withRls(controller.list));
+router.post('/', createRules, validate, withRls(controller.create));
 
 module.exports = router;

@@ -4,7 +4,7 @@ const { pool } = require('../config/db');
 // Every application table, in no particular order — TRUNCATE ... CASCADE
 // handles foreign-key dependencies regardless of the order they're listed in,
 // since it's evaluated as a single statement across all of them at once.
-const TABLES = ['audit_log', 'ledger', 'order_items', 'orders', 'products', 'distributors', 'manufacturers', 'users'];
+const TABLES = ['audit_log', 'ledger', 'order_items', 'orders', 'products', 'distributors', 'manufacturers', 'users', 'zones', 'user_zones', 'order_drafts', 'backups'];
 
 function maskConnectionString(url) {
   if (!url) return '(DATABASE_URL not set)';

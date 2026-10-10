@@ -1,20 +1,59 @@
 const bcrypt = require('bcryptjs');
-const { pool } = require('../config/db');
 const { asyncHandler } = require('../utils/asyncHandler');
 const { ApiError } = require('../utils/ApiError');
 const { recordAudit } = require('../utils/audit');
 const { isPasswordBreached } = require('../utils/passwordBreachCheck');
 
-const list = asyncHandler(async (req, res) => {
-  const result = await pool.query(
-    `SELECT id, name, email, role, assigned_zone, is_active, mfa_enabled, created_at
-     FROM users ORDER BY name`
+// Replaces all of a user's zone assignments with exactly the given set.
+// Delete-then-reinsert is simplest and correct here because zone counts per
+// user are small (a handful at most) — no need for a diff/merge.
+async function setUserZones(db, userId, zoneIds) {
+  await db.query('DELETE FROM user_zones WHERE user_id = $1', [userId]);
+  if (zoneIds.length > 0) {
+    const values = zoneIds.map((_, i) => `($1, $${i + 2})`).join(', ');
+    await db.query(
+      `INSERT INTO user_zones (user_id, zone_id) VALUES ${values}`,
+      [userId, ...zoneIds]
+    );
+  }
+}
+
+// Distinguishes "zone_ids not present in the request body at all" (meaning:
+// don't touch this user's zones) from "zone_ids: []" (meaning: explicitly
+// clear all zones) from a real array of ids to set. Duplicates are dropped
+// so a repeated id can't trip user_zones' uniqueness.
+function parseZoneIds(body) {
+  if (!Object.prototype.hasOwnProperty.call(body, 'zone_ids')) return undefined;
+  if (!Array.isArray(body.zone_ids)) return [];
+  return [...new Set(body.zone_ids.map(Number).filter((n) => Number.isInteger(n) && n > 0))];
+}
+
+// Same shape list() returns per user, so create/update responses match it.
+async function fetchUserZones(db, userId) {
+  const result = await db.query(
+    `SELECT z.id, z.name FROM user_zones uz JOIN zones z ON z.id = uz.zone_id
+     WHERE uz.user_id = $1 ORDER BY z.name`,
+    [userId]
   );
-  res.json(result.rows);
+  return result.rows;
+}
+
+const list = asyncHandler(async (req, res) => {
+  const result = await req.db.query(
+    `SELECT u.id, u.name, u.email, u.role, u.assigned_zone, u.is_active, u.mfa_enabled, u.created_at,
+       COALESCE(
+         (SELECT json_agg(json_build_object('id', z.id, 'name', z.name) ORDER BY z.name)
+          FROM user_zones uz JOIN zones z ON z.id = uz.zone_id
+          WHERE uz.user_id = u.id),
+         '[]'
+       ) AS zones
+     FROM users u ORDER BY u.name`
+  );
+  req.respond(200, result.rows);
 });
 
 const create = asyncHandler(async (req, res) => {
-  const { name, email, password, role, assigned_zone } = req.body;
+  const { name, email, password, role } = req.body;
   if (!name || !email || !password || !role) {
     throw new ApiError(400, 'name, email, password, and role are required.');
   }
@@ -28,25 +67,32 @@ const create = asyncHandler(async (req, res) => {
   }
 
   const hash = await bcrypt.hash(password, 10);
-  const result = await pool.query(
-    `INSERT INTO users (name, email, password_hash, role, assigned_zone)
-     VALUES ($1, $2, $3, $4, $5)
+  const result = await req.db.query(
+    `INSERT INTO users (name, email, password_hash, role)
+     VALUES ($1, $2, $3, $4)
      RETURNING id, name, email, role, assigned_zone, is_active, mfa_enabled, created_at`,
-    [name, email, hash, role, assigned_zone || null]
+    [name, email, hash, role]
   );
 
-  await recordAudit(pool, { userId: req.user.id, action: 'CREATE', entityType: 'user', entityId: result.rows[0].id, after: result.rows[0] });
-  res.status(201).json(result.rows[0]);
+  // undefined (field omitted) on create just means "no zones assigned".
+  const zoneIds = parseZoneIds(req.body);
+  if (zoneIds !== undefined) {
+    await setUserZones(req.db, result.rows[0].id, zoneIds);
+  }
+  result.rows[0].zones = await fetchUserZones(req.db, result.rows[0].id);
+
+  await recordAudit(req.db, { userId: req.user.id, action: 'CREATE', entityType: 'user', entityId: result.rows[0].id, after: result.rows[0] });
+  req.respond(201, result.rows[0]);
 });
 
 const update = asyncHandler(async (req, res) => {
   const { id } = req.params;
-  const { name, role, assigned_zone, is_active, password } = req.body;
+  const { name, role, is_active, password } = req.body;
   if (role && !['admin', 'sales_rep'].includes(role)) {
     throw new ApiError(400, 'role must be "admin" or "sales_rep".');
   }
 
-  const existing = await pool.query('SELECT * FROM users WHERE id = $1', [id]);
+  const existing = await req.db.query('SELECT * FROM users WHERE id = $1', [id]);
   if (existing.rows.length === 0) throw new ApiError(404, 'User not found.');
   const targetUser = existing.rows[0];
 
@@ -68,7 +114,7 @@ const update = asyncHandler(async (req, res) => {
   // the last one standing — otherwise the app can end up with zero active
   // admins and no way to create or restore one short of a direct DB edit.
   if (losingAdminAccess) {
-    const otherActiveAdmins = await pool.query(
+    const otherActiveAdmins = await req.db.query(
       `SELECT COUNT(*)::int AS count FROM users WHERE role = 'admin' AND is_active = true AND id != $1`,
       [id]
     );
@@ -91,21 +137,27 @@ const update = asyncHandler(async (req, res) => {
   // (accountController.js), just triggered by an admin instead of the user.
   const bumpTokenVersion = !!password;
 
-  const result = await pool.query(
+  const result = await req.db.query(
     `UPDATE users SET
        name = COALESCE($1, name),
        role = COALESCE($2, role),
-       assigned_zone = COALESCE($3, assigned_zone),
-       is_active = COALESCE($4, is_active),
-       password_hash = COALESCE($5, password_hash),
-       token_version = token_version + $6
-     WHERE id = $7
+       is_active = COALESCE($3, is_active),
+       password_hash = COALESCE($4, password_hash),
+       token_version = token_version + $5
+     WHERE id = $6
      RETURNING id, name, email, role, assigned_zone, is_active, mfa_enabled, created_at`,
-    [name || null, role || null, assigned_zone || null, is_active ?? null, passwordHash, bumpTokenVersion ? 1 : 0, id]
+    [name || null, role || null, is_active ?? null, passwordHash, bumpTokenVersion ? 1 : 0, id]
   );
 
-  await recordAudit(pool, { userId: req.user.id, action: 'UPDATE', entityType: 'user', entityId: id, before: existing.rows[0], after: result.rows[0] });
-  res.json(result.rows[0]);
+  // undefined (field omitted) leaves existing zones untouched; [] clears them.
+  const zoneIds = parseZoneIds(req.body);
+  if (zoneIds !== undefined) {
+    await setUserZones(req.db, id, zoneIds);
+  }
+  result.rows[0].zones = await fetchUserZones(req.db, id);
+
+  await recordAudit(req.db, { userId: req.user.id, action: 'UPDATE', entityType: 'user', entityId: id, before: existing.rows[0], after: result.rows[0] });
+  req.respond(200, result.rows[0]);
 });
 
 const remove = asyncHandler(async (req, res) => {
@@ -113,12 +165,12 @@ const remove = asyncHandler(async (req, res) => {
   if (Number(id) === req.user.id) {
     throw new ApiError(400, 'You cannot delete your own account.');
   }
-  const existing = await pool.query('SELECT * FROM users WHERE id = $1', [id]);
+  const existing = await req.db.query('SELECT * FROM users WHERE id = $1', [id]);
   if (existing.rows.length === 0) throw new ApiError(404, 'User not found.');
 
-  await pool.query('DELETE FROM users WHERE id = $1', [id]);
-  await recordAudit(pool, { userId: req.user.id, action: 'DELETE', entityType: 'user', entityId: id, before: existing.rows[0] });
-  res.status(204).send();
+  await req.db.query('DELETE FROM users WHERE id = $1', [id]);
+  await recordAudit(req.db, { userId: req.user.id, action: 'DELETE', entityType: 'user', entityId: id, before: existing.rows[0] });
+  req.respondEnd(204);
 });
 
 module.exports = { list, create, update, remove };

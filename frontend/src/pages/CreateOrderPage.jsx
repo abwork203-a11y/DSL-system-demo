@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { useNavigate, useBlocker, useLocation, Link } from 'react-router-dom';
 import { Plus, Minus, Loader2, ArrowLeft, X, ChevronLeft, ChevronRight, Star } from 'lucide-react';
-import { distributors as distributorsApi, products as productsApi, orders as ordersApi, reports } from '../api/endpoints';
+import { distributors as distributorsApi, products as productsApi, orders as ordersApi, reports, zonesApi } from '../api/endpoints';
 import { apiErrorMessage } from '../api/client';
 import { useToast } from '../context/ToastContext';
 import { useConfirm } from '../context/ConfirmContext';
@@ -22,6 +22,7 @@ export default function CreateOrderPage() {
   const [step, setStep] = useState(0);
   const [distributorsList, setDistributorsList] = useState([]);
   const [productsList, setProductsList] = useState([]);
+  const [zones, setZones] = useState([]);
   // IDs of the best-selling products, best first. Used to float them to the
   // top of the product picker and mark them with a star.
   const [topSellerIds, setTopSellerIds] = useState([]);
@@ -187,6 +188,13 @@ export default function CreateOrderPage() {
     [subtotal, discountAmount, freightCost]
   );
 
+  // Zone names for the distributor picker (distributors only carry zone_id now).
+  useEffect(() => {
+    zonesApi.list().then((res) => setZones(res.data)).catch(() => {});
+  }, []);
+
+  const zoneName = (d) => zones.find((z) => z.id === d.zone_id)?.name || '';
+
   const filteredDistributors = useMemo(() => {
     const q = distributorSearch.trim().toLowerCase();
     if (!q) return distributorsList;
@@ -343,12 +351,16 @@ export default function CreateOrderPage() {
                       }}
                     >
                       <td><strong>{d.name}</strong></td>
-                      <td>{[d.zone, d.city].filter(Boolean).join(' · ') || '—'}</td>
+                      <td>{[zoneName(d), d.city].filter(Boolean).join(' · ') || '—'}</td>
                       <td className="num">{money(d.balance)}</td>
                     </tr>
                   ))}
                   {filteredDistributors.length === 0 && (
-                    <tr><td colSpan={3}><div className="empty-state">No distributors match "{distributorSearch}".</div></td></tr>
+                    <tr><td colSpan={3}><div className="empty-state">
+                      {distributorsList.length === 0 && !distributorSearch
+                        ? 'No distributors available. Reps only see distributors in their assigned zones — ask an admin to assign you a zone.'
+                        : `No distributors match "${distributorSearch}".`}
+                    </div></td></tr>
                   )}
                 </tbody>
               </table>

@@ -1,7 +1,7 @@
 import { useEffect, useState, useCallback } from 'react';
 import { Link } from 'react-router-dom';
 import { Plus, Pencil, Trash2, Eye, Ban, RotateCcw } from 'lucide-react';
-import { distributors as distributorsApi } from '../api/endpoints';
+import { distributors as distributorsApi, zonesApi } from '../api/endpoints';
 import { apiErrorMessage } from '../api/client';
 import { useAuth } from '../context/AuthContext';
 import { useToast } from '../context/ToastContext';
@@ -12,7 +12,7 @@ import Pagination from '../components/Pagination';
 import FilterToolbar from '../components/FilterToolbar';
 import { TableSkeleton } from '../components/Skeleton';
 
-const EMPTY_FORM = { name: '', contact_name: '', contact_phone: '', contact_email: '', zone: '', region: '', city: '', area: '', address: '' };
+const EMPTY_FORM = { name: '', contact_name: '', contact_phone: '', contact_email: '', zone_id: '', region: '', city: '', area: '', address: '' };
 
 function money(n) {
   return Number(n || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
@@ -31,6 +31,15 @@ export default function DistributorsPage() {
   const [editing, setEditing] = useState(null);
   const [form, setForm] = useState(EMPTY_FORM);
   const [saving, setSaving] = useState(false);
+  const [zones, setZones] = useState([]);
+
+  useEffect(() => {
+    zonesApi.list().then((res) => setZones(res.data)).catch(() => {});
+  }, []);
+
+  // Look up a distributor's zone name from its zone_id. Returns '' (not a dash)
+  // so .filter(Boolean) below drops it cleanly when there is no zone.
+  const zoneName = (d) => zones.find((z) => z.id === d.zone_id)?.name || '';
 
   const load = useCallback(async () => {
     try {
@@ -53,18 +62,30 @@ export default function DistributorsPage() {
   const activeFilterCount = status ? 1 : 0;
   const resetFilters = () => { setStatus(''); setPage(1); };
 
+  // Reps only see distributors in their assigned zones, so an empty list can
+  // simply mean "no zone assigned yet" rather than "nothing exists".
+  const emptyMessage = !isAdmin && !search && !status
+    ? 'No distributors to show. You only see distributors in your assigned zones — ask an admin to assign you a zone.'
+    : 'No distributors found.';
+
   const openNew = () => { setForm(EMPTY_FORM); setEditing({}); };
-  const openEdit = (d) => { setForm({ ...EMPTY_FORM, ...d }); setEditing(d); };
+  const openEdit = (d) => { setForm({ ...EMPTY_FORM, ...d, zone_id: d.zone_id ?? '' }); setEditing(d); };
 
   const handleSave = async (e) => {
     e.preventDefault();
     setSaving(true);
+    // The backend wants zone_id as a number, or left out entirely.
+    // An empty dropdown gives '' so we drop the key. The old text "zone" is no longer used.
+    const payload = { ...form };
+    delete payload.zone;
+    if (payload.zone_id === '' || payload.zone_id == null) delete payload.zone_id;
+    else payload.zone_id = Number(payload.zone_id);
     try {
       if (editing?.id) {
-        await distributorsApi.update(editing.id, form);
+        await distributorsApi.update(editing.id, payload);
         toast.success('Distributor updated.');
       } else {
-        await distributorsApi.create(form);
+        await distributorsApi.create(payload);
         toast.success('Distributor added.');
       }
       setEditing(null);
@@ -146,7 +167,7 @@ export default function DistributorsPage() {
               <div key={d.id} className="pill-card" data-status={d.status}>
                 <div className="pill-card-left">
                   <div className="pill-card-name">{d.name}</div>
-                  <div className="pill-card-sub">{[d.zone, d.city].filter(Boolean).join(' · ') || '—'}</div>
+                  <div className="pill-card-sub">{[zoneName(d), d.city].filter(Boolean).join(' · ') || '—'}</div>
                   {(d.contact_name || d.contact_phone) && (
                     <div className="pill-card-meta">
                       {d.contact_name || '—'}{d.contact_phone ? ` · ${d.contact_phone}` : ''}
@@ -177,7 +198,7 @@ export default function DistributorsPage() {
                 </div>
               </div>
             ))}
-            {rows.length === 0 && <div className="empty-state">No distributors found.</div>}
+            {rows.length === 0 && <div className="empty-state">{emptyMessage}</div>}
           </div>
           <div className="table-wrap">
             <table className="data-table">
@@ -195,7 +216,7 @@ export default function DistributorsPage() {
                 {rows.map((d) => (
                   <tr key={d.id} data-status={d.status} onClick={() => openEdit(d)} style={{ cursor: 'pointer' }}>
                     <td data-label="Name"><strong>{d.name}</strong></td>
-                    <td data-label="Zone / City">{[d.zone, d.city].filter(Boolean).join(' · ') || '—'}</td>
+                    <td data-label="Zone / City">{[zoneName(d), d.city].filter(Boolean).join(' · ') || '—'}</td>
                     <td data-label="Contact">{d.contact_name || '—'}{d.contact_phone ? ` · ${d.contact_phone}` : ''}</td>
                     <td className="num" data-label="Balance">{money(d.balance)}</td>
                     <td data-label="Status"><StatusBadge value={d.status} /></td>
@@ -210,7 +231,7 @@ export default function DistributorsPage() {
                   </tr>
                 ))}
                 {rows.length === 0 && (
-                  <tr><td colSpan={6}><div className="empty-state">No distributors found.</div></td></tr>
+                  <tr><td colSpan={6}><div className="empty-state">{emptyMessage}</div></td></tr>
                 )}
               </tbody>
             </table>
@@ -249,7 +270,10 @@ export default function DistributorsPage() {
             <div className="field-row">
               <div className="field">
                 <label>Zone</label>
-                <input value={form.zone} onChange={(e) => setForm({ ...form, zone: e.target.value })} />
+                <select value={form.zone_id ?? ''} onChange={(e) => setForm({ ...form, zone_id: e.target.value })}>
+                  <option value="">— None —</option>
+                  {zones.map((z) => <option key={z.id} value={z.id}>{z.name}</option>)}
+                </select>
               </div>
               <div className="field">
                 <label>Region</label>

@@ -135,4 +135,86 @@ function withRls(handler) {
   };
 }
 
-module.exports = { withRls };
+/**
+ * Variant for routes that STREAM a file response (xlsx/pdf exports) rather
+ * than returning JSON. Nothing is deferred here: the handler writes to `res`
+ * itself. We still run on one transaction-scoped client with app.user_id /
+ * app.role set, so RLS applies to every query the handler makes.
+ *
+ * Release ordering matters. The client may only go back to the pool once BOTH
+ * (a) our COMMIT/ROLLBACK has finished and (b) the response has finished or
+ * closed. Releasing earlier would let another request grab the connection
+ * while we still have a statement to send on it. 'finish' and 'close' both
+ * fire for a normal response, and pg throws if a client is released twice
+ * (an uncaught throw inside an event handler would crash the process), so
+ * release is guarded to run exactly once.
+ *
+ * As in withRls, the handler is expected to be asyncHandler-wrapped, so its
+ * errors arrive through the `next` we pass in rather than as a rejection.
+ */
+function withRlsReadOnly(handler) {
+  return async (req, res, next) => {
+    if (!req.user) {
+      return next(new Error('withRlsReadOnly used without requireAuth running first.'));
+    }
+
+    let client;
+    try {
+      client = await pool.connect();
+    } catch (err) {
+      // See withRls: an unhandled rejection here would crash the process.
+      return next(err);
+    }
+
+    req.db = client;
+
+    let txDone = false;
+    let resDone = false;
+    let released = false;
+    const maybeRelease = () => {
+      if (released || !txDone || !resDone) return;
+      released = true;
+      client.release();
+    };
+    res.on('finish', () => { resDone = true; maybeRelease(); });
+    res.on('close', () => { resDone = true; maybeRelease(); });
+
+    let handlerError = null;
+    const handlerNext = (err) => { if (err && !handlerError) handlerError = err; };
+
+    let failure = null;
+    try {
+      await client.query('BEGIN');
+      await client.query(
+        `SELECT set_config('app.user_id', $1, true),
+                set_config('app.role', $2, true)`,
+        [String(req.user.id), req.user.role]
+      );
+      await handler(req, res, handlerNext);
+      failure = handlerError;
+    } catch (err) {
+      failure = err;
+    }
+
+    try {
+      await client.query(failure ? 'ROLLBACK' : 'COMMIT'); // read-only; closes the transaction cleanly
+    } catch (txErr) {
+      failure = failure || txErr;
+      await client.query('ROLLBACK').catch(() => {});
+    }
+    txDone = true;
+    maybeRelease();
+
+    if (failure) {
+      if (res.headersSent) {
+        // Already streaming — the error handler can't change the response now.
+        // eslint-disable-next-line no-console
+        console.error('withRlsReadOnly failed after the response started:', failure);
+      } else {
+        next(failure);
+      }
+    }
+  };
+}
+
+module.exports = { withRls, withRlsReadOnly };

@@ -1,0 +1,1848 @@
+diff --git a/backend/.env.example b/backend/.env.example
+index e386326..687cf76 100644
+--- a/backend/.env.example
++++ b/backend/.env.example
+@@ -17,3 +17,7 @@ JWT_EXPIRES_IN=8h
+ SEED_ADMIN_NAME=Admin
+ SEED_ADMIN_EMAIL=admin@example.com
+ SEED_ADMIN_PASSWORD=ChangeMe123!
++
++# Optional: owner credentials used only by `npm run migrate` / the entrypoint, when DATABASE_URL
++# is a restricted non-owner role (required for RLS to apply). Falls back to DATABASE_URL.
++# MIGRATION_DATABASE_URL=
+diff --git a/backend/src/app.js b/backend/src/app.js
+index a57e251..464413d 100644
+--- a/backend/src/app.js
++++ b/backend/src/app.js
+@@ -22,6 +22,7 @@ const exportRoutes = require('./routes/exportRoutes');
+ const auditRoutes = require('./routes/auditRoutes');
+ const backupRoutes = require('./routes/backupRoutes');
+ const orderDraftRoutes = require('./routes/orderDraftRoutes');
++const zonesRoutes = require('./routes/zonesRoutes');
+ 
+ function resolveCorsOrigin() {
+   const configured = process.env.CLIENT_ORIGIN;
+@@ -89,6 +90,7 @@ function createApp() {
+   app.use('/api/audit', auditRoutes);
+   app.use('/api/backups', backupRoutes);
+   app.use('/api/order-drafts', orderDraftRoutes);
++  app.use('/api/zones', zonesRoutes);
+ 
+   app.use(notFound);
+   app.use(errorHandler);
+diff --git a/backend/src/config/db.js b/backend/src/config/db.js
+index efcc9be..6f9523e 100644
+--- a/backend/src/config/db.js
++++ b/backend/src/config/db.js
+@@ -2,6 +2,9 @@ const { Pool } = require('pg');
+ 
+ const pool = new Pool({
+   connectionString: process.env.DATABASE_URL,
++  connectionTimeoutMillis: 10_000, // fail fast if the pool can't hand out a client
++  query_timeout: 15_000,           // fail fast on a hung query rather than hanging the request forever
++  options: '-c statement_timeout=15000', // belt-and-suspenders: enforce server-side too
+ });
+ 
+ pool.on('error', (err) => {
+diff --git a/backend/src/controllers/backupController.js b/backend/src/controllers/backupController.js
+index 2e378d9..327f3d3 100644
+--- a/backend/src/controllers/backupController.js
++++ b/backend/src/controllers/backupController.js
+@@ -1,4 +1,3 @@
+-const { pool } = require('../config/db');
+ const { asyncHandler } = require('../utils/asyncHandler');
+ const { ApiError } = require('../utils/ApiError');
+ 
+@@ -12,7 +11,7 @@ const create = asyncHandler(async (req, res) => {
+     throw new ApiError(400, 'folder_name and folder_url are required.');
+   }
+ 
+-  const result = await pool.query(
++  const result = await req.db.query(
+     `INSERT INTO backups (user_id, folder_name, folder_url, period_start, period_end, file_count, failed_count)
+      VALUES ($1, $2, $3, $4, $5, $6, $7)
+      RETURNING *`,
+@@ -27,7 +26,7 @@ const create = asyncHandler(async (req, res) => {
+     ]
+   );
+ 
+-  res.status(201).json(result.rows[0]);
++  req.respond(201, result.rows[0]);
+ });
+ 
+ // Recent backup history, most recent first. Kept simple (no pagination) —
+@@ -35,7 +34,7 @@ const create = asyncHandler(async (req, res) => {
+ // orders or the audit log.
+ const list = asyncHandler(async (req, res) => {
+   const limit = Math.min(100, Number(req.query.limit) || 20);
+-  const result = await pool.query(
++  const result = await req.db.query(
+     `SELECT b.*, u.name AS user_name
+      FROM backups b
+      LEFT JOIN users u ON u.id = b.user_id
+@@ -43,7 +42,7 @@ const list = asyncHandler(async (req, res) => {
+      LIMIT $1`,
+     [limit]
+   );
+-  res.json(result.rows);
++  req.respond(200, result.rows);
+ });
+ 
+ module.exports = { create, list };
+diff --git a/backend/src/controllers/distributorController.js b/backend/src/controllers/distributorController.js
+index 0a75b79..906bc02 100644
+--- a/backend/src/controllers/distributorController.js
++++ b/backend/src/controllers/distributorController.js
+@@ -1,11 +1,10 @@
+-const { pool } = require('../config/db');
+ const { asyncHandler } = require('../utils/asyncHandler');
+ const { ApiError } = require('../utils/ApiError');
+ const { recordAudit } = require('../utils/audit');
+ const { parsePagination, paginatedResponse } = require('../utils/pagination');
+ 
+ const list = asyncHandler(async (req, res) => {
+-  const { search, status, zone } = req.query;
++  const { search, status, zone_id } = req.query;
+   const { page, pageSize, offset } = parsePagination(req.query);
+   const clauses = [];
+   const params = [];
+@@ -18,37 +17,37 @@ const list = asyncHandler(async (req, res) => {
+     params.push(status);
+     clauses.push(`status = $${params.length}`);
+   }
+-  if (zone) {
+-    params.push(zone);
+-    clauses.push(`zone = $${params.length}`);
++  if (zone_id) {
++    params.push(zone_id);
++    clauses.push(`zone_id = $${params.length}`);
+   }
+ 
+   const where = clauses.length ? `WHERE ${clauses.join(' AND ')}` : '';
+ 
+-  const countResult = await pool.query(`SELECT COUNT(*) FROM distributors ${where}`, params);
++  const countResult = await req.db.query(`SELECT COUNT(*) FROM distributors ${where}`, params);
+   const total = Number(countResult.rows[0].count);
+ 
+-  const result = await pool.query(
++  const result = await req.db.query(
+     `SELECT * FROM distributors ${where} ORDER BY name LIMIT $${params.length + 1} OFFSET $${params.length + 2}`,
+     [...params, pageSize, offset]
+   );
+-  res.json(paginatedResponse(result.rows, total, page, pageSize));
++  req.respond(200, paginatedResponse(result.rows, total, page, pageSize));
+ });
+ 
+ const getOne = asyncHandler(async (req, res) => {
+-  const result = await pool.query('SELECT * FROM distributors WHERE id = $1', [req.params.id]);
++  const result = await req.db.query('SELECT * FROM distributors WHERE id = $1', [req.params.id]);
+   if (result.rows.length === 0) throw new ApiError(404, 'Distributor not found.');
+-  res.json(result.rows[0]);
++  req.respond(200, result.rows[0]);
+ });
+ 
+ const create = asyncHandler(async (req, res) => {
+-  const { name, contact_name, contact_phone, contact_email, zone, region, city, area, address } = req.body; 
++  const { name, contact_name, contact_phone, contact_email, zone_id, region, city, area, address } = req.body; 
+   if (!name) throw new ApiError(400, 'name is required.');
+ 
+- const result = await pool.query(
++ const result = await req.db.query(
+   `INSERT INTO distributors (
+      name, contact_name, contact_phone, contact_email,
+-     zone, region, city, area, address
++     zone_id, region, city, area, address
+    )
+    VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
+    RETURNING *`,
+@@ -57,15 +56,15 @@ const create = asyncHandler(async (req, res) => {
+     contact_name || null,
+     contact_phone || null,
+     contact_email || null,
+-    zone || null,
++    zone_id || null,
+     region || null,
+     city || null,
+     area || null,
+     address || null
+   ]
+ );
+-  await recordAudit(pool, { userId: req.user.id, action: 'CREATE', entityType: 'distributor', entityId: result.rows[0].id, after: result.rows[0] });
+-  res.status(201).json(result.rows[0]);
++  await recordAudit(req.db, { userId: req.user.id, action: 'CREATE', entityType: 'distributor', entityId: result.rows[0].id, after: result.rows[0] });
++  req.respond(201, result.rows[0]);
+ });
+ 
+ const update = asyncHandler(async (req, res) => {
+@@ -75,7 +74,7 @@ const update = asyncHandler(async (req, res) => {
+   contact_name,
+   contact_phone,
+   contact_email,
+-  zone,
++  zone_id,
+   region,
+   city,
+   area,
+@@ -86,16 +85,16 @@ const update = asyncHandler(async (req, res) => {
+     throw new ApiError(400, 'status must be "active" or "inactive".');
+   }
+ 
+-  const existing = await pool.query('SELECT * FROM distributors WHERE id = $1', [id]);
++  const existing = await req.db.query('SELECT * FROM distributors WHERE id = $1', [id]);
+   if (existing.rows.length === 0) throw new ApiError(404, 'Distributor not found.');
+ 
+-  const result = await pool.query(
++  const result = await req.db.query(
+   `UPDATE distributors SET
+      name = COALESCE($1, name),
+      contact_name = COALESCE($2, contact_name),
+      contact_phone = COALESCE($3, contact_phone),
+      contact_email = COALESCE($4, contact_email),
+-     zone = COALESCE($5, zone),
++     zone_id = COALESCE($5, zone_id),
+      region = COALESCE($6, region),
+      city = COALESCE($7, city),
+      area = COALESCE($8, area),
+@@ -108,7 +107,7 @@ const update = asyncHandler(async (req, res) => {
+     contact_name || null,
+     contact_phone || null,
+     contact_email || null,
+-    zone || null,
++    zone_id || null,
+     region || null,
+     city || null,
+     area || null,
+@@ -117,18 +116,18 @@ const update = asyncHandler(async (req, res) => {
+     id
+   ]
+ );
+-  await recordAudit(pool, { userId: req.user.id, action: 'UPDATE', entityType: 'distributor', entityId: id, before: existing.rows[0], after: result.rows[0] });
+-  res.json(result.rows[0]);
++  await recordAudit(req.db, { userId: req.user.id, action: 'UPDATE', entityType: 'distributor', entityId: id, before: existing.rows[0], after: result.rows[0] });
++  req.respond(200, result.rows[0]);
+ });
+ 
+ const remove = asyncHandler(async (req, res) => {
+   const { id } = req.params;
+-  const existing = await pool.query('SELECT * FROM distributors WHERE id = $1', [id]);
++  const existing = await req.db.query('SELECT * FROM distributors WHERE id = $1', [id]);
+   if (existing.rows.length === 0) throw new ApiError(404, 'Distributor not found.');
+ 
+-  await pool.query('DELETE FROM distributors WHERE id = $1', [id]);
+-  await recordAudit(pool, { userId: req.user.id, action: 'DELETE', entityType: 'distributor', entityId: id, before: existing.rows[0] });
+-  res.status(204).send();
++  await req.db.query('DELETE FROM distributors WHERE id = $1', [id]);
++  await recordAudit(req.db, { userId: req.user.id, action: 'DELETE', entityType: 'distributor', entityId: id, before: existing.rows[0] });
++  req.respondEnd(204);
+ });
+ 
+ module.exports = { list, getOne, create, update, remove };
+diff --git a/backend/src/controllers/exportController.js b/backend/src/controllers/exportController.js
+index e8bd279..ea08c8d 100644
+--- a/backend/src/controllers/exportController.js
++++ b/backend/src/controllers/exportController.js
+@@ -1,6 +1,5 @@
+ const ExcelJS = require('exceljs');
+ const PDFDocument = require('pdfkit');
+-const { pool } = require('../config/db');
+ const { asyncHandler } = require('../utils/asyncHandler');
+ const { ApiError } = require('../utils/ApiError');
+ 
+@@ -23,8 +22,8 @@ function sanitizeRow(row) {
+   return out;
+ }
+ 
+-async function getOrderWithItems(orderId) {
+-  const orderResult = await pool.query(
++async function getOrderWithItems(db, orderId) {
++  const orderResult = await db.query(
+     `SELECT o.*, d.name AS distributor_name, d.contact_name AS distributor_contact,
+             d.contact_phone AS distributor_phone, d.city, d.area, d.zone,
+             u.name AS created_by_name
+@@ -36,7 +35,7 @@ async function getOrderWithItems(orderId) {
+   );
+   if (orderResult.rows.length === 0) return null;
+ 
+-  const itemsResult = await pool.query(
++  const itemsResult = await db.query(
+     `SELECT oi.*, p.name AS product_name, p.size_packaging, m.name AS manufacturer_name
+      FROM order_items oi
+      JOIN products p ON p.id = oi.product_id
+@@ -61,7 +60,7 @@ function computeDiscountAmount(order, grossValue) {
+ 
+ // ── Invoice: Excel ──────────────────────────────────────────
+ const invoiceExcel = asyncHandler(async (req, res) => {
+-  const order = await getOrderWithItems(req.params.id);
++  const order = await getOrderWithItems(req.db, req.params.id);
+   if (!order) throw new ApiError(404, 'Order not found.');
+ 
+   const workbook = new ExcelJS.Workbook();
+@@ -129,7 +128,7 @@ const invoiceExcel = asyncHandler(async (req, res) => {
+ 
+ // ── Invoice: PDF ────────────────────────────────────────────
+ const invoicePdf = asyncHandler(async (req, res) => {
+-  const order = await getOrderWithItems(req.params.id);
++  const order = await getOrderWithItems(req.db, req.params.id);
+   if (!order) throw new ApiError(404, 'Order not found.');
+ 
+   res.setHeader('Content-Type', 'application/pdf');
+@@ -227,7 +226,7 @@ async function sendExcel(res, filename, columns, rows) {
+ }
+ 
+ const exportProducts = asyncHandler(async (req, res) => {
+-  const result = await pool.query(
++  const result = await req.db.query(
+     `SELECT p.name, m.name AS manufacturer, p.size_packaging, p.price, p.is_active
+      FROM products p JOIN manufacturers m ON m.id = p.manufacturer_id ORDER BY p.name`
+   );
+@@ -241,7 +240,7 @@ const exportProducts = asyncHandler(async (req, res) => {
+ });
+ 
+ const exportDistributors = asyncHandler(async (req, res) => {
+-  const result = await pool.query('SELECT name, zone, city, contact_name, contact_phone, balance, status FROM distributors ORDER BY name');
++  const result = await req.db.query('SELECT name, zone, city, contact_name, contact_phone, balance, status FROM distributors ORDER BY name');
+   await sendExcel(res, 'distributors.xlsx', [
+     { header: 'Distributor', key: 'name' },
+     { header: 'Zone', key: 'zone' },
+@@ -254,7 +253,7 @@ const exportDistributors = asyncHandler(async (req, res) => {
+ });
+ 
+ const exportOrders = asyncHandler(async (req, res) => {
+-  const result = await pool.query(
++  const result = await req.db.query(
+     `SELECT o.order_number, d.name AS distributor, o.order_date, o.total, o.payment_term,
+             o.payment_status, o.order_status
+      FROM orders o JOIN distributors d ON d.id = o.distributor_id
+@@ -275,7 +274,7 @@ const exportOrders = asyncHandler(async (req, res) => {
+ // export. Used by both exportLedgerExcel and exportLedgerPdf so the two
+ // formats can never silently drift apart on what counts as "this month's
+ // entries" — one query, two renderers.
+-async function fetchBulkLedgerEntries({ distributorId, startDate, endDate }) {
++async function fetchBulkLedgerEntries(db, { distributorId, startDate, endDate }) {
+   const params = [];
+   const clauses = [];
+   if (distributorId) {
+@@ -292,7 +291,7 @@ async function fetchBulkLedgerEntries({ distributorId, startDate, endDate }) {
+   }
+   const where = clauses.length ? `WHERE ${clauses.join(' AND ')}` : '';
+ 
+-  const result = await pool.query(
++  const result = await db.query(
+     `SELECT d.name AS distributor, l.entry_date, l.type, l.amount, l.running_balance, l.note, o.payment_term
+      FROM ledger l
+      JOIN distributors d ON d.id = l.distributor_id
+@@ -307,7 +306,7 @@ async function fetchBulkLedgerEntries({ distributorId, startDate, endDate }) {
+ // ── Ledger: generic bulk export (all distributors, or filtered) — Excel ──
+ const exportLedgerExcel = asyncHandler(async (req, res) => {
+   const { distributor_id, start_date, end_date } = req.query;
+-  const entries = await fetchBulkLedgerEntries({ distributorId: distributor_id, startDate: start_date, endDate: end_date });
++  const entries = await fetchBulkLedgerEntries(req.db, { distributorId: distributor_id, startDate: start_date, endDate: end_date });
+ 
+   const rows = entries.map((entry) => ({
+     distributor: entry.distributor,
+@@ -339,7 +338,7 @@ const exportLedgerExcel = asyncHandler(async (req, res) => {
+ // regardless of how long a distributor name or note happens to be.
+ const exportLedgerPdf = asyncHandler(async (req, res) => {
+   const { distributor_id, start_date, end_date } = req.query;
+-  const entries = await fetchBulkLedgerEntries({ distributorId: distributor_id, startDate: start_date, endDate: end_date });
++  const entries = await fetchBulkLedgerEntries(req.db, { distributorId: distributor_id, startDate: start_date, endDate: end_date });
+ 
+   res.setHeader('Content-Type', 'application/pdf');
+   res.setHeader('Content-Disposition', 'attachment; filename=ledger.pdf');
+@@ -414,8 +413,8 @@ const exportLedgerPdf = asyncHandler(async (req, res) => {
+ // view/materialized table instead of the raw `ledger` table), point this
+ // query at the same source before shipping — it wasn't available to check
+ // against here.
+-async function fetchDistributorLedger(distributorId, { start_date, end_date }) {
+-  const distributorResult = await pool.query(
++async function fetchDistributorLedger(db, distributorId, { start_date, end_date }) {
++  const distributorResult = await db.query(
+     'SELECT id, name FROM distributors WHERE id = $1',
+     [distributorId]
+   );
+@@ -433,7 +432,7 @@ async function fetchDistributorLedger(distributorId, { start_date, end_date }) {
+     dateWhere += ` AND l.entry_date <= $${params.length}`;
+   }
+ 
+-  const entriesResult = await pool.query(
++  const entriesResult = await db.query(
+     `SELECT l.entry_date, l.type, l.amount, l.running_balance, l.note, o.payment_term
+      FROM ledger l
+      LEFT JOIN orders o ON o.id = l.order_id
+@@ -456,7 +455,7 @@ function dateRangeLabel(start_date, end_date) {
+ const exportDistributorLedgerExcel = asyncHandler(async (req, res) => {
+   const { id: distributorId } = req.params;
+   const { start_date, end_date } = req.query;
+-  const { distributor, entries } = await fetchDistributorLedger(distributorId, { start_date, end_date });
++  const { distributor, entries } = await fetchDistributorLedger(req.db, distributorId, { start_date, end_date });
+ 
+   const workbook = new ExcelJS.Workbook();
+   const sheet = workbook.addWorksheet('Customer Ledger');
+@@ -518,7 +517,7 @@ const exportDistributorLedgerExcel = asyncHandler(async (req, res) => {
+ const exportDistributorLedgerPdf = asyncHandler(async (req, res) => {
+   const { id: distributorId } = req.params;
+   const { start_date, end_date } = req.query;
+-  const { distributor, entries } = await fetchDistributorLedger(distributorId, { start_date, end_date });
++  const { distributor, entries } = await fetchDistributorLedger(req.db, distributorId, { start_date, end_date });
+ 
+   res.setHeader('Content-Type', 'application/pdf');
+   res.setHeader('Content-Disposition', `attachment; filename=ledger-${distributor.name.replace(/[^a-z0-9]+/gi, '-')}.pdf`);
+diff --git a/backend/src/controllers/ledgerController.js b/backend/src/controllers/ledgerController.js
+index 4ec3ce0..0bd2af2 100644
+--- a/backend/src/controllers/ledgerController.js
++++ b/backend/src/controllers/ledgerController.js
+@@ -1,4 +1,3 @@
+-const { pool } = require('../config/db');
+ const { asyncHandler } = require('../utils/asyncHandler');
+ const { ApiError } = require('../utils/ApiError');
+ const { parsePagination, paginatedResponse } = require('../utils/pagination');
+@@ -28,10 +27,10 @@ const list = asyncHandler(async (req, res) => {
+ 
+   const where = clauses.length ? `WHERE ${clauses.join(' AND ')}` : '';
+ 
+-  const countResult = await pool.query(`SELECT COUNT(*)::int AS total FROM ledger l ${where}`, params);
++  const countResult = await req.db.query(`SELECT COUNT(*)::int AS total FROM ledger l ${where}`, params);
+ 
+   const dataParams = [...params, pageSize, offset];
+-  const result = await pool.query(
++  const result = await req.db.query(
+     `SELECT l.*, d.name AS distributor_name, o.order_number, o.payment_term
+      FROM ledger l
+      JOIN distributors d ON d.id = l.distributor_id
+@@ -41,7 +40,7 @@ const list = asyncHandler(async (req, res) => {
+      LIMIT $${dataParams.length - 1} OFFSET $${dataParams.length}`,
+     dataParams
+   );
+-  res.json(paginatedResponse(result.rows, countResult.rows[0].total, page, pageSize));
++  req.respond(200, paginatedResponse(result.rows, countResult.rows[0].total, page, pageSize));
+ });
+ 
+ // A single distributor's full ledger history stays unpaginated for now —
+@@ -51,10 +50,10 @@ const list = asyncHandler(async (req, res) => {
+ // distributor's history grows large enough to matter.
+ const distributorSummary = asyncHandler(async (req, res) => {
+   const { id } = req.params;
+-  const distResult = await pool.query('SELECT id, name, balance FROM distributors WHERE id = $1', [id]);
++  const distResult = await req.db.query('SELECT id, name, balance FROM distributors WHERE id = $1', [id]);
+   if (distResult.rows.length === 0) throw new ApiError(404, 'Distributor not found.');
+ 
+-  const entriesResult = await pool.query(
++  const entriesResult = await req.db.query(
+     `SELECT l.*, o.order_number, o.payment_term
+      FROM ledger l
+      LEFT JOIN orders o ON o.id = l.order_id
+@@ -63,7 +62,7 @@ const distributorSummary = asyncHandler(async (req, res) => {
+     [id]
+   );
+ 
+-  res.json({ distributor: distResult.rows[0], entries: entriesResult.rows });
++  req.respond(200, { distributor: distResult.rows[0], entries: entriesResult.rows });
+ });
+ 
+ module.exports = { list, distributorSummary };
+diff --git a/backend/src/controllers/orderController.js b/backend/src/controllers/orderController.js
+index a51c891..92152d7 100644
+--- a/backend/src/controllers/orderController.js
++++ b/backend/src/controllers/orderController.js
+@@ -1,4 +1,3 @@
+-const { pool } = require('../config/db');
+ const { asyncHandler } = require('../utils/asyncHandler');
+ const { ApiError } = require('../utils/ApiError');
+ const { createOrderWithLedger, recordPayment, cancelOrder, deleteOrder } = require('../services/ledgerService');
+@@ -42,13 +41,13 @@ const list = asyncHandler(async (req, res) => {
+   // Two queries (count + page) rather than a window function — simpler to
+   // read, and at this app's realistic data volumes the extra round-trip
+   // costs nothing worth optimizing away yet.
+-  const countResult = await pool.query(
++  const countResult = await req.db.query(
+     `SELECT COUNT(*)::int AS total FROM orders o JOIN distributors d ON d.id = o.distributor_id ${where}`,
+     params
+   );
+ 
+   const dataParams = [...params, pageSize, offset];
+-  const result = await pool.query(
++  const result = await req.db.query(
+     `SELECT o.*, d.name AS distributor_name, u.name AS created_by_name
+      FROM orders o
+      JOIN distributors d ON d.id = o.distributor_id
+@@ -58,11 +57,11 @@ const list = asyncHandler(async (req, res) => {
+      LIMIT $${dataParams.length - 1} OFFSET $${dataParams.length}`,
+     dataParams
+   );
+-  res.json(paginatedResponse(result.rows, countResult.rows[0].total, page, pageSize));
++  req.respond(200, paginatedResponse(result.rows, countResult.rows[0].total, page, pageSize));
+ });
+ 
+ const getOne = asyncHandler(async (req, res) => {
+-  const orderResult = await pool.query(
++  const orderResult = await req.db.query(
+     `SELECT o.*, d.name AS distributor_name, u.name AS created_by_name
+      FROM orders o
+      JOIN distributors d ON d.id = o.distributor_id
+@@ -72,7 +71,7 @@ const getOne = asyncHandler(async (req, res) => {
+   );
+   if (orderResult.rows.length === 0) throw new ApiError(404, 'Order not found.');
+ 
+-  const itemsResult = await pool.query(
++  const itemsResult = await req.db.query(
+     `SELECT oi.*, p.name AS product_name, p.size_packaging, m.name AS manufacturer_name
+      FROM order_items oi
+      JOIN products p ON p.id = oi.product_id
+@@ -82,42 +81,33 @@ const getOne = asyncHandler(async (req, res) => {
+     [req.params.id]
+   );
+ 
+-  res.json({ ...orderResult.rows[0], items: itemsResult.rows });
++  req.respond(200, { ...orderResult.rows[0], items: itemsResult.rows });
+ });
+ 
+ const create = asyncHandler(async (req, res) => {
+   const { distributor_id, items, discount, discount_type, freight_cost, payment_term, payment_status, amount_paid, notes } = req.body;
+   if (!distributor_id) throw new ApiError(400, 'distributor_id is required.');
+ 
+-  const client = await pool.connect();
+-  try {
+-    await client.query('BEGIN');
+-    const order = await createOrderWithLedger(client, {
+-      distributorId: distributor_id,
+-      createdBy: req.user.id,
+-      items,
+-      discount,
+-      discountType: discount_type || 'fixed',
+-      freightCost: freight_cost,
+-      paymentTerm: payment_term,
+-      paymentStatus: payment_status,
+-      amountPaid: amount_paid || 0,
+-      notes,
+-    });
+-    await client.query('COMMIT');
++  const order = await createOrderWithLedger(req.db, {
++    distributorId: distributor_id,
++    createdBy: req.user.id,
++    items,
++    discount,
++    discountType: discount_type || 'fixed',
++    freightCost: freight_cost,
++    paymentTerm: payment_term,
++    paymentStatus: payment_status,
++    amountPaid: amount_paid || 0,
++    notes,
++  });
+ 
++  req.afterCommit(() => {
+     invalidatePrefix('route:/api/reports'); // dashboard/report numbers just went stale
+-
+     const io = req.app.get('io');
+     if (io) io.emit('order:created', { orderId: order.id, distributorId: distributor_id });
++  });
+ 
+-    res.status(201).json(order);
+-  } catch (err) {
+-    await client.query('ROLLBACK');
+-    throw err;
+-  } finally {
+-    client.release();
+-  }
++  req.respond(201, order);
+ });
+ 
+ const updateStatus = asyncHandler(async (req, res) => {
+@@ -136,7 +126,7 @@ const updateStatus = asyncHandler(async (req, res) => {
+     );
+   }
+ 
+-  const existing = await pool.query('SELECT * FROM orders WHERE id = $1', [id]);
++  const existing = await req.db.query('SELECT * FROM orders WHERE id = $1', [id]);
+   if (existing.rows.length === 0) throw new ApiError(404, 'Order not found.');
+ 
+   // Once cancelled (via the proper Cancel action), the ledger has already
+@@ -147,11 +137,11 @@ const updateStatus = asyncHandler(async (req, res) => {
+     throw new ApiError(400, 'This order is cancelled and its status can no longer be changed.');
+   }
+ 
+-  const result = await pool.query(
++  const result = await req.db.query(
+     'UPDATE orders SET order_status = $1 WHERE id = $2 RETURNING *',
+     [order_status, id]
+   );
+-  await recordAudit(pool, {
++  await recordAudit(req.db, {
+     userId: req.user.id,
+     action: 'UPDATE',
+     entityType: 'order',
+@@ -160,79 +150,53 @@ const updateStatus = asyncHandler(async (req, res) => {
+     after: { order_status },
+   });
+ 
+-  const io = req.app.get('io');
+-  if (io) io.emit('order:updated', { orderId: Number(id) });
++  req.afterCommit(() => {
++    const io = req.app.get('io');
++    if (io) io.emit('order:updated', { orderId: Number(id) });
++  });
+ 
+-  res.json(result.rows[0]);
++  req.respond(200, result.rows[0]);
+ });
+ 
+ const pay = asyncHandler(async (req, res) => {
+   const { id } = req.params;
+   const { amount, note } = req.body;
+ 
+-  const client = await pool.connect();
+-  try {
+-    await client.query('BEGIN');
+-    const result = await recordPayment(client, { orderId: id, amount, note, userId: req.user.id });
+-    await client.query('COMMIT');
++  const result = await recordPayment(req.db, { orderId: id, amount, note, userId: req.user.id });
+ 
++  req.afterCommit(() => {
+     invalidatePrefix('route:/api/reports'); // outstanding-receivables figure just changed
+-
+     const io = req.app.get('io');
+     if (io) io.emit('order:payment', { orderId: Number(id) });
++  });
+ 
+-    res.json(result);
+-  } catch (err) {
+-    await client.query('ROLLBACK');
+-    throw err;
+-  } finally {
+-    client.release();
+-  }
++  req.respond(200, result);
+ });
+ 
+ const cancel = asyncHandler(async (req, res) => {
+   const { id } = req.params;
+ 
+-  const client = await pool.connect();
+-  try {
+-    await client.query('BEGIN');
+-    const order = await cancelOrder(client, { orderId: id, userId: req.user.id });
+-    await client.query('COMMIT');
++  const order = await cancelOrder(req.db, { orderId: id, userId: req.user.id });
+ 
++  req.afterCommit(() => {
+     invalidatePrefix('route:/api/reports'); // outstanding-receivables figure just changed
+-
+     const io = req.app.get('io');
+     if (io) io.emit('order:cancelled', { orderId: Number(id) });
++  });
+ 
+-    res.json(order);
+-  } catch (err) {
+-    await client.query('ROLLBACK');
+-    throw err;
+-  } finally {
+-    client.release();
+-  }
++  req.respond(200, order);
+ });
+ 
+ const remove = asyncHandler(async (req, res) => {
+   const { id } = req.params;
+ 
+-  const client = await pool.connect();
+-  try {
+-    await client.query('BEGIN');
+-    await deleteOrder(client, { orderId: id, userId: req.user.id });
+-    await client.query('COMMIT');
+-
+-    invalidatePrefix('route:/api/reports');
+-
+-    res.status(204).end();
+-  } catch (err) {
+-    await client.query('ROLLBACK');
+-    throw err; // includes the 409 "unsafe to delete" case — the existing
+-               // error-handling middleware already turns ApiError into the
+-               // right status code, no special handling needed here
+-  } finally {
+-    client.release();
+-  }
++  // Errors (including the 409 "unsafe to delete" case) propagate to
++  // withRls, which rolls back and hands them to the error middleware.
++  await deleteOrder(req.db, { orderId: id, userId: req.user.id });
++
++  req.afterCommit(() => invalidatePrefix('route:/api/reports'));
++
++  req.respondEnd(204);
+ });
+ 
+ // Scoped, narrow read of this one order's history — deliberately not a
+@@ -241,7 +205,7 @@ const remove = asyncHandler(async (req, res) => {
+ // role that can view an order at all can see its own activity trail; that's
+ // a much narrower surface than being able to browse the whole audit log.
+ const getActivity = asyncHandler(async (req, res) => {
+-  const result = await pool.query(
++  const result = await req.db.query(
+     `SELECT a.*, u.name AS user_name
+      FROM audit_log a
+      LEFT JOIN users u ON u.id = a.user_id
+@@ -249,7 +213,7 @@ const getActivity = asyncHandler(async (req, res) => {
+      ORDER BY a.created_at DESC`,
+     [req.params.id]
+   );
+-  res.json(result.rows);
++  req.respond(200, result.rows);
+ });
+ 
+ module.exports = { list, getOne, create, updateStatus, pay, cancel, remove, getActivity };
+diff --git a/backend/src/controllers/orderDraftController.js b/backend/src/controllers/orderDraftController.js
+index e3e6f09..66560b5 100644
+--- a/backend/src/controllers/orderDraftController.js
++++ b/backend/src/controllers/orderDraftController.js
+@@ -1,4 +1,3 @@
+-const { pool } = require('../config/db');
+ const { asyncHandler } = require('../utils/asyncHandler');
+ const { ApiError } = require('../utils/ApiError');
+ 
+@@ -19,11 +18,11 @@ function toClientShape(row) {
+ // Most-recently-edited first — matches the old localStorage listDrafts()
+ // ordering, which the Drafts tab's "recent work" framing depends on.
+ const list = asyncHandler(async (req, res) => {
+-  const result = await pool.query(
++  const result = await req.db.query(
+     `SELECT * FROM order_drafts WHERE user_id = $1 ORDER BY updated_at DESC`,
+     [req.user.id]
+   );
+-  res.json(result.rows.map(toClientShape));
++  req.respond(200, result.rows.map(toClientShape));
+ });
+ 
+ // Upsert, shared by both the normal (CSRF-protected) route and the
+@@ -45,7 +44,7 @@ const save = asyncHandler(async (req, res) => {
+     throw new ApiError(400, 'id is required.');
+   }
+ 
+-  const result = await pool.query(
++  const result = await req.db.query(
+     `INSERT INTO order_drafts (id, user_id, distributor_id, data)
+      VALUES ($1, $2, $3, $4)
+      ON CONFLICT (id) DO UPDATE
+@@ -62,12 +61,12 @@ const save = asyncHandler(async (req, res) => {
+     throw new ApiError(409, 'This draft could not be saved.');
+   }
+ 
+-  res.json(toClientShape(result.rows[0]));
++  req.respond(200, toClientShape(result.rows[0]));
+ });
+ 
+ const remove = asyncHandler(async (req, res) => {
+-  await pool.query(`DELETE FROM order_drafts WHERE id = $1 AND user_id = $2`, [req.params.id, req.user.id]);
+-  res.status(204).end();
++  await req.db.query(`DELETE FROM order_drafts WHERE id = $1 AND user_id = $2`, [req.params.id, req.user.id]);
++  req.respondEnd(204);
+ });
+ 
+ module.exports = { list, save, remove };
+diff --git a/backend/src/controllers/reportController.js b/backend/src/controllers/reportController.js
+index 46c545f..3db4a66 100644
+--- a/backend/src/controllers/reportController.js
++++ b/backend/src/controllers/reportController.js
+@@ -1,22 +1,21 @@
+-const { pool } = require('../config/db');
+ const { asyncHandler } = require('../utils/asyncHandler');
+ 
+ // Dashboard: high-level counts + this month's totals
+ const dashboardSummary = asyncHandler(async (req, res) => {
+-  const [orders, receivables, distributors, monthSales] = await Promise.all([
+-    pool.query(`SELECT order_status, COUNT(*)::int AS count FROM orders GROUP BY order_status`),
+-    pool.query(`SELECT COALESCE(SUM(balance), 0) AS total_outstanding FROM distributors WHERE balance > 0`),
+-    pool.query(`SELECT status, COUNT(*)::int AS count FROM distributors GROUP BY status`),
+-    pool.query(`
+-      SELECT COALESCE(SUM(total), 0) AS total, COUNT(*)::int AS order_count
+-      FROM orders
+-      WHERE date_trunc('month', order_date) = date_trunc('month', CURRENT_DATE)
+-        AND order_status != 'cancelled'
+-        AND payment_status != 'unpaid'
+-    `),
+-  ]);
++  // Sequential, not Promise.all: req.db is a single transaction-scoped client
++  // (from withRls), and a single pg client can only run one query at a time.
++  const orders = await req.db.query(`SELECT order_status, COUNT(*)::int AS count FROM orders GROUP BY order_status`);
++  const receivables = await req.db.query(`SELECT COALESCE(SUM(balance), 0) AS total_outstanding FROM distributors WHERE balance > 0`);
++  const distributors = await req.db.query(`SELECT status, COUNT(*)::int AS count FROM distributors GROUP BY status`);
++  const monthSales = await req.db.query(`
++    SELECT COALESCE(SUM(total), 0) AS total, COUNT(*)::int AS order_count
++    FROM orders
++    WHERE date_trunc('month', order_date) = date_trunc('month', CURRENT_DATE)
++      AND order_status != 'cancelled'
++      AND payment_status != 'unpaid'
++  `);
+ 
+-  res.json({
++  req.respond(200, {
+     ordersByStatus: orders.rows,
+     totalOutstanding: Number(receivables.rows[0].total_outstanding),
+     distributorsByStatus: distributors.rows,
+@@ -30,7 +29,7 @@ const dashboardSummary = asyncHandler(async (req, res) => {
+ // Monthly sales trend, last N months (default 12)
+ const monthlySales = asyncHandler(async (req, res) => {
+   const months = Number(req.query.months) || 12;
+-  const result = await pool.query(
++  const result = await req.db.query(
+     `SELECT
+        date_trunc('month', order_date) AS month,
+        COALESCE(SUM(total), 0) AS total_sales,
+@@ -42,7 +41,7 @@ const monthlySales = asyncHandler(async (req, res) => {
+      ORDER BY 1`,
+     [months]
+   );
+-  res.json(result.rows);
++  req.respond(200, result.rows);
+ });
+ 
+ // Sales performance by distributor
+@@ -59,8 +58,8 @@ const performanceByDistributor = asyncHandler(async (req, res) => {
+     clauses.push(`o.order_date <= $${params.length}`);
+   }
+ 
+-  const result = await pool.query(
+-    `SELECT d.id, d.name, d.zone, d.balance,
++  const result = await req.db.query(
++    `SELECT d.id, d.name, d.zone, d.zone_id, d.balance,
+             COUNT(o.id)::int AS order_count,
+             COALESCE(SUM(o.total), 0) AS total_sales
+      FROM distributors d
+@@ -69,12 +68,17 @@ const performanceByDistributor = asyncHandler(async (req, res) => {
+      ORDER BY total_sales DESC`,
+     params
+   );
+-  res.json(result.rows);
++  req.respond(200, result.rows);
+ });
+ 
+-// Sales performance by sales rep
++// IMPORTANT: this handler must remain admin-only (enforced in reportRoutes.js
++// via requireRole('admin') before withRls). Under RLS, if a sales rep called
++// this endpoint, the underlying `orders` query is already zone-filtered to
++// ONLY that rep's own visible orders — so every OTHER rep's numbers would
++// silently come back as zero, not as an access-denied error. A
++// silently-wrong report is worse than a blocked one.
+ const performanceByRep = asyncHandler(async (req, res) => {
+-  const result = await pool.query(
++  const result = await req.db.query(
+     `SELECT u.id, u.name,
+             COUNT(o.id)::int AS order_count,
+             COALESCE(SUM(o.total), 0) AS total_sales
+@@ -84,13 +88,13 @@ const performanceByRep = asyncHandler(async (req, res) => {
+      GROUP BY u.id
+      ORDER BY total_sales DESC`
+   );
+-  res.json(result.rows);
++  req.respond(200, result.rows);
+ });
+ 
+ // Top products by revenue
+ const topProducts = asyncHandler(async (req, res) => {
+   const limit = Number(req.query.limit) || 10;
+-  const result = await pool.query(
++  const result = await req.db.query(
+     `SELECT p.id, p.name, m.name AS manufacturer_name,
+             SUM(oi.quantity)::numeric AS total_quantity,
+             SUM(oi.line_total)::numeric AS total_revenue
+@@ -103,7 +107,7 @@ const topProducts = asyncHandler(async (req, res) => {
+      LIMIT $1`,
+     [limit]
+   );
+-  res.json(result.rows);
++  req.respond(200, result.rows);
+ });
+ 
+ module.exports = { dashboardSummary, monthlySales, performanceByDistributor, performanceByRep, topProducts };
+diff --git a/backend/src/controllers/userController.js b/backend/src/controllers/userController.js
+index 5450ef3..babf2c8 100644
+--- a/backend/src/controllers/userController.js
++++ b/backend/src/controllers/userController.js
+@@ -1,20 +1,59 @@
+ const bcrypt = require('bcryptjs');
+-const { pool } = require('../config/db');
+ const { asyncHandler } = require('../utils/asyncHandler');
+ const { ApiError } = require('../utils/ApiError');
+ const { recordAudit } = require('../utils/audit');
+ const { isPasswordBreached } = require('../utils/passwordBreachCheck');
+ 
++// Replaces all of a user's zone assignments with exactly the given set.
++// Delete-then-reinsert is simplest and correct here because zone counts per
++// user are small (a handful at most) — no need for a diff/merge.
++async function setUserZones(db, userId, zoneIds) {
++  await db.query('DELETE FROM user_zones WHERE user_id = $1', [userId]);
++  if (zoneIds.length > 0) {
++    const values = zoneIds.map((_, i) => `($1, $${i + 2})`).join(', ');
++    await db.query(
++      `INSERT INTO user_zones (user_id, zone_id) VALUES ${values}`,
++      [userId, ...zoneIds]
++    );
++  }
++}
++
++// Distinguishes "zone_ids not present in the request body at all" (meaning:
++// don't touch this user's zones) from "zone_ids: []" (meaning: explicitly
++// clear all zones) from a real array of ids to set. Duplicates are dropped
++// so a repeated id can't trip user_zones' uniqueness.
++function parseZoneIds(body) {
++  if (!Object.prototype.hasOwnProperty.call(body, 'zone_ids')) return undefined;
++  if (!Array.isArray(body.zone_ids)) return [];
++  return [...new Set(body.zone_ids.map(Number).filter((n) => Number.isInteger(n) && n > 0))];
++}
++
++// Same shape list() returns per user, so create/update responses match it.
++async function fetchUserZones(db, userId) {
++  const result = await db.query(
++    `SELECT z.id, z.name FROM user_zones uz JOIN zones z ON z.id = uz.zone_id
++     WHERE uz.user_id = $1 ORDER BY z.name`,
++    [userId]
++  );
++  return result.rows;
++}
++
+ const list = asyncHandler(async (req, res) => {
+-  const result = await pool.query(
+-    `SELECT id, name, email, role, assigned_zone, is_active, mfa_enabled, created_at
+-     FROM users ORDER BY name`
++  const result = await req.db.query(
++    `SELECT u.id, u.name, u.email, u.role, u.assigned_zone, u.is_active, u.mfa_enabled, u.created_at,
++       COALESCE(
++         (SELECT json_agg(json_build_object('id', z.id, 'name', z.name) ORDER BY z.name)
++          FROM user_zones uz JOIN zones z ON z.id = uz.zone_id
++          WHERE uz.user_id = u.id),
++         '[]'
++       ) AS zones
++     FROM users u ORDER BY u.name`
+   );
+-  res.json(result.rows);
++  req.respond(200, result.rows);
+ });
+ 
+ const create = asyncHandler(async (req, res) => {
+-  const { name, email, password, role, assigned_zone } = req.body;
++  const { name, email, password, role } = req.body;
+   if (!name || !email || !password || !role) {
+     throw new ApiError(400, 'name, email, password, and role are required.');
+   }
+@@ -28,25 +67,32 @@ const create = asyncHandler(async (req, res) => {
+   }
+ 
+   const hash = await bcrypt.hash(password, 10);
+-  const result = await pool.query(
+-    `INSERT INTO users (name, email, password_hash, role, assigned_zone)
+-     VALUES ($1, $2, $3, $4, $5)
++  const result = await req.db.query(
++    `INSERT INTO users (name, email, password_hash, role)
++     VALUES ($1, $2, $3, $4)
+      RETURNING id, name, email, role, assigned_zone, is_active, mfa_enabled, created_at`,
+-    [name, email, hash, role, assigned_zone || null]
++    [name, email, hash, role]
+   );
+ 
+-  await recordAudit(pool, { userId: req.user.id, action: 'CREATE', entityType: 'user', entityId: result.rows[0].id, after: result.rows[0] });
+-  res.status(201).json(result.rows[0]);
++  // undefined (field omitted) on create just means "no zones assigned".
++  const zoneIds = parseZoneIds(req.body);
++  if (zoneIds !== undefined) {
++    await setUserZones(req.db, result.rows[0].id, zoneIds);
++  }
++  result.rows[0].zones = await fetchUserZones(req.db, result.rows[0].id);
++
++  await recordAudit(req.db, { userId: req.user.id, action: 'CREATE', entityType: 'user', entityId: result.rows[0].id, after: result.rows[0] });
++  req.respond(201, result.rows[0]);
+ });
+ 
+ const update = asyncHandler(async (req, res) => {
+   const { id } = req.params;
+-  const { name, role, assigned_zone, is_active, password } = req.body;
++  const { name, role, is_active, password } = req.body;
+   if (role && !['admin', 'sales_rep'].includes(role)) {
+     throw new ApiError(400, 'role must be "admin" or "sales_rep".');
+   }
+ 
+-  const existing = await pool.query('SELECT * FROM users WHERE id = $1', [id]);
++  const existing = await req.db.query('SELECT * FROM users WHERE id = $1', [id]);
+   if (existing.rows.length === 0) throw new ApiError(404, 'User not found.');
+   const targetUser = existing.rows[0];
+ 
+@@ -68,7 +114,7 @@ const update = asyncHandler(async (req, res) => {
+   // the last one standing — otherwise the app can end up with zero active
+   // admins and no way to create or restore one short of a direct DB edit.
+   if (losingAdminAccess) {
+-    const otherActiveAdmins = await pool.query(
++    const otherActiveAdmins = await req.db.query(
+       `SELECT COUNT(*)::int AS count FROM users WHERE role = 'admin' AND is_active = true AND id != $1`,
+       [id]
+     );
+@@ -91,21 +137,27 @@ const update = asyncHandler(async (req, res) => {
+   // (accountController.js), just triggered by an admin instead of the user.
+   const bumpTokenVersion = !!password;
+ 
+-  const result = await pool.query(
++  const result = await req.db.query(
+     `UPDATE users SET
+        name = COALESCE($1, name),
+        role = COALESCE($2, role),
+-       assigned_zone = COALESCE($3, assigned_zone),
+-       is_active = COALESCE($4, is_active),
+-       password_hash = COALESCE($5, password_hash),
+-       token_version = token_version + $6
+-     WHERE id = $7
++       is_active = COALESCE($3, is_active),
++       password_hash = COALESCE($4, password_hash),
++       token_version = token_version + $5
++     WHERE id = $6
+      RETURNING id, name, email, role, assigned_zone, is_active, mfa_enabled, created_at`,
+-    [name || null, role || null, assigned_zone || null, is_active ?? null, passwordHash, bumpTokenVersion ? 1 : 0, id]
++    [name || null, role || null, is_active ?? null, passwordHash, bumpTokenVersion ? 1 : 0, id]
+   );
+ 
+-  await recordAudit(pool, { userId: req.user.id, action: 'UPDATE', entityType: 'user', entityId: id, before: existing.rows[0], after: result.rows[0] });
+-  res.json(result.rows[0]);
++  // undefined (field omitted) leaves existing zones untouched; [] clears them.
++  const zoneIds = parseZoneIds(req.body);
++  if (zoneIds !== undefined) {
++    await setUserZones(req.db, id, zoneIds);
++  }
++  result.rows[0].zones = await fetchUserZones(req.db, id);
++
++  await recordAudit(req.db, { userId: req.user.id, action: 'UPDATE', entityType: 'user', entityId: id, before: existing.rows[0], after: result.rows[0] });
++  req.respond(200, result.rows[0]);
+ });
+ 
+ const remove = asyncHandler(async (req, res) => {
+@@ -113,12 +165,12 @@ const remove = asyncHandler(async (req, res) => {
+   if (Number(id) === req.user.id) {
+     throw new ApiError(400, 'You cannot delete your own account.');
+   }
+-  const existing = await pool.query('SELECT * FROM users WHERE id = $1', [id]);
++  const existing = await req.db.query('SELECT * FROM users WHERE id = $1', [id]);
+   if (existing.rows.length === 0) throw new ApiError(404, 'User not found.');
+ 
+-  await pool.query('DELETE FROM users WHERE id = $1', [id]);
+-  await recordAudit(pool, { userId: req.user.id, action: 'DELETE', entityType: 'user', entityId: id, before: existing.rows[0] });
+-  res.status(204).send();
++  await req.db.query('DELETE FROM users WHERE id = $1', [id]);
++  await recordAudit(req.db, { userId: req.user.id, action: 'DELETE', entityType: 'user', entityId: id, before: existing.rows[0] });
++  req.respondEnd(204);
+ });
+ 
+ module.exports = { list, create, update, remove };
+diff --git a/backend/src/db/migrate.js b/backend/src/db/migrate.js
+index a0ea2e8..c7c0266 100644
+--- a/backend/src/db/migrate.js
++++ b/backend/src/db/migrate.js
+@@ -1,7 +1,14 @@
+ require('dotenv').config();
+ const fs = require('fs');
+ const path = require('path');
+-const { pool } = require('../config/db');
++const { Pool } = require('pg');
++
++// schema.sql runs ALTER TABLE ... which only the table OWNER may do. If the
++// app itself connects as a restricted, non-owner role (needed so RLS
++// applies — see migrations/2026-10-zones-rls-app-role.sql), run migrations
++// with separate owner credentials via MIGRATION_DATABASE_URL. Falls back to
++// DATABASE_URL, so nothing changes for setups that don't set it.
++const pool = new Pool({ connectionString: process.env.MIGRATION_DATABASE_URL || process.env.DATABASE_URL });
+ 
+ async function migrate() {
+   const schemaPath = path.join(__dirname, 'schema.sql');
+diff --git a/backend/src/db/migrations/2026-10-zones-rls-app-role.sql b/backend/src/db/migrations/2026-10-zones-rls-app-role.sql
+new file mode 100644
+index 0000000..8974957
+--- /dev/null
++++ b/backend/src/db/migrations/2026-10-zones-rls-app-role.sql
+@@ -0,0 +1,21 @@
++-- ============================================================
++-- OPTIONAL — only needed if `node src/db/checkRlsRole.js` reports that the
++-- role in DATABASE_URL has rolsuper or rolbypassrls = true. In that case
++-- every RLS policy is silently ignored for that connection.
++--
++-- Run AFTER 2026-10-zones-rls.sql, as the owner. Replace the password with a
++-- generated secret and DO NOT commit the real value.
++-- ============================================================
++CREATE ROLE app_runtime WITH LOGIN PASSWORD 'CHANGE_ME_GENERATE_A_REAL_SECRET'
++  NOSUPERUSER NOBYPASSRLS NOCREATEDB NOCREATEROLE;
++GRANT USAGE ON SCHEMA public TO app_runtime;
++GRANT ALL PRIVILEGES ON ALL TABLES IN SCHEMA public TO app_runtime;
++GRANT ALL PRIVILEGES ON ALL SEQUENCES IN SCHEMA public TO app_runtime;
++ALTER DEFAULT PRIVILEGES IN SCHEMA public GRANT ALL ON TABLES TO app_runtime;
++ALTER DEFAULT PRIVILEGES IN SCHEMA public GRANT ALL ON SEQUENCES TO app_runtime;
++
++-- IMPORTANT: app_runtime is NOT the table owner, so it cannot run the
++-- ALTER TABLE statements in schema.sql. docker-entrypoint.sh runs
++-- `migrate.js` on every start, so point migrations at the owner instead:
++-- set MIGRATION_DATABASE_URL (owner credentials) next to DATABASE_URL
++-- (app_runtime credentials).
+diff --git a/backend/src/db/migrations/2026-10-zones-rls.sql b/backend/src/db/migrations/2026-10-zones-rls.sql
+new file mode 100644
+index 0000000..28646d8
+--- /dev/null
++++ b/backend/src/db/migrations/2026-10-zones-rls.sql
+@@ -0,0 +1,167 @@
++-- ============================================================
++-- Zones + Row-Level Security — ONE-TIME migration.
++-- Run in the Supabase SQL Editor as the table OWNER (not as the
++-- restricted app role), BEFORE creating the app role (see
++-- 2026-10-zones-rls-app-role.sql).
++-- Safe to re-run: every statement is idempotent, EXCEPT that Part A's
++-- backfill re-reads the legacy users.assigned_zone column — so do not
++-- re-run Part A after admins have started editing zone assignments
++-- (it would restore assignments they cleared). schema.sql therefore
++-- contains Part A's structure and Part B only, never the backfill.
++-- ============================================================
++
++-- ============================================================
++-- Part A: New tables + backfill
++-- ============================================================
++BEGIN;
++
++CREATE TABLE IF NOT EXISTS zones (
++  id   SERIAL PRIMARY KEY,
++  name TEXT UNIQUE NOT NULL
++);
++
++CREATE TABLE IF NOT EXISTS user_zones (
++  user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
++  zone_id INTEGER NOT NULL REFERENCES zones(id) ON DELETE CASCADE,
++  PRIMARY KEY (user_id, zone_id)
++);
++CREATE INDEX IF NOT EXISTS idx_user_zones_zone ON user_zones(zone_id);
++
++ALTER TABLE distributors ADD COLUMN IF NOT EXISTS zone_id INTEGER REFERENCES zones(id);
++CREATE INDEX IF NOT EXISTS idx_distributors_zone_id ON distributors(zone_id);
++
++-- Backfill: create a zone row for every distinct non-null legacy zone value
++-- seen on either distributors.zone or users.assigned_zone, then point the
++-- new FK columns at the matching zone row.
++INSERT INTO zones (name)
++SELECT DISTINCT zone FROM distributors WHERE zone IS NOT NULL AND zone <> ''
++ON CONFLICT (name) DO NOTHING;
++
++INSERT INTO zones (name)
++SELECT DISTINCT assigned_zone FROM users WHERE assigned_zone IS NOT NULL AND assigned_zone <> ''
++ON CONFLICT (name) DO NOTHING;
++
++UPDATE distributors d
++SET zone_id = z.id
++FROM zones z
++WHERE d.zone = z.name AND d.zone_id IS NULL;
++
++INSERT INTO user_zones (user_id, zone_id)
++SELECT u.id, z.id
++FROM users u
++JOIN zones z ON z.name = u.assigned_zone
++WHERE u.assigned_zone IS NOT NULL AND u.assigned_zone <> ''
++ON CONFLICT DO NOTHING;
++
++COMMIT;
++
++-- ============================================================
++-- Part B: Row-Level Security
++-- ============================================================
++BEGIN;
++
++-- distributors: admin sees all; rep sees only distributors in one of their zones
++ALTER TABLE distributors ENABLE ROW LEVEL SECURITY;
++ALTER TABLE distributors FORCE ROW LEVEL SECURITY;
++
++-- Guarded so re-running this file (or schema.sql) doesn't fail on an existing policy.
++DO $$ BEGIN
++  CREATE POLICY distributors_zone_scoped ON distributors
++  USING (
++    current_setting('app.role', true) = 'admin'
++    OR EXISTS (
++      SELECT 1 FROM user_zones uz
++      WHERE uz.user_id = NULLIF(current_setting('app.user_id', true), '')::INTEGER
++        AND uz.zone_id = distributors.zone_id
++    )
++  );
++EXCEPTION WHEN duplicate_object THEN NULL;
++END $$;
++
++-- orders: scoped via the order's distributor's zone
++ALTER TABLE orders ENABLE ROW LEVEL SECURITY;
++ALTER TABLE orders FORCE ROW LEVEL SECURITY;
++
++-- Guarded so re-running this file (or schema.sql) doesn't fail on an existing policy.
++DO $$ BEGIN
++  CREATE POLICY orders_zone_scoped ON orders
++  USING (
++    current_setting('app.role', true) = 'admin'
++    OR EXISTS (
++      SELECT 1
++      FROM distributors d
++      JOIN user_zones uz ON uz.zone_id = d.zone_id
++      WHERE d.id = orders.distributor_id
++        AND uz.user_id = NULLIF(current_setting('app.user_id', true), '')::INTEGER
++    )
++  );
++EXCEPTION WHEN duplicate_object THEN NULL;
++END $$;
++
++-- order_items: scoped via its parent order's distributor's zone
++ALTER TABLE order_items ENABLE ROW LEVEL SECURITY;
++ALTER TABLE order_items FORCE ROW LEVEL SECURITY;
++
++-- Guarded so re-running this file (or schema.sql) doesn't fail on an existing policy.
++DO $$ BEGIN
++  CREATE POLICY order_items_zone_scoped ON order_items
++  USING (
++    current_setting('app.role', true) = 'admin'
++    OR EXISTS (
++      SELECT 1
++      FROM orders o
++      JOIN distributors d ON d.id = o.distributor_id
++      JOIN user_zones uz ON uz.zone_id = d.zone_id
++      WHERE o.id = order_items.order_id
++        AND uz.user_id = NULLIF(current_setting('app.user_id', true), '')::INTEGER
++    )
++  );
++EXCEPTION WHEN duplicate_object THEN NULL;
++END $$;
++
++-- ledger: scoped via the entry's distributor's zone
++ALTER TABLE ledger ENABLE ROW LEVEL SECURITY;
++ALTER TABLE ledger FORCE ROW LEVEL SECURITY;
++
++-- Guarded so re-running this file (or schema.sql) doesn't fail on an existing policy.
++DO $$ BEGIN
++  CREATE POLICY ledger_zone_scoped ON ledger
++  USING (
++    current_setting('app.role', true) = 'admin'
++    OR EXISTS (
++      SELECT 1
++      FROM distributors d
++      JOIN user_zones uz ON uz.zone_id = d.zone_id
++      WHERE d.id = ledger.distributor_id
++        AND uz.user_id = NULLIF(current_setting('app.user_id', true), '')::INTEGER
++    )
++  );
++EXCEPTION WHEN duplicate_object THEN NULL;
++END $$;
++
++-- order_drafts: ownership (admin unscoped, per global constraint 1) — re-adding what was lost in rollback
++ALTER TABLE order_drafts ENABLE ROW LEVEL SECURITY;
++ALTER TABLE order_drafts FORCE ROW LEVEL SECURITY;
++
++-- Guarded so re-running this file (or schema.sql) doesn't fail on an existing policy.
++DO $$ BEGIN
++  CREATE POLICY order_drafts_owner ON order_drafts
++  USING (
++    current_setting('app.role', true) = 'admin'
++    OR user_id = NULLIF(current_setting('app.user_id', true), '')::INTEGER
++  );
++EXCEPTION WHEN duplicate_object THEN NULL;
++END $$;
++
++-- backups: admin-only — re-adding what was lost in rollback
++ALTER TABLE backups ENABLE ROW LEVEL SECURITY;
++ALTER TABLE backups FORCE ROW LEVEL SECURITY;
++
++-- Guarded so re-running this file (or schema.sql) doesn't fail on an existing policy.
++DO $$ BEGIN
++  CREATE POLICY backups_admin_only ON backups
++  USING (current_setting('app.role', true) = 'admin');
++EXCEPTION WHEN duplicate_object THEN NULL;
++END $$;
++
++COMMIT;
+diff --git a/backend/src/db/reset.js b/backend/src/db/reset.js
+index 37b8ddd..dbe6a34 100644
+--- a/backend/src/db/reset.js
++++ b/backend/src/db/reset.js
+@@ -4,7 +4,7 @@ const { pool } = require('../config/db');
+ // Every application table, in no particular order — TRUNCATE ... CASCADE
+ // handles foreign-key dependencies regardless of the order they're listed in,
+ // since it's evaluated as a single statement across all of them at once.
+-const TABLES = ['audit_log', 'ledger', 'order_items', 'orders', 'products', 'distributors', 'manufacturers', 'users'];
++const TABLES = ['audit_log', 'ledger', 'order_items', 'orders', 'products', 'distributors', 'manufacturers', 'users', 'zones', 'user_zones', 'order_drafts', 'backups'];
+ 
+ function maskConnectionString(url) {
+   if (!url) return '(DATABASE_URL not set)';
+diff --git a/backend/src/db/schema.sql b/backend/src/db/schema.sql
+index f0e0007..05c0cea 100644
+--- a/backend/src/db/schema.sql
++++ b/backend/src/db/schema.sql
+@@ -76,6 +76,26 @@ CREATE TABLE IF NOT EXISTS distributors (
+ CREATE INDEX IF NOT EXISTS idx_distributors_status ON distributors(status);
+ CREATE INDEX IF NOT EXISTS idx_distributors_zone ON distributors(zone);
+ 
++-- ─────────────────────────────────────────────────────────────
++-- Zones (admin-managed list) + which users can see which zones.
++-- distributors.zone / users.assigned_zone (free text) are legacy and no
++-- longer written; kept in place rather than dropped.
++-- ─────────────────────────────────────────────────────────────
++CREATE TABLE IF NOT EXISTS zones (
++  id   SERIAL PRIMARY KEY,
++  name TEXT UNIQUE NOT NULL
++);
++
++CREATE TABLE IF NOT EXISTS user_zones (
++  user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
++  zone_id INTEGER NOT NULL REFERENCES zones(id) ON DELETE CASCADE,
++  PRIMARY KEY (user_id, zone_id)
++);
++CREATE INDEX IF NOT EXISTS idx_user_zones_zone ON user_zones(zone_id);
++
++ALTER TABLE distributors ADD COLUMN IF NOT EXISTS zone_id INTEGER REFERENCES zones(id);
++CREATE INDEX IF NOT EXISTS idx_distributors_zone_id ON distributors(zone_id);
++
+ -- ─────────────────────────────────────────────────────────────
+ -- Orders
+ -- ─────────────────────────────────────────────────────────────
+@@ -290,3 +310,120 @@ ALTER TABLE orders ADD COLUMN IF NOT EXISTS discount_type TEXT NOT NULL DEFAULT
+ CHECK (discount_type IN ('fixed', 'percentage'));
+ 
+ COMMIT;
++
++-- ─────────────────────────────────────────────────────────────
++-- Row-Level Security (zones pass). Policies key off the session-local
++-- settings app.user_id / app.role that middleware/rls.js sets per
++-- transaction. FORCE is required — without it the table owner (usually the
++-- app's own connection role) silently bypasses RLS.
++-- The one-time legacy-zone backfill lives only in
++-- migrations/2026-10-zones-rls.sql, not here, because schema.sql re-runs on
++-- every container start.
++-- ─────────────────────────────────────────────────────────────
++BEGIN;
++
++-- distributors: admin sees all; rep sees only distributors in one of their zones
++ALTER TABLE distributors ENABLE ROW LEVEL SECURITY;
++ALTER TABLE distributors FORCE ROW LEVEL SECURITY;
++
++-- Guarded so re-running this file (or schema.sql) doesn't fail on an existing policy.
++DO $$ BEGIN
++  CREATE POLICY distributors_zone_scoped ON distributors
++  USING (
++    current_setting('app.role', true) = 'admin'
++    OR EXISTS (
++      SELECT 1 FROM user_zones uz
++      WHERE uz.user_id = NULLIF(current_setting('app.user_id', true), '')::INTEGER
++        AND uz.zone_id = distributors.zone_id
++    )
++  );
++EXCEPTION WHEN duplicate_object THEN NULL;
++END $$;
++
++-- orders: scoped via the order's distributor's zone
++ALTER TABLE orders ENABLE ROW LEVEL SECURITY;
++ALTER TABLE orders FORCE ROW LEVEL SECURITY;
++
++-- Guarded so re-running this file (or schema.sql) doesn't fail on an existing policy.
++DO $$ BEGIN
++  CREATE POLICY orders_zone_scoped ON orders
++  USING (
++    current_setting('app.role', true) = 'admin'
++    OR EXISTS (
++      SELECT 1
++      FROM distributors d
++      JOIN user_zones uz ON uz.zone_id = d.zone_id
++      WHERE d.id = orders.distributor_id
++        AND uz.user_id = NULLIF(current_setting('app.user_id', true), '')::INTEGER
++    )
++  );
++EXCEPTION WHEN duplicate_object THEN NULL;
++END $$;
++
++-- order_items: scoped via its parent order's distributor's zone
++ALTER TABLE order_items ENABLE ROW LEVEL SECURITY;
++ALTER TABLE order_items FORCE ROW LEVEL SECURITY;
++
++-- Guarded so re-running this file (or schema.sql) doesn't fail on an existing policy.
++DO $$ BEGIN
++  CREATE POLICY order_items_zone_scoped ON order_items
++  USING (
++    current_setting('app.role', true) = 'admin'
++    OR EXISTS (
++      SELECT 1
++      FROM orders o
++      JOIN distributors d ON d.id = o.distributor_id
++      JOIN user_zones uz ON uz.zone_id = d.zone_id
++      WHERE o.id = order_items.order_id
++        AND uz.user_id = NULLIF(current_setting('app.user_id', true), '')::INTEGER
++    )
++  );
++EXCEPTION WHEN duplicate_object THEN NULL;
++END $$;
++
++-- ledger: scoped via the entry's distributor's zone
++ALTER TABLE ledger ENABLE ROW LEVEL SECURITY;
++ALTER TABLE ledger FORCE ROW LEVEL SECURITY;
++
++-- Guarded so re-running this file (or schema.sql) doesn't fail on an existing policy.
++DO $$ BEGIN
++  CREATE POLICY ledger_zone_scoped ON ledger
++  USING (
++    current_setting('app.role', true) = 'admin'
++    OR EXISTS (
++      SELECT 1
++      FROM distributors d
++      JOIN user_zones uz ON uz.zone_id = d.zone_id
++      WHERE d.id = ledger.distributor_id
++        AND uz.user_id = NULLIF(current_setting('app.user_id', true), '')::INTEGER
++    )
++  );
++EXCEPTION WHEN duplicate_object THEN NULL;
++END $$;
++
++-- order_drafts: ownership (admin unscoped, per global constraint 1) — re-adding what was lost in rollback
++ALTER TABLE order_drafts ENABLE ROW LEVEL SECURITY;
++ALTER TABLE order_drafts FORCE ROW LEVEL SECURITY;
++
++-- Guarded so re-running this file (or schema.sql) doesn't fail on an existing policy.
++DO $$ BEGIN
++  CREATE POLICY order_drafts_owner ON order_drafts
++  USING (
++    current_setting('app.role', true) = 'admin'
++    OR user_id = NULLIF(current_setting('app.user_id', true), '')::INTEGER
++  );
++EXCEPTION WHEN duplicate_object THEN NULL;
++END $$;
++
++-- backups: admin-only — re-adding what was lost in rollback
++ALTER TABLE backups ENABLE ROW LEVEL SECURITY;
++ALTER TABLE backups FORCE ROW LEVEL SECURITY;
++
++-- Guarded so re-running this file (or schema.sql) doesn't fail on an existing policy.
++DO $$ BEGIN
++  CREATE POLICY backups_admin_only ON backups
++  USING (current_setting('app.role', true) = 'admin');
++EXCEPTION WHEN duplicate_object THEN NULL;
++END $$;
++
++COMMIT;
+diff --git a/backend/src/db/seed.js b/backend/src/db/seed.js
+index c508ee8..f69bd18 100644
+--- a/backend/src/db/seed.js
++++ b/backend/src/db/seed.js
+@@ -39,14 +39,27 @@ async function seed() {
+       );
+     }
+ 
++    // distributors is under FORCE ROW LEVEL SECURITY: with no app.role set,
++    // the insert is rejected for any role subject to RLS. Seed as admin, in
++    // one transaction so the setting is local to it.
++    await client.query('BEGIN');
++    await client.query(`SELECT set_config('app.role', 'admin', true), set_config('app.user_id', '', true)`);
++    const zone = await client.query(
++      `INSERT INTO zones (name) VALUES ('North')
++       ON CONFLICT (name) DO UPDATE SET name = EXCLUDED.name
++       RETURNING id`
++    );
+     await client.query(
+-      `INSERT INTO distributors (name, contact_name, zone, city, status)
+-       VALUES ('Sample Distributor Co.', 'Jane Doe', 'North', 'Springfield', 'active')
+-       ON CONFLICT DO NOTHING`
++      `INSERT INTO distributors (name, contact_name, zone_id, city, status)
++       VALUES ('Sample Distributor Co.', 'Jane Doe', $1, 'Springfield', 'active')
++       ON CONFLICT DO NOTHING`,
++      [zone.rows[0].id]
+     );
++    await client.query('COMMIT');
+ 
+     console.log('✔ Seed complete.');
+   } catch (err) {
++    await client.query('ROLLBACK').catch(() => {});
+     console.error('✗ Seed failed:', err.message);
+     process.exitCode = 1;
+   } finally {
+diff --git a/backend/src/middleware/errorHandler.js b/backend/src/middleware/errorHandler.js
+index 72246af..449ab36 100644
+--- a/backend/src/middleware/errorHandler.js
++++ b/backend/src/middleware/errorHandler.js
+@@ -31,6 +31,13 @@ function errorHandler(err, req, res, next) {
+     return res.status(400).json({ error: 'Invalid value for one of the fields provided.' });
+   }
+ 
++  // Postgres insufficient_privilege — what a row-level security policy raises
++  // when a write (e.g. a rep saving a distributor into a zone they don't
++  // cover) fails its WITH CHECK. A deliberate access refusal, not a server fault.
++  if (err.code === '42501') {
++    return res.status(403).json({ error: 'You do not have access to that zone or record.' });
++  }
++
+   // eslint-disable-next-line no-console
+   console.error(err);
+   return res.status(500).json({ error: 'Internal server error.' });
+diff --git a/backend/src/middleware/rls.js b/backend/src/middleware/rls.js
+index e6f50a9..a47cf7b 100644
+--- a/backend/src/middleware/rls.js
++++ b/backend/src/middleware/rls.js
+@@ -135,4 +135,86 @@ function withRls(handler) {
+   };
+ }
+ 
+-module.exports = { withRls };
+\ No newline at end of file
++/**
++ * Variant for routes that STREAM a file response (xlsx/pdf exports) rather
++ * than returning JSON. Nothing is deferred here: the handler writes to `res`
++ * itself. We still run on one transaction-scoped client with app.user_id /
++ * app.role set, so RLS applies to every query the handler makes.
++ *
++ * Release ordering matters. The client may only go back to the pool once BOTH
++ * (a) our COMMIT/ROLLBACK has finished and (b) the response has finished or
++ * closed. Releasing earlier would let another request grab the connection
++ * while we still have a statement to send on it. 'finish' and 'close' both
++ * fire for a normal response, and pg throws if a client is released twice
++ * (an uncaught throw inside an event handler would crash the process), so
++ * release is guarded to run exactly once.
++ *
++ * As in withRls, the handler is expected to be asyncHandler-wrapped, so its
++ * errors arrive through the `next` we pass in rather than as a rejection.
++ */
++function withRlsReadOnly(handler) {
++  return async (req, res, next) => {
++    if (!req.user) {
++      return next(new Error('withRlsReadOnly used without requireAuth running first.'));
++    }
++
++    let client;
++    try {
++      client = await pool.connect();
++    } catch (err) {
++      // See withRls: an unhandled rejection here would crash the process.
++      return next(err);
++    }
++
++    req.db = client;
++
++    let txDone = false;
++    let resDone = false;
++    let released = false;
++    const maybeRelease = () => {
++      if (released || !txDone || !resDone) return;
++      released = true;
++      client.release();
++    };
++    res.on('finish', () => { resDone = true; maybeRelease(); });
++    res.on('close', () => { resDone = true; maybeRelease(); });
++
++    let handlerError = null;
++    const handlerNext = (err) => { if (err && !handlerError) handlerError = err; };
++
++    let failure = null;
++    try {
++      await client.query('BEGIN');
++      await client.query(
++        `SELECT set_config('app.user_id', $1, true),
++                set_config('app.role', $2, true)`,
++        [String(req.user.id), req.user.role]
++      );
++      await handler(req, res, handlerNext);
++      failure = handlerError;
++    } catch (err) {
++      failure = err;
++    }
++
++    try {
++      await client.query(failure ? 'ROLLBACK' : 'COMMIT'); // read-only; closes the transaction cleanly
++    } catch (txErr) {
++      failure = failure || txErr;
++      await client.query('ROLLBACK').catch(() => {});
++    }
++    txDone = true;
++    maybeRelease();
++
++    if (failure) {
++      if (res.headersSent) {
++        // Already streaming — the error handler can't change the response now.
++        // eslint-disable-next-line no-console
++        console.error('withRlsReadOnly failed after the response started:', failure);
++      } else {
++        next(failure);
++      }
++    }
++  };
++}
++
++module.exports = { withRls, withRlsReadOnly };
+\ No newline at end of file
+diff --git a/backend/src/routes/backupRoutes.js b/backend/src/routes/backupRoutes.js
+index 6da8bd9..9af6777 100644
+--- a/backend/src/routes/backupRoutes.js
++++ b/backend/src/routes/backupRoutes.js
+@@ -2,6 +2,7 @@ const express = require('express');
+ const { body } = require('express-validator');
+ const { requireAuth, requireRole } = require('../middleware/auth');
+ const { validate } = require('../middleware/validate');
++const { withRls } = require('../middleware/rls');
+ const controller = require('../controllers/backupController');
+ 
+ const router = express.Router();
+@@ -16,7 +17,7 @@ const createRules = [
+   body('failed_count').optional().isInt({ min: 0 }),
+ ];
+ 
+-router.get('/', controller.list);
+-router.post('/', createRules, validate, controller.create);
++router.get('/', withRls(controller.list));
++router.post('/', createRules, validate, withRls(controller.create));
+ 
+ module.exports = router;
+diff --git a/backend/src/routes/distributorRoutes.js b/backend/src/routes/distributorRoutes.js
+index 8cb9428..6072e8c 100644
+--- a/backend/src/routes/distributorRoutes.js
++++ b/backend/src/routes/distributorRoutes.js
+@@ -2,6 +2,7 @@ const express = require('express');
+ const { body } = require('express-validator');
+ const { requireAuth, requireRole } = require('../middleware/auth');
+ const { validate } = require('../middleware/validate');
++const { withRls } = require('../middleware/rls');
+ const controller = require('../controllers/distributorController');
+ 
+ const router = express.Router();
+@@ -10,6 +11,7 @@ router.use(requireAuth);
+ const writeRules = [
+   body('name').optional().trim().isLength({ min: 1, max: 200 }),
+   body('contact_email').optional({ nullable: true, checkFalsy: true }).isEmail().withMessage('Contact email must be valid.'),
++  body('zone_id').optional({ nullable: true }).isInt({ min: 1 }),
+   body('status').optional().isIn(['active', 'inactive']),
+   body('address')
+   .optional({ nullable: true })
+@@ -17,10 +19,10 @@ const writeRules = [
+   .isLength({ max: 500 }),
+ ];
+ 
+-router.get('/', controller.list);
+-router.get('/:id', controller.getOne);
+-router.post('/', writeRules, validate, controller.create); // admin + sales_rep, per PRD
+-router.put('/:id', writeRules, validate, controller.update); // admin + sales_rep, per PRD (includes marking inactive)
+-router.delete('/:id', requireRole('admin'), controller.remove);
++router.get('/', withRls(controller.list));
++router.get('/:id', withRls(controller.getOne));
++router.post('/', writeRules, validate, withRls(controller.create)); // admin + sales_rep, per PRD
++router.put('/:id', writeRules, validate, withRls(controller.update)); // admin + sales_rep, per PRD (includes marking inactive)
++router.delete('/:id', requireRole('admin'), withRls(controller.remove));
+ 
+ module.exports = router;
+diff --git a/backend/src/routes/exportRoutes.js b/backend/src/routes/exportRoutes.js
+index 2bb582d..e96ba40 100644
+--- a/backend/src/routes/exportRoutes.js
++++ b/backend/src/routes/exportRoutes.js
+@@ -1,19 +1,20 @@
+ const express = require('express');
+ const { requireAuth, requireRole } = require('../middleware/auth');
++const { withRlsReadOnly } = require('../middleware/rls');
+ const controller = require('../controllers/exportController');
+ 
+ const router = express.Router();
+ router.use(requireAuth);
+ 
+-router.get('/invoice/:id/excel', controller.invoiceExcel);
+-router.get('/invoice/:id/pdf', controller.invoicePdf);
++router.get('/invoice/:id/excel', withRlsReadOnly(controller.invoiceExcel));
++router.get('/invoice/:id/pdf', withRlsReadOnly(controller.invoicePdf));
+ 
+-router.get('/products', requireRole('admin'), controller.exportProducts);
+-router.get('/distributors', requireRole('admin'), controller.exportDistributors);
+-router.get('/orders', requireRole('admin'), controller.exportOrders);
+-router.get('/ledger/excel', requireRole('admin'), controller.exportLedgerExcel);
+-router.get('/ledger/pdf', requireRole('admin'), controller.exportLedgerPdf);
+-router.get('/ledger/distributor/:id/excel', requireRole('admin'), controller.exportDistributorLedgerExcel);
+-router.get('/ledger/distributor/:id/pdf', requireRole('admin'), controller.exportDistributorLedgerPdf);
++router.get('/products', requireRole('admin'), withRlsReadOnly(controller.exportProducts));
++router.get('/distributors', requireRole('admin'), withRlsReadOnly(controller.exportDistributors));
++router.get('/orders', requireRole('admin'), withRlsReadOnly(controller.exportOrders));
++router.get('/ledger/excel', requireRole('admin'), withRlsReadOnly(controller.exportLedgerExcel));
++router.get('/ledger/pdf', requireRole('admin'), withRlsReadOnly(controller.exportLedgerPdf));
++router.get('/ledger/distributor/:id/excel', requireRole('admin'), withRlsReadOnly(controller.exportDistributorLedgerExcel));
++router.get('/ledger/distributor/:id/pdf', requireRole('admin'), withRlsReadOnly(controller.exportDistributorLedgerPdf));
+ 
+ module.exports = router;
+diff --git a/backend/src/routes/ledgerRoutes.js b/backend/src/routes/ledgerRoutes.js
+index 54a2c45..285a8ad 100644
+--- a/backend/src/routes/ledgerRoutes.js
++++ b/backend/src/routes/ledgerRoutes.js
+@@ -1,11 +1,12 @@
+ const express = require('express');
+ const { requireAuth } = require('../middleware/auth');
++const { withRls } = require('../middleware/rls');
+ const controller = require('../controllers/ledgerController');
+ 
+ const router = express.Router();
+ router.use(requireAuth);
+ 
+-router.get('/', controller.list);
+-router.get('/distributor/:id', controller.distributorSummary);
++router.get('/', withRls(controller.list));
++router.get('/distributor/:id', withRls(controller.distributorSummary));
+ 
+ module.exports = router;
+diff --git a/backend/src/routes/orderDraftRoutes.js b/backend/src/routes/orderDraftRoutes.js
+index 4a3a167..146b07c 100644
+--- a/backend/src/routes/orderDraftRoutes.js
++++ b/backend/src/routes/orderDraftRoutes.js
+@@ -2,6 +2,7 @@ const express = require('express');
+ const { body } = require('express-validator');
+ const { requireAuth } = require('../middleware/auth');
+ const { validate } = require('../middleware/validate');
++const { withRls } = require('../middleware/rls');
+ const controller = require('../controllers/orderDraftController');
+ 
+ const router = express.Router();
+@@ -14,8 +15,8 @@ const saveRules = [
+   body('items').optional().isArray(),
+ ];
+ 
+-router.get('/', controller.list);
+-router.post('/', saveRules, validate, controller.save);
++router.get('/', withRls(controller.list));
++router.post('/', saveRules, validate, withRls(controller.save));
+ 
+ // CSRF-exempt (see middleware/csrf.js CSRF_EXEMPT_PATHS) — the only path
+ // navigator.sendBeacon() can hit, since it can't attach the CSRF header.
+@@ -24,8 +25,8 @@ router.post('/', saveRules, validate, controller.save);
+ // a 400 back to the user anyway — better to have the controller's own
+ // `id` check fail closed than to 400 on a slightly-malformed beacon payload
+ // for no one to ever see.
+-router.post('/beacon', controller.save);
++router.post('/beacon', withRls(controller.save));
+ 
+-router.delete('/:id', controller.remove);
++router.delete('/:id', withRls(controller.remove));
+ 
+ module.exports = router;
+diff --git a/backend/src/routes/orderRoutes.js b/backend/src/routes/orderRoutes.js
+index 713fc5c..08e75c6 100644
+--- a/backend/src/routes/orderRoutes.js
++++ b/backend/src/routes/orderRoutes.js
+@@ -2,6 +2,7 @@ const express = require('express');
+ const { body } = require('express-validator');
+ const { requireAuth, requireRole } = require('../middleware/auth');
+ const { validate } = require('../middleware/validate');
++const { withRls } = require('../middleware/rls');
+ const controller = require('../controllers/orderController');
+ 
+ const router = express.Router();
+@@ -24,13 +25,13 @@ const payRules = [
+   body('amount').isFloat({ gt: 0 }).withMessage('Payment amount must be greater than 0.'),
+ ];
+ 
+-router.get('/', controller.list);
+-router.get('/:id', controller.getOne);
+-router.get('/:id/activity', controller.getActivity);
+-router.post('/', createRules, validate, controller.create); // admin + sales_rep
+-router.patch('/:id/status', requireRole('admin'), controller.updateStatus);
+-router.patch('/:id/cancel', controller.cancel); // admin + sales_rep — same access level as create, no extra role check
+-router.post('/:id/pay', payRules, validate, controller.pay); // admin + sales_rep can record a payment
+-router.delete('/:id', requireRole('admin'), controller.remove); // admin-only hard delete
++router.get('/', withRls(controller.list));
++router.get('/:id', withRls(controller.getOne));
++router.get('/:id/activity', withRls(controller.getActivity));
++router.post('/', createRules, validate, withRls(controller.create)); // admin + sales_rep
++router.patch('/:id/status', requireRole('admin'), withRls(controller.updateStatus));
++router.patch('/:id/cancel', withRls(controller.cancel)); // admin + sales_rep — same access level as create, no extra role check
++router.post('/:id/pay', payRules, validate, withRls(controller.pay)); // admin + sales_rep can record a payment
++router.delete('/:id', requireRole('admin'), withRls(controller.remove)); // admin-only hard delete
+ 
+ module.exports = router;
+diff --git a/backend/src/routes/reportRoutes.js b/backend/src/routes/reportRoutes.js
+index 135eaed..2848361 100644
+--- a/backend/src/routes/reportRoutes.js
++++ b/backend/src/routes/reportRoutes.js
+@@ -1,6 +1,7 @@
+ const express = require('express');
+ const { requireAuth, requireRole } = require('../middleware/auth');
+ const { cacheRoute } = require('../utils/cache');
++const { withRls } = require('../middleware/rls');
+ const controller = require('../controllers/reportController');
+ 
+ const router = express.Router();
+@@ -12,10 +13,10 @@ router.use(requireAuth);
+ // back a minute later). Explicitly invalidated on order/payment writes too
+ // (see orderController.js) so a just-created order shows up immediately
+ // rather than waiting out the TTL.
+-router.get('/dashboard', cacheRoute(30_000), controller.dashboardSummary);
+-router.get('/monthly-sales', requireRole('admin'), cacheRoute(30_000), controller.monthlySales);
+-router.get('/performance/distributors', requireRole('admin'), cacheRoute(30_000), controller.performanceByDistributor);
+-router.get('/performance/reps', requireRole('admin'), cacheRoute(30_000), controller.performanceByRep);
+-router.get('/top-products', requireRole('admin'), cacheRoute(30_000), controller.topProducts);
++router.get('/dashboard', cacheRoute(30_000), withRls(controller.dashboardSummary));
++router.get('/monthly-sales', requireRole('admin'), cacheRoute(30_000), withRls(controller.monthlySales));
++router.get('/performance/distributors', requireRole('admin'), cacheRoute(30_000), withRls(controller.performanceByDistributor));
++router.get('/performance/reps', requireRole('admin'), cacheRoute(30_000), withRls(controller.performanceByRep));
++router.get('/top-products', requireRole('admin'), cacheRoute(30_000), withRls(controller.topProducts));
+ 
+ module.exports = router;
+diff --git a/backend/src/routes/userRoutes.js b/backend/src/routes/userRoutes.js
+index 7409ce7..bb48f62 100644
+--- a/backend/src/routes/userRoutes.js
++++ b/backend/src/routes/userRoutes.js
+@@ -2,6 +2,7 @@ const express = require('express');
+ const { body } = require('express-validator');
+ const { requireAuth, requireRole } = require('../middleware/auth');
+ const { validate } = require('../middleware/validate');
++const { withRls } = require('../middleware/rls');
+ const userController = require('../controllers/userController');
+ 
+ const router = express.Router();
+@@ -12,20 +13,22 @@ const createRules = [
+   body('email').trim().isEmail().withMessage('A valid email is required.').normalizeEmail(),
+   body('password').isLength({ min: 8, max: 200 }).withMessage('Password must be at least 8 characters.'),
+   body('role').isIn(['admin', 'sales_rep']).withMessage('Role must be admin or sales_rep.'),
+-  body('assigned_zone').optional({ nullable: true }).trim().isLength({ max: 100 }),
++  body('zone_ids').optional().isArray(),
++  body('zone_ids.*').isInt({ min: 1 }),
+ ];
+ 
+ const updateRules = [
+   body('name').optional().trim().isLength({ min: 1, max: 200 }),
+   body('password').optional({ nullable: true }).isLength({ min: 8, max: 200 }).withMessage('Password must be at least 8 characters.'),
+   body('role').optional().isIn(['admin', 'sales_rep']).withMessage('Role must be admin or sales_rep.'),
+-  body('assigned_zone').optional({ nullable: true }).trim().isLength({ max: 100 }),
++  body('zone_ids').optional().isArray(),
++  body('zone_ids.*').isInt({ min: 1 }),
+   body('is_active').optional().isBoolean(),
+ ];
+ 
+-router.get('/', userController.list);
+-router.post('/', createRules, validate, userController.create);
+-router.put('/:id', updateRules, validate, userController.update);
+-router.delete('/:id', userController.remove);
++router.get('/', withRls(userController.list));
++router.post('/', createRules, validate, withRls(userController.create));
++router.put('/:id', updateRules, validate, withRls(userController.update));
++router.delete('/:id', withRls(userController.remove));
+ 
+ module.exports = router;
+diff --git a/backend/src/utils/asyncHandler.js b/backend/src/utils/asyncHandler.js
+index 80bcd22..9c590a8 100644
+--- a/backend/src/utils/asyncHandler.js
++++ b/backend/src/utils/asyncHandler.js
+@@ -1,7 +1,15 @@
+ // Wraps an async route handler so rejected promises are forwarded to Express's
+ // error middleware instead of crashing the process or hanging the request.
+-const asyncHandler = (fn) => (req, res, next) => {
++//
++// The wrapper RETURNS the promise on purpose. Express ignores a handler's
++// return value, so plain routes are unaffected — but middleware/rls.js's
++// withRls / withRlsReadOnly `await` the wrapped handler to know when the
++// controller has actually finished before they COMMIT and release the
++// database connection. If this returned undefined, that await would resolve
++// immediately, the transaction would commit (and the connection be released)
++// while the controller's queries were still pending, and the response
++// deferred through req.respond() would never be sent.
++const asyncHandler = (fn) => (req, res, next) =>
+   Promise.resolve(fn(req, res, next)).catch(next);
+-};
+ 
+ module.exports = { asyncHandler };
+diff --git a/backend/src/utils/cache.js b/backend/src/utils/cache.js
+index c906443..cb71b6c 100644
+--- a/backend/src/utils/cache.js
++++ b/backend/src/utils/cache.js
+@@ -31,10 +31,12 @@ function invalidatePrefix(prefix) {
+ 
+ // Express middleware: caches a GET route's JSON response for ttlMs, keyed by
+ // the full URL (so different query params/filters get separate cache
+-// entries automatically).
++// entries automatically) AND the requesting user — RLS-scoped routes return
++// different data per user at the same URL, so a shared key would serve one
++// rep's cached numbers to another. Requires requireAuth to run first.
+ function cacheRoute(ttlMs) {
+   return (req, res, next) => {
+-    const key = `route:${req.originalUrl}`;
++    const key = `route:${req.originalUrl}:${req.user?.id ?? 'anon'}`;
+     const cached = get(key);
+     if (cached !== undefined) {
+       res.setHeader('X-Cache', 'HIT');

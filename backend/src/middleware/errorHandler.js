@@ -31,6 +31,13 @@ function errorHandler(err, req, res, next) {
     return res.status(400).json({ error: 'Invalid value for one of the fields provided.' });
   }
 
+  // Postgres insufficient_privilege — what a row-level security policy raises
+  // when a write (e.g. a rep saving a distributor into a zone they don't
+  // cover) fails its WITH CHECK. A deliberate access refusal, not a server fault.
+  if (err.code === '42501') {
+    return res.status(403).json({ error: 'You do not have access to that zone or record.' });
+  }
+
   // eslint-disable-next-line no-console
   console.error(err);
   return res.status(500).json({ error: 'Internal server error.' });

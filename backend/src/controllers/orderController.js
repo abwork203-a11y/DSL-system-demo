@@ -1,4 +1,3 @@
-const { pool } = require('../config/db');
 const { asyncHandler } = require('../utils/asyncHandler');
 const { ApiError } = require('../utils/ApiError');
 const { createOrderWithLedger, recordPayment, cancelOrder, deleteOrder } = require('../services/ledgerService');
@@ -42,13 +41,13 @@ const list = asyncHandler(async (req, res) => {
   // Two queries (count + page) rather than a window function — simpler to
   // read, and at this app's realistic data volumes the extra round-trip
   // costs nothing worth optimizing away yet.
-  const countResult = await pool.query(
+  const countResult = await req.db.query(
     `SELECT COUNT(*)::int AS total FROM orders o JOIN distributors d ON d.id = o.distributor_id ${where}`,
     params
   );
 
   const dataParams = [...params, pageSize, offset];
-  const result = await pool.query(
+  const result = await req.db.query(
     `SELECT o.*, d.name AS distributor_name, u.name AS created_by_name
      FROM orders o
      JOIN distributors d ON d.id = o.distributor_id
@@ -58,11 +57,11 @@ const list = asyncHandler(async (req, res) => {
      LIMIT $${dataParams.length - 1} OFFSET $${dataParams.length}`,
     dataParams
   );
-  res.json(paginatedResponse(result.rows, countResult.rows[0].total, page, pageSize));
+  req.respond(200, paginatedResponse(result.rows, countResult.rows[0].total, page, pageSize));
 });
 
 const getOne = asyncHandler(async (req, res) => {
-  const orderResult = await pool.query(
+  const orderResult = await req.db.query(
     `SELECT o.*, d.name AS distributor_name, u.name AS created_by_name
      FROM orders o
      JOIN distributors d ON d.id = o.distributor_id
@@ -72,7 +71,7 @@ const getOne = asyncHandler(async (req, res) => {
   );
   if (orderResult.rows.length === 0) throw new ApiError(404, 'Order not found.');
 
-  const itemsResult = await pool.query(
+  const itemsResult = await req.db.query(
     `SELECT oi.*, p.name AS product_name, p.size_packaging, m.name AS manufacturer_name
      FROM order_items oi
      JOIN products p ON p.id = oi.product_id
@@ -82,42 +81,33 @@ const getOne = asyncHandler(async (req, res) => {
     [req.params.id]
   );
 
-  res.json({ ...orderResult.rows[0], items: itemsResult.rows });
+  req.respond(200, { ...orderResult.rows[0], items: itemsResult.rows });
 });
 
 const create = asyncHandler(async (req, res) => {
   const { distributor_id, items, discount, discount_type, freight_cost, payment_term, payment_status, amount_paid, notes } = req.body;
   if (!distributor_id) throw new ApiError(400, 'distributor_id is required.');
 
-  const client = await pool.connect();
-  try {
-    await client.query('BEGIN');
-    const order = await createOrderWithLedger(client, {
-      distributorId: distributor_id,
-      createdBy: req.user.id,
-      items,
-      discount,
-      discountType: discount_type || 'fixed',
-      freightCost: freight_cost,
-      paymentTerm: payment_term,
-      paymentStatus: payment_status,
-      amountPaid: amount_paid || 0,
-      notes,
-    });
-    await client.query('COMMIT');
+  const order = await createOrderWithLedger(req.db, {
+    distributorId: distributor_id,
+    createdBy: req.user.id,
+    items,
+    discount,
+    discountType: discount_type || 'fixed',
+    freightCost: freight_cost,
+    paymentTerm: payment_term,
+    paymentStatus: payment_status,
+    amountPaid: amount_paid || 0,
+    notes,
+  });
 
+  req.afterCommit(() => {
     invalidatePrefix('route:/api/reports'); // dashboard/report numbers just went stale
-
     const io = req.app.get('io');
     if (io) io.emit('order:created', { orderId: order.id, distributorId: distributor_id });
+  });
 
-    res.status(201).json(order);
-  } catch (err) {
-    await client.query('ROLLBACK');
-    throw err;
-  } finally {
-    client.release();
-  }
+  req.respond(201, order);
 });
 
 const updateStatus = asyncHandler(async (req, res) => {
@@ -136,7 +126,7 @@ const updateStatus = asyncHandler(async (req, res) => {
     );
   }
 
-  const existing = await pool.query('SELECT * FROM orders WHERE id = $1', [id]);
+  const existing = await req.db.query('SELECT * FROM orders WHERE id = $1', [id]);
   if (existing.rows.length === 0) throw new ApiError(404, 'Order not found.');
 
   // Once cancelled (via the proper Cancel action), the ledger has already
@@ -147,11 +137,11 @@ const updateStatus = asyncHandler(async (req, res) => {
     throw new ApiError(400, 'This order is cancelled and its status can no longer be changed.');
   }
 
-  const result = await pool.query(
+  const result = await req.db.query(
     'UPDATE orders SET order_status = $1 WHERE id = $2 RETURNING *',
     [order_status, id]
   );
-  await recordAudit(pool, {
+  await recordAudit(req.db, {
     userId: req.user.id,
     action: 'UPDATE',
     entityType: 'order',
@@ -160,79 +150,53 @@ const updateStatus = asyncHandler(async (req, res) => {
     after: { order_status },
   });
 
-  const io = req.app.get('io');
-  if (io) io.emit('order:updated', { orderId: Number(id) });
+  req.afterCommit(() => {
+    const io = req.app.get('io');
+    if (io) io.emit('order:updated', { orderId: Number(id) });
+  });
 
-  res.json(result.rows[0]);
+  req.respond(200, result.rows[0]);
 });
 
 const pay = asyncHandler(async (req, res) => {
   const { id } = req.params;
   const { amount, note } = req.body;
 
-  const client = await pool.connect();
-  try {
-    await client.query('BEGIN');
-    const result = await recordPayment(client, { orderId: id, amount, note, userId: req.user.id });
-    await client.query('COMMIT');
+  const result = await recordPayment(req.db, { orderId: id, amount, note, userId: req.user.id });
 
+  req.afterCommit(() => {
     invalidatePrefix('route:/api/reports'); // outstanding-receivables figure just changed
-
     const io = req.app.get('io');
     if (io) io.emit('order:payment', { orderId: Number(id) });
+  });
 
-    res.json(result);
-  } catch (err) {
-    await client.query('ROLLBACK');
-    throw err;
-  } finally {
-    client.release();
-  }
+  req.respond(200, result);
 });
 
 const cancel = asyncHandler(async (req, res) => {
   const { id } = req.params;
 
-  const client = await pool.connect();
-  try {
-    await client.query('BEGIN');
-    const order = await cancelOrder(client, { orderId: id, userId: req.user.id });
-    await client.query('COMMIT');
+  const order = await cancelOrder(req.db, { orderId: id, userId: req.user.id });
 
+  req.afterCommit(() => {
     invalidatePrefix('route:/api/reports'); // outstanding-receivables figure just changed
-
     const io = req.app.get('io');
     if (io) io.emit('order:cancelled', { orderId: Number(id) });
+  });
 
-    res.json(order);
-  } catch (err) {
-    await client.query('ROLLBACK');
-    throw err;
-  } finally {
-    client.release();
-  }
+  req.respond(200, order);
 });
 
 const remove = asyncHandler(async (req, res) => {
   const { id } = req.params;
 
-  const client = await pool.connect();
-  try {
-    await client.query('BEGIN');
-    await deleteOrder(client, { orderId: id, userId: req.user.id });
-    await client.query('COMMIT');
+  // Errors (including the 409 "unsafe to delete" case) propagate to
+  // withRls, which rolls back and hands them to the error middleware.
+  await deleteOrder(req.db, { orderId: id, userId: req.user.id });
 
-    invalidatePrefix('route:/api/reports');
+  req.afterCommit(() => invalidatePrefix('route:/api/reports'));
 
-    res.status(204).end();
-  } catch (err) {
-    await client.query('ROLLBACK');
-    throw err; // includes the 409 "unsafe to delete" case — the existing
-               // error-handling middleware already turns ApiError into the
-               // right status code, no special handling needed here
-  } finally {
-    client.release();
-  }
+  req.respondEnd(204);
 });
 
 // Scoped, narrow read of this one order's history — deliberately not a
@@ -241,7 +205,7 @@ const remove = asyncHandler(async (req, res) => {
 // role that can view an order at all can see its own activity trail; that's
 // a much narrower surface than being able to browse the whole audit log.
 const getActivity = asyncHandler(async (req, res) => {
-  const result = await pool.query(
+  const result = await req.db.query(
     `SELECT a.*, u.name AS user_name
      FROM audit_log a
      LEFT JOIN users u ON u.id = a.user_id
@@ -249,7 +213,7 @@ const getActivity = asyncHandler(async (req, res) => {
      ORDER BY a.created_at DESC`,
     [req.params.id]
   );
-  res.json(result.rows);
+  req.respond(200, result.rows);
 });
 
 module.exports = { list, getOne, create, updateStatus, pay, cancel, remove, getActivity };

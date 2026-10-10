@@ -1,6 +1,6 @@
 import { useEffect, useState, useCallback } from 'react';
 import { Plus, Pencil, Trash2, Ban, RotateCcw } from 'lucide-react';
-import { usersApi, distributors as distributorsApi } from '../api/endpoints';
+import { usersApi, zonesApi } from '../api/endpoints';
 import { apiErrorMessage, apiErrorFields } from '../api/client';
 import { useAuth } from '../context/AuthContext';
 import { useToast } from '../context/ToastContext';
@@ -9,9 +9,8 @@ import Modal from '../components/Modal';
 import PasswordInput from '../components/PasswordInput';
 import PasswordStrengthMeter from '../components/PasswordStrengthMeter';
 import { TableSkeleton } from '../components/Skeleton';
-import { fetchAllPages } from '../utils/fetchAllPages';
 
-const EMPTY_FORM = { name: '', email: '', password: '', role: 'sales_rep', assigned_zone: '' };
+const EMPTY_FORM = { name: '', email: '', password: '', role: 'sales_rep', zone_ids: [] };
 
 export default function UsersPage() {
   const { user: currentUser } = useAuth();
@@ -39,20 +38,38 @@ export default function UsersPage() {
 
   useEffect(() => { load(); }, [load]);
 
-  // Zone options come from whatever zones distributors are actually using —
-  // keeps a sales rep's assigned zone consistent with real zone names
-  // instead of free text that could drift (typos, casing, abbreviations).
-  useEffect(() => {
-    fetchAllPages(distributorsApi.list)
-      .then((allDistributors) => {
-        const distinctZones = Array.from(new Set(allDistributors.map((d) => d.zone).filter(Boolean))).sort();
-        setZones(distinctZones);
-      })
-      .catch(() => {});
+  const loadZones = useCallback(() => {
+    zonesApi.list().then((res) => setZones(res.data)).catch(() => {});
   }, []);
 
+  useEffect(() => { loadZones(); }, [loadZones]);
+
+  const [newZoneName, setNewZoneName] = useState('');
+  const [creatingZone, setCreatingZone] = useState(false);
+
+  const handleCreateZone = async (e) => {
+    e.preventDefault();
+    if (!newZoneName.trim()) return;
+    setCreatingZone(true);
+    try {
+      await zonesApi.create(newZoneName.trim());
+      setNewZoneName('');
+      loadZones();
+      toast.success('Zone added.');
+    } catch (err) {
+      toast.error(apiErrorMessage(err));
+    } finally {
+      setCreatingZone(false);
+    }
+  };
+
   const openNew = () => { setForm(EMPTY_FORM); setFieldErrors({}); setEditing({}); };
-  const openEdit = (u) => { setForm({ ...EMPTY_FORM, ...u, password: '' }); setFieldErrors({}); setEditing(u); };
+  const openEdit = (u) => {
+    // The API gives us zones as [{id, name}]; the checkboxes need plain ids.
+    setForm({ ...EMPTY_FORM, ...u, password: '', zone_ids: (u.zones || []).map((z) => z.id) });
+    setFieldErrors({});
+    setEditing(u);
+  };
 
   // Updates one form field and clears that field's error as soon as the
   // user starts changing it — otherwise a stale "Password must be at least
@@ -63,6 +80,15 @@ export default function UsersPage() {
     setFieldErrors((errs) => (errs[key] ? { ...errs, [key]: undefined } : errs));
   };
 
+  const toggleZone = (zoneId) => {
+    setForm((f) => {
+      const has = f.zone_ids.includes(zoneId);
+      return { ...f, zone_ids: has ? f.zone_ids.filter((id) => id !== zoneId) : [...f.zone_ids, zoneId] };
+    });
+  };
+
+  const zoneNames = (u) => (u.zones || []).map((z) => z.name).join(', ');
+
   const handleSave = async (e) => {
     e.preventDefault();
     setSaving(true);
@@ -71,6 +97,10 @@ export default function UsersPage() {
       if (editing?.id) {
         const payload = { ...form };
         if (!payload.password) delete payload.password;
+        // zone_ids is always sent (so the checkboxes are the source of truth);
+        // these two are read-only display fields from the API, not something to send back.
+        delete payload.zones;
+        delete payload.assigned_zone;
         await usersApi.update(editing.id, payload);
         toast.success('Account updated.');
       } else {
@@ -131,6 +161,26 @@ export default function UsersPage() {
         <button className="btn" onClick={openNew}><Plus size={16} /> Add Account</button>
       </div>
 
+      <div className="card" style={{ marginBottom: 16 }}>
+        <h2 style={{ marginTop: 0 }}>Manage Zones</h2>
+        <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, marginBottom: 12 }}>
+          {zones.map((z) => <span key={z.id} className="badge badge-neutral">{z.name}</span>)}
+          {zones.length === 0 && <span style={{ color: 'var(--ink-muted)' }}>No zones yet.</span>}
+        </div>
+        <form onSubmit={handleCreateZone} style={{ display: 'flex', gap: 8 }}>
+          <input
+            aria-label="New zone name"
+            placeholder="New zone name"
+            value={newZoneName}
+            onChange={(e) => setNewZoneName(e.target.value)}
+            style={{ flex: 1 }}
+          />
+          <button className="btn" type="submit" disabled={creatingZone}>
+            {creatingZone ? 'Adding…' : 'Add Zone'}
+          </button>
+        </form>
+      </div>
+
       <div className="card">
         {loading ? (
           <TableSkeleton columns={6} rows={4} />
@@ -143,7 +193,7 @@ export default function UsersPage() {
                   <div className="pill-card-name">{u.name}</div>
                   <div className="pill-card-sub">{u.email}</div>
                   <div className="pill-card-meta" style={{ textTransform: 'capitalize' }}>
-                    {u.role.replace('_', ' ')}{u.assigned_zone ? ` · ${u.assigned_zone}` : ''}
+                    {u.role.replace('_', ' ')}{zoneNames(u) ? ` · ${zoneNames(u)}` : ''}
                   </div>
                 </div>
                 <div className="pill-card-divider" />
@@ -182,7 +232,7 @@ export default function UsersPage() {
                     <td data-label="Name"><strong>{u.name}</strong></td>
                     <td data-label="Email">{u.email}</td>
                     <td data-label="Role" style={{ textTransform: 'capitalize' }}>{u.role.replace('_', ' ')}</td>
-                    <td data-label="Zone">{u.assigned_zone || '—'}</td>
+                    <td data-label="Zone">{zoneNames(u) || '—'}</td>
                     <td data-label="Status">{u.is_active ? <span className="badge badge-green">active</span> : <span className="badge badge-neutral">inactive</span>}</td>
                     <td className="table-actions">
                       <button className="btn-ghost" onClick={() => openEdit(u)} title="Edit" aria-label="Edit"><Pencil size={15} /></button>
@@ -254,18 +304,17 @@ export default function UsersPage() {
                 {fieldErrors.role && <FieldError message={fieldErrors.role} />}
               </div>
               <div className="field">
-                <label>Assigned Zone (optional)</label>
-                <select value={form.assigned_zone} onChange={(e) => setField('assigned_zone', e.target.value)}>
-                  <option value="">— None —</option>
-                  {zones.map((z) => <option key={z} value={z}>{z}</option>)}
-                  {/* If this account already has a zone that no distributor currently uses
-                      (e.g. that distributor was later reassigned or deleted), keep it
-                      selectable so saving the form doesn't silently wipe it out. */}
-                  {form.assigned_zone && !zones.includes(form.assigned_zone) && (
-                    <option value={form.assigned_zone}>{form.assigned_zone}</option>
-                  )}
-                </select>
-                {fieldErrors.assigned_zone && <FieldError message={fieldErrors.assigned_zone} />}
+                <label>Assigned Zones (optional)</label>
+                <div className="checkbox-list">
+                  {zones.map((z) => (
+                    <label key={z.id} className="checkbox-row">
+                      <input type="checkbox" checked={form.zone_ids.includes(z.id)} onChange={() => toggleZone(z.id)} />
+                      {z.name}
+                    </label>
+                  ))}
+                  {zones.length === 0 && <span style={{ color: 'var(--ink-muted)' }}>No zones yet — add one in Manage Zones.</span>}
+                </div>
+                {fieldErrors.zone_ids && <FieldError message={fieldErrors.zone_ids} />}
               </div>
             </div>
             <button className="btn" type="submit" disabled={saving} style={{ width: '100%', justifyContent: 'center' }}>
