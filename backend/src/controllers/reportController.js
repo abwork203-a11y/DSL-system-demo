@@ -1,7 +1,22 @@
 const { asyncHandler } = require('../utils/asyncHandler');
 
+// Optional ?month=YYYY-MM filter shared by the report endpoints.
+// monthStart('2026-09') -> '2026-09-01'. Anything invalid or missing -> null
+// (meaning "no month filter"), so a bad value can never reach the database.
+function monthStart(input) {
+  return /^\d{4}-(0[1-9]|1[0-2])$/.test(input || '') ? `${input}-01` : null;
+}
+
+// SQL for "this order falls inside the month that starts at parameter $n".
+// A half-open range (>= first day, < first day of next month) so it is
+// correct whether order_date is a date or a timestamp.
+function inMonthSql(alias, n) {
+  return `${alias}.order_date >= $${n}::date AND ${alias}.order_date < ($${n}::date + interval '1 month')`;
+}
+
 // Dashboard: high-level counts + this month's totals
 const dashboardSummary = asyncHandler(async (req, res) => {
+  const month = monthStart(req.query.month); // null = the current month
   // Sequential, not Promise.all: req.db is a single transaction-scoped client
   // (from withRls), and a single pg client can only run one query at a time.
   const orders = await req.db.query(`SELECT order_status, COUNT(*)::int AS count FROM orders GROUP BY order_status`);
@@ -10,10 +25,11 @@ const dashboardSummary = asyncHandler(async (req, res) => {
   const monthSales = await req.db.query(`
     SELECT COALESCE(SUM(total), 0) AS total, COUNT(*)::int AS order_count
     FROM orders
-    WHERE date_trunc('month', order_date) = date_trunc('month', CURRENT_DATE)
+    WHERE order_date >= date_trunc('month', COALESCE($1::date, CURRENT_DATE))
+      AND order_date < date_trunc('month', COALESCE($1::date, CURRENT_DATE)) + interval '1 month'
       AND order_status != 'cancelled'
       AND payment_status != 'unpaid'
-  `);
+  `, [month]);
 
   req.respond(200, {
     ordersByStatus: orders.rows,
@@ -58,6 +74,12 @@ const performanceByDistributor = asyncHandler(async (req, res) => {
     clauses.push(`o.order_date <= $${params.length}`);
   }
 
+  const month = monthStart(req.query.month);
+  if (month) {
+    params.push(month);
+    clauses.push(inMonthSql('o', params.length));
+  }
+
   const result = await req.db.query(
     `SELECT d.id, d.name, d.zone, d.zone_id, d.balance,
             COUNT(o.id)::int AS order_count,
@@ -78,15 +100,26 @@ const performanceByDistributor = asyncHandler(async (req, res) => {
 // silently come back as zero, not as an access-denied error. A
 // silently-wrong report is worse than a blocked one.
 const performanceByRep = asyncHandler(async (req, res) => {
+  const month = monthStart(req.query.month);
+  const params = [];
+  let monthClause = '';
+  if (month) {
+    params.push(month);
+    // In the JOIN (not the WHERE) so reps with no sales that month still
+    // appear in the list, with zeros, instead of vanishing.
+    monthClause = ` AND ${inMonthSql('o', 1)}`;
+  }
+
   const result = await req.db.query(
     `SELECT u.id, u.name,
             COUNT(o.id)::int AS order_count,
             COALESCE(SUM(o.total), 0) AS total_sales
      FROM users u
-     LEFT JOIN orders o ON o.created_by = u.id AND o.order_status != 'cancelled'
+     LEFT JOIN orders o ON o.created_by = u.id AND o.order_status != 'cancelled'${monthClause}
      WHERE u.role = 'sales_rep'
      GROUP BY u.id
-     ORDER BY total_sales DESC`
+     ORDER BY total_sales DESC`,
+    params
   );
   req.respond(200, result.rows);
 });
@@ -94,6 +127,14 @@ const performanceByRep = asyncHandler(async (req, res) => {
 // Top products by revenue
 const topProducts = asyncHandler(async (req, res) => {
   const limit = Number(req.query.limit) || 10;
+  const params = [limit];
+  let monthClause = '';
+  const month = monthStart(req.query.month);
+  if (month) {
+    params.push(month);
+    monthClause = ` AND ${inMonthSql('o', 2)}`;
+  }
+
   const result = await req.db.query(
     `SELECT p.id, p.name, m.name AS manufacturer_name,
             SUM(oi.quantity)::numeric AS total_quantity,
@@ -101,11 +142,11 @@ const topProducts = asyncHandler(async (req, res) => {
      FROM order_items oi
      JOIN products p ON p.id = oi.product_id
      JOIN manufacturers m ON m.id = p.manufacturer_id
-     JOIN orders o ON o.id = oi.order_id AND o.order_status != 'cancelled'
+     JOIN orders o ON o.id = oi.order_id AND o.order_status != 'cancelled'${monthClause}
      GROUP BY p.id, m.name
      ORDER BY total_revenue DESC
      LIMIT $1`,
-    [limit]
+    params
   );
   req.respond(200, result.rows);
 });

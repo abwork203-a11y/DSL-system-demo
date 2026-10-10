@@ -57,11 +57,12 @@ export const ledger = {
 };
 
 export const reports = {
-  dashboard: () => client.get('/reports/dashboard'),
+  // month is 'YYYY-MM' (or undefined = backend default). Axios leaves undefined params out of the URL.
+  dashboard: (month) => client.get('/reports/dashboard', { params: { month } }),
   monthlySales: (months) => client.get('/reports/monthly-sales', { params: { months } }),
   performanceByDistributor: (params) => client.get('/reports/performance/distributors', { params }),
-  performanceByRep: () => client.get('/reports/performance/reps'),
-  topProducts: (limit) => client.get('/reports/top-products', { params: { limit } }),
+  performanceByRep: (month) => client.get('/reports/performance/reps', { params: { month } }),
+  topProducts: (limit, month) => client.get('/reports/top-products', { params: { limit, month } }),
 };
 
 export const usersApi = {

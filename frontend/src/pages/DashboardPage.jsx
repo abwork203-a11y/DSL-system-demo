@@ -14,6 +14,8 @@ import { useToast } from '../context/ToastContext';
 import { useLiveOrderEvents } from '../context/SocketContext';
 
 import StatusBadge from '../components/StatusBadge';
+import MonthPicker from '../components/MonthPicker';
+import { currentMonthValue, monthLabel } from '../utils/months';
 import { StatSkeleton, TableSkeleton } from '../components/Skeleton';
 
 
@@ -84,12 +86,13 @@ export default function DashboardPage() {
   const [summary, setSummary] = useState(null);
   const [recentOrders, setRecentOrders] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [month, setMonth] = useState(currentMonthValue()); // 'YYYY-MM'
 
 
   const load = useCallback(async () => {
     try {
       const [summaryRes, ordersRes] = await Promise.all([
-        reports.dashboard(),
+        reports.dashboard(month),
         ordersApi.list({ pageSize: 8 }),
       ]);
 
@@ -102,10 +105,14 @@ export default function DashboardPage() {
     }
 
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  }, [month]);
 
 
+  // Runs on first load and every time the month changes (load is rebuilt when
+  // `month` changes). The skeleton is shown only for this path, not for live
+  // order events below, so the page doesn't flash on every incoming order.
   useEffect(() => {
+    setLoading(true);
     load();
   }, [load]);
 
@@ -116,6 +123,9 @@ export default function DashboardPage() {
 
 
   const firstName = user?.name?.split(' ')[0] || 'there';
+
+  const isCurrentMonth = month === currentMonthValue();
+  const periodShort = monthLabel(month, true);
 
 
   const pendingCount =
@@ -172,6 +182,14 @@ export default function DashboardPage() {
       </div>
 
 
+      <div className="period-bar">
+        <MonthPicker value={month} onChange={setMonth} />
+        <p className="period-note">
+          Sales and order counts follow the selected month. Receivables, distributors and order status always show current figures.
+        </p>
+      </div>
+
+
       {/* =====================================================
           KEY METRICS
       ====================================================== */}
@@ -185,7 +203,7 @@ export default function DashboardPage() {
         <div className="stat-grid dashboard-stat-grid">
 
           <div className="stat-card">
-            <div className="stat-label">This Month's Sales</div>
+            <div className="stat-label">{isCurrentMonth ? "This Month's Sales" : `Sales — ${periodShort}`}</div>
             <div className="stat-value">
               <span className="stat-currency">PKR</span>
               <span>{moneyAmount(summary?.currentMonth?.totalSales)}</span>
@@ -193,7 +211,7 @@ export default function DashboardPage() {
           </div>
 
           <div className="stat-card">
-            <div className="stat-label">Orders This Month</div>
+            <div className="stat-label">{isCurrentMonth ? 'Orders This Month' : `Orders — ${periodShort}`}</div>
             <div className="stat-value">
               {summary?.currentMonth?.orderCount ?? 0}
             </div>
