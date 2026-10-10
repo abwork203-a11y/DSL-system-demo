@@ -5,6 +5,8 @@ import { reports, exportApi } from '../api/endpoints';
 import { apiErrorMessage, downloadFile } from '../api/client';
 import { useToast } from '../context/ToastContext';
 import { TableSkeleton } from '../components/Skeleton';
+import MonthPicker from '../components/MonthPicker';
+import { monthLabel } from '../utils/months';
 
 function money(n) {
   return Number(n || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
@@ -17,16 +19,19 @@ export default function ReportsPage() {
   const [byRep, setByRep] = useState([]);
   const [topProducts, setTopProducts] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [month, setMonth] = useState(''); // 'YYYY-MM', or '' = all time (the old behaviour)
   const [exporting, setExporting] = useState(''); // '' | 'orders' | 'distributors' | 'products'
   const [exportProgress, setExportProgress] = useState(null);
   const exportingRef = useRef(false);
 
   useEffect(() => {
+    setLoading(true);
+    const m = month || undefined; // undefined = don't send the param
     Promise.all([
       reports.monthlySales(12),
-      reports.performanceByDistributor(),
-      reports.performanceByRep(),
-      reports.topProducts(8),
+      reports.performanceByDistributor({ month: m }),
+      reports.performanceByRep(m),
+      reports.topProducts(8, m),
     ])
       .then(([m, d, r, p]) => {
         setMonthly(m.data.map((row) => ({ ...row, month: new Date(row.month).toLocaleDateString(undefined, { month: 'short', year: '2-digit' }), total_sales: Number(row.total_sales) })));
@@ -37,7 +42,9 @@ export default function ReportsPage() {
       .catch((err) => toast.error(apiErrorMessage(err)))
       .finally(() => setLoading(false));
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  }, [month]);
+
+  const periodSuffix = month ? ` — ${monthLabel(month, true)}` : '';
 
   const handleExport = async (which) => {
     if (exportingRef.current) return; // one export at a time — all three buttons are disabled while this is true, but a fast double-click on the same button could still slip through without this
@@ -92,6 +99,13 @@ export default function ReportsPage() {
         </div>
       </div>
 
+      <div className="period-bar">
+        <MonthPicker value={month} onChange={setMonth} allowAll />
+        <p className="period-note">
+          Applies to distributors, reps and products. The monthly trend always shows the last 12 months, and exports are not filtered.
+        </p>
+      </div>
+
       <div className="card">
         <h2 style={{ marginBottom: 16 }}>Monthly Sales — Last 12 Months</h2>
         {loading ? <TableSkeleton columns={1} rows={6} /> : (
@@ -108,7 +122,7 @@ export default function ReportsPage() {
       </div>
 
       <div className="card">
-        <h2 style={{ marginBottom: 16 }}>Top Distributors by Sales</h2>
+        <h2 style={{ marginBottom: 16 }}>Top Distributors by Sales{periodSuffix}</h2>
         {loading ? <TableSkeleton columns={1} rows={5} /> : byDistributor.length === 0 ? <div className="empty-state">No sales data yet.</div> : (
           <ResponsiveContainer width="100%" height={Math.max(220, byDistributor.length * 34)}>
             <BarChart data={byDistributor} layout="vertical" margin={{ left: 40 }}>
@@ -123,7 +137,7 @@ export default function ReportsPage() {
       </div>
 
       <div className="card">
-        <h2 style={{ marginBottom: 14 }}>Sales Rep Performance</h2>
+        <h2 style={{ marginBottom: 14 }}>Sales Rep Performance{periodSuffix}</h2>
         {loading ? <TableSkeleton columns={3} rows={3} /> : (
           <>
             {/* Small screens: pill cards (shown only below 640px).
@@ -171,7 +185,7 @@ export default function ReportsPage() {
       </div>
 
       <div className="card">
-        <h2 style={{ marginBottom: 14 }}>Top Products by Revenue</h2>
+        <h2 style={{ marginBottom: 14 }}>Top Products by Revenue{periodSuffix}</h2>
         {loading ? <TableSkeleton columns={4} rows={5} /> : (
           <>
             {/* Small screens: pill cards (shown only below 640px). */}
