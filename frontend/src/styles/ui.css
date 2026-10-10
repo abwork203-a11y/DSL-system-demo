@@ -4212,3 +4212,37 @@ input[type='password']::-ms-clear {
   border: none;
   background: none;
 }
+
+/* ---- Manage Zones modal: one row per zone with a delete button ---- */
+.zone-list {
+  display: flex;
+  flex-direction: column;
+
+  max-height: 240px;
+  overflow-y: auto;
+
+  margin-bottom: 16px;
+
+  border: 1px solid var(--rule);
+  border-radius: var(--radius-sm);
+}
+
+.zone-list-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+
+  padding: 6px 6px 6px 12px;
+
+  font-size: 13.5px;
+  color: var(--ink);
+}
+
+.zone-list-row + .zone-list-row {
+  border-top: 1px solid var(--rule);
+}
+
+.zone-list > span {
+  padding: 10px 12px;
+}

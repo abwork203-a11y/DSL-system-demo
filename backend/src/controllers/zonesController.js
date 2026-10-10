@@ -53,4 +53,23 @@ const create = asyncHandler(async (req, res) => {
   req.respond(201, result.rows[0]);
 });
 
-module.exports = { list, create };
+const remove = asyncHandler(async (req, res) => {
+  const { id } = req.params;
+  const existing = await req.db.query('SELECT * FROM zones WHERE id = $1', [id]);
+  if (existing.rows.length === 0) throw new ApiError(404, 'Zone not found.');
+
+  // Distributors point at a zone with a plain foreign key, so Postgres would
+  // block the delete anyway. Counting first lets us give a friendly message.
+  // (Admins see every distributor under RLS, so this count is accurate.)
+  const inUse = await req.db.query('SELECT COUNT(*)::int AS n FROM distributors WHERE zone_id = $1', [id]);
+  if (inUse.rows[0].n > 0) {
+    throw new ApiError(409, `Cannot delete "${existing.rows[0].name}": ${inUse.rows[0].n} distributor(s) are still assigned to it. Reassign them first.`);
+  }
+
+  // user_zones rows are removed automatically (ON DELETE CASCADE).
+  await req.db.query('DELETE FROM zones WHERE id = $1', [id]);
+  req.respondEnd(204);
+});
+
+
+module.exports = { list, create,remove };

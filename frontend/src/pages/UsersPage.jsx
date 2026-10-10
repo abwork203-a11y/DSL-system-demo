@@ -44,8 +44,30 @@ export default function UsersPage() {
 
   useEffect(() => { loadZones(); }, [loadZones]);
 
+  const [zonesOpen, setZonesOpen] = useState(false);
   const [newZoneName, setNewZoneName] = useState('');
   const [creatingZone, setCreatingZone] = useState(false);
+
+  const handleDeleteZone = async (z) => {
+    // How many accounts currently have this zone ticked — they'd lose it.
+    const affected = rows.filter((u) => (u.zones || []).some((x) => x.id === z.id)).length;
+    const extra = affected > 0 ? ` ${affected} account${affected === 1 ? '' : 's'} will lose access to it.` : '';
+    if (!await confirm({
+      title: 'Delete Zone?',
+      message: `Delete the zone "${z.name}"?${extra} This cannot be undone.`,
+      confirmLabel: 'Delete',
+      danger: true,
+    })) return;
+    try {
+      await zonesApi.remove(z.id);
+      toast.success('Zone deleted.');
+      loadZones();
+      load(); // refresh accounts so their zone lists drop the deleted zone
+    } catch (err) {
+      // e.g. 409 "distributors are still assigned to this zone"
+      toast.error(apiErrorMessage(err));
+    }
+  };
 
   const handleCreateZone = async (e) => {
     e.preventDefault();
@@ -158,27 +180,10 @@ export default function UsersPage() {
           <h1>Sales Reps &amp; Admins</h1>
           <p>{rows.length} accounts</p>
         </div>
-        <button className="btn" onClick={openNew}><Plus size={16} /> Add Account</button>
-      </div>
-
-      <div className="card" style={{ marginBottom: 16 }}>
-        <h2 style={{ marginTop: 0 }}>Manage Zones</h2>
-        <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, marginBottom: 12 }}>
-          {zones.map((z) => <span key={z.id} className="badge badge-neutral">{z.name}</span>)}
-          {zones.length === 0 && <span style={{ color: 'var(--ink-muted)' }}>No zones yet.</span>}
+        <div className="page-header-actions">
+          <button className="btn btn-secondary" onClick={() => setZonesOpen(true)}><Plus size={16} /> Add Zone</button>
+          <button className="btn" onClick={openNew}><Plus size={16} /> Add Account</button>
         </div>
-        <form onSubmit={handleCreateZone} style={{ display: 'flex', gap: 8 }}>
-          <input
-            aria-label="New zone name"
-            placeholder="New zone name"
-            value={newZoneName}
-            onChange={(e) => setNewZoneName(e.target.value)}
-            style={{ flex: 1 }}
-          />
-          <button className="btn" type="submit" disabled={creatingZone}>
-            {creatingZone ? 'Adding…' : 'Add Zone'}
-          </button>
-        </form>
       </div>
 
       <div className="card">
@@ -255,6 +260,35 @@ export default function UsersPage() {
         )}
       </div>
 
+      {zonesOpen && (
+        <Modal title="Manage Zones" onClose={() => setZonesOpen(false)}>
+          <div className="zone-list">
+            {zones.map((z) => (
+              <div key={z.id} className="zone-list-row">
+                <span>{z.name}</span>
+                <button type="button" className="btn-ghost" onClick={() => handleDeleteZone(z)} title="Delete zone" aria-label={`Delete zone ${z.name}`}>
+                  <Trash2 size={15} />
+                </button>
+              </div>
+            ))}
+            {zones.length === 0 && <span style={{ color: 'var(--ink-muted)' }}>No zones yet.</span>}
+          </div>
+          <form onSubmit={handleCreateZone} style={{ display: 'flex', gap: 8 }}>
+            <input
+              aria-label="New zone name"
+              placeholder="New zone name"
+              value={newZoneName}
+              onChange={(e) => setNewZoneName(e.target.value)}
+              style={{ flex: 1 }}
+              autoFocus
+            />
+            <button className="btn" type="submit" disabled={creatingZone}>
+              {creatingZone ? 'Adding…' : 'Add Zone'}
+            </button>
+          </form>
+        </Modal>
+      )}
+
       {editing !== null && (
         <Modal title={editing.id ? 'Edit Account' : 'Add Account'} onClose={() => setEditing(null)}>
           <form onSubmit={handleSave}>
@@ -312,7 +346,7 @@ export default function UsersPage() {
                       {z.name}
                     </label>
                   ))}
-                  {zones.length === 0 && <span style={{ color: 'var(--ink-muted)' }}>No zones yet — add one in Manage Zones.</span>}
+                  {zones.length === 0 && <span style={{ color: 'var(--ink-muted)' }}>No zones yet — close this and click Add Zone.</span>}
                 </div>
                 {fieldErrors.zone_ids && <FieldError message={fieldErrors.zone_ids} />}
               </div>

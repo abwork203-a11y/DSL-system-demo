@@ -74,6 +74,7 @@ export const usersApi = {
 export const zonesApi = {
   list: () => client.get('/zones'),
   create: (name) => client.post('/zones', { name }),
+  remove: (id) => client.delete(`/zones/${id}`),
 };
 
 export const exportApi = {
