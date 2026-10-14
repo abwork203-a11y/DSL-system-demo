@@ -94,7 +94,7 @@ const update = asyncHandler(async (req, res) => {
      contact_name = COALESCE($2, contact_name),
      contact_phone = COALESCE($3, contact_phone),
      contact_email = COALESCE($4, contact_email),
-     zone_id = COALESCE($5, zone_id),
+     zone_id = CASE WHEN $12::boolean THEN $5 ELSE zone_id END,
      region = COALESCE($6, region),
      city = COALESCE($7, city),
      area = COALESCE($8, area),
@@ -113,7 +113,10 @@ const update = asyncHandler(async (req, res) => {
     area || null,
     address || null,
     status || null,
-    id
+    id,
+    // zone_id present in the body (even as null/'') means "set it" — that is how a zone gets cleared.
+    // Omitting the key leaves the zone untouched.
+    Object.prototype.hasOwnProperty.call(req.body, 'zone_id'),
   ]
 );
   await recordAudit(req.db, { userId: req.user.id, action: 'UPDATE', entityType: 'distributor', entityId: id, before: existing.rows[0], after: result.rows[0] });

@@ -23,6 +23,8 @@ const auditRoutes = require('./routes/auditRoutes');
 const backupRoutes = require('./routes/backupRoutes');
 const orderDraftRoutes = require('./routes/orderDraftRoutes');
 const zonesRoutes = require('./routes/zonesRoutes');
+const requestRoutes = require('./routes/requestRoutes');
+const priceOverrideRoutes = require('./routes/priceOverrideRoutes');
 
 function resolveCorsOrigin() {
   const configured = process.env.CLIENT_ORIGIN;
@@ -91,6 +93,8 @@ function createApp() {
   app.use('/api/backups', backupRoutes);
   app.use('/api/order-drafts', orderDraftRoutes);
   app.use('/api/zones', zonesRoutes);
+  app.use('/api/requests', requestRoutes);
+  app.use('/api/price-overrides', priceOverrideRoutes);
 
   app.use(notFound);
   app.use(errorHandler);

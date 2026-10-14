@@ -13,6 +13,7 @@ import {
   CloudUpload,
   Menu,
   Settings,
+  ClipboardCheck,
 } from 'lucide-react';
 
 import { useAuth } from '../context/AuthContext';
@@ -23,6 +24,7 @@ import { APP_NAME } from '../config';
 const NAV_ITEMS = [
   { to: '/', label: 'Dashboard', icon: LayoutDashboard, end: true },
   { to: '/orders', label: 'Orders', icon: FileText },
+  { to: '/requests', label: 'Requests', icon: ClipboardCheck },
   { to: '/distributors', label: 'Distributors', icon: Building2 },
   { to: '/products', label: 'Products', icon: Package, adminOnly: true },
   { to: '/manufacturers', label: 'Manufacturers', icon: Factory, adminOnly: true },

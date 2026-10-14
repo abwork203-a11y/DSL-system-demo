@@ -1,0 +1,1615 @@
+diff --git a/backend/src/app.js b/backend/src/app.js
+index 464413d..66acb45 100644
+--- a/backend/src/app.js
++++ b/backend/src/app.js
+@@ -23,6 +23,8 @@ const auditRoutes = require('./routes/auditRoutes');
+ const backupRoutes = require('./routes/backupRoutes');
+ const orderDraftRoutes = require('./routes/orderDraftRoutes');
+ const zonesRoutes = require('./routes/zonesRoutes');
++const requestRoutes = require('./routes/requestRoutes');
++const priceOverrideRoutes = require('./routes/priceOverrideRoutes');
+ 
+ function resolveCorsOrigin() {
+   const configured = process.env.CLIENT_ORIGIN;
+@@ -91,6 +93,8 @@ function createApp() {
+   app.use('/api/backups', backupRoutes);
+   app.use('/api/order-drafts', orderDraftRoutes);
+   app.use('/api/zones', zonesRoutes);
++  app.use('/api/requests', requestRoutes);
++  app.use('/api/price-overrides', priceOverrideRoutes);
+ 
+   app.use(notFound);
+   app.use(errorHandler);
+diff --git a/backend/src/controllers/distributorController.js b/backend/src/controllers/distributorController.js
+index 906bc02..8d3f7a7 100644
+--- a/backend/src/controllers/distributorController.js
++++ b/backend/src/controllers/distributorController.js
+@@ -94,7 +94,7 @@ const update = asyncHandler(async (req, res) => {
+      contact_name = COALESCE($2, contact_name),
+      contact_phone = COALESCE($3, contact_phone),
+      contact_email = COALESCE($4, contact_email),
+-     zone_id = COALESCE($5, zone_id),
++     zone_id = CASE WHEN $12::boolean THEN $5 ELSE zone_id END,
+      region = COALESCE($6, region),
+      city = COALESCE($7, city),
+      area = COALESCE($8, area),
+@@ -113,7 +113,10 @@ const update = asyncHandler(async (req, res) => {
+     area || null,
+     address || null,
+     status || null,
+-    id
++    id,
++    // zone_id present in the body (even as null/'') means "set it" — that is how a zone gets cleared.
++    // Omitting the key leaves the zone untouched.
++    Object.prototype.hasOwnProperty.call(req.body, 'zone_id'),
+   ]
+ );
+   await recordAudit(req.db, { userId: req.user.id, action: 'UPDATE', entityType: 'distributor', entityId: id, before: existing.rows[0], after: result.rows[0] });
+diff --git a/backend/src/controllers/orderController.js b/backend/src/controllers/orderController.js
+index 92152d7..32d4e55 100644
+--- a/backend/src/controllers/orderController.js
++++ b/backend/src/controllers/orderController.js
+@@ -1,6 +1,7 @@
+ const { asyncHandler } = require('../utils/asyncHandler');
+ const { ApiError } = require('../utils/ApiError');
+ const { createOrderWithLedger, recordPayment, cancelOrder, deleteOrder } = require('../services/ledgerService');
++const { createRequest } = require('../services/requestService');
+ const { recordAudit } = require('../utils/audit');
+ const { parsePagination, paginatedResponse } = require('../utils/pagination');
+ const { invalidatePrefix } = require('../utils/cache');
+@@ -88,6 +89,38 @@ const create = asyncHandler(async (req, res) => {
+   const { distributor_id, items, discount, discount_type, freight_cost, payment_term, payment_status, amount_paid, notes } = req.body;
+   if (!distributor_id) throw new ApiError(400, 'distributor_id is required.');
+ 
++  // Non-admin (sales rep): nothing is created yet. The order is stored as a
++  // pending request; no order, stock or ledger row exists until an admin approves.
++  if (req.user.role !== 'admin') {
++    const payload = {
++      distributor_id: Number(distributor_id),
++      items: (items || []).map((i) => ({
++        product_id: Number(i.product_id),
++        quantity: Number(i.quantity),
++        ...(i.price_override_id != null ? { price_override_id: Number(i.price_override_id) } : {}),
++      })),
++      discount: discount || 0,
++      discount_type: discount_type || 'fixed',
++      freight_cost: freight_cost || 0,
++      payment_term,
++      payment_status,
++      amount_paid: amount_paid || 0,
++      notes: notes || null,
++    };
++    const request = await createRequest(req.db, {
++      type: 'order',
++      requestedBy: req.user.id,
++      distributorId: distributor_id,
++      payload,
++      reason: notes || null,
++    });
++    req.afterCommit(() => {
++      const io = req.app.get('io');
++      if (io) io.emit('request:created', { requestId: request.id, type: 'order' });
++    });
++    return req.respond(202, { ...request, pending_approval: true });
++  }
++
+   const order = await createOrderWithLedger(req.db, {
+     distributorId: distributor_id,
+     createdBy: req.user.id,
+diff --git a/backend/src/controllers/requestController.js b/backend/src/controllers/requestController.js
+new file mode 100644
+index 0000000..5b5936d
+--- /dev/null
++++ b/backend/src/controllers/requestController.js
+@@ -0,0 +1,249 @@
++const { asyncHandler } = require('../utils/asyncHandler');
++const { ApiError } = require('../utils/ApiError');
++const { recordAudit } = require('../utils/audit');
++const { parsePagination, paginatedResponse } = require('../utils/pagination');
++const { invalidatePrefix } = require('../utils/cache');
++const { normalizePayload, createRequest, applyRequest, computeWarnings } = require('../services/requestService');
++
++// All handlers run inside withRls (see requestRoutes.js), so req.db is the
++// RLS-scoped transaction client: a rep only ever sees requests for distributors
++// in their zones, admin sees everything. Responses go through req.respond so
++// nothing is sent until COMMIT has succeeded.
++
++const REQUEST_SELECT = `
++  SELECT r.*, d.name AS distributor_name, u.name AS requested_by_name, rv.name AS reviewed_by_name
++  FROM requests r
++  JOIN distributors d ON d.id = r.distributor_id
++  LEFT JOIN users u ON u.id = r.requested_by
++  LEFT JOIN users rv ON rv.id = r.reviewed_by`;
++
++function emit(req, event, data) {
++  const io = req.app.get('io');
++  if (io) io.emit(event, data);
++}
++
++const list = asyncHandler(async (req, res) => {
++  const { status, type, mine, distributor_id } = req.query;
++  const { page, pageSize, offset } = parsePagination(req.query);
++  const clauses = [];
++  const params = [];
++
++  if (status) {
++    params.push(status);
++    clauses.push(`r.status = $${params.length}`);
++  }
++  if (type) {
++    params.push(type);
++    clauses.push(`r.type = $${params.length}`);
++  }
++  if (distributor_id) {
++    params.push(distributor_id);
++    clauses.push(`r.distributor_id = $${params.length}`);
++  }
++  if (mine === 'true' || mine === '1') {
++    params.push(req.user.id);
++    clauses.push(`r.requested_by = $${params.length}`);
++  }
++  const where = clauses.length ? `WHERE ${clauses.join(' AND ')}` : '';
++
++  const countResult = await req.db.query(`SELECT COUNT(*)::int AS total FROM requests r ${where}`, params);
++
++  const dataParams = [...params, pageSize, offset];
++  const result = await req.db.query(
++    `${REQUEST_SELECT}
++     ${where}
++     ORDER BY (r.status = 'pending') DESC, r.created_at DESC
++     LIMIT $${dataParams.length - 1} OFFSET $${dataParams.length}`,
++    dataParams
++  );
++  req.respond(200, paginatedResponse(result.rows, countResult.rows[0].total, page, pageSize));
++});
++
++const getOne = asyncHandler(async (req, res) => {
++  const result = await req.db.query(`${REQUEST_SELECT} WHERE r.id = $1`, [req.params.id]);
++  if (result.rows.length === 0) throw new ApiError(404, 'Request not found.');
++
++  const request = result.rows[0];
++  const warnings = await computeWarnings(req.db, request);
++  req.respond(200, { ...request, warnings });
++});
++
++// credit_extension / price_override requests. Order requests are created by
++// orderController.create when a non-admin calls POST /api/orders.
++const create = asyncHandler(async (req, res) => {
++  const { type, distributor_id, payload, reason } = req.body;
++  if (type === 'order') {
++    throw new ApiError(400, 'Order requests are submitted through POST /api/orders.');
++  }
++
++  const normalized = await normalizePayload(req.db, type, payload);
++  const request = await createRequest(req.db, {
++    type,
++    requestedBy: req.user.id,
++    distributorId: distributor_id,
++    payload: normalized,
++    reason: reason || null,
++  });
++
++  req.afterCommit(() => emit(req, 'request:created', { requestId: request.id, type }));
++  req.respond(201, request);
++});
++
++// Explains why a pending-only UPDATE matched nothing: the request either
++// doesn't exist (or isn't visible to this user) or was already actioned.
++async function explainNotPending(db, id) {
++  const existing = await db.query('SELECT status FROM requests WHERE id = $1', [id]);
++  if (existing.rows.length === 0) throw new ApiError(404, 'Request not found.');
++  throw new ApiError(409, `This request was already ${existing.rows[0].status}.`);
++}
++
++// Admin only (see requestRoutes.js). The UPDATE ... WHERE status = 'pending' is
++// the concurrency guard: if two admins approve at once, the second blocks on the
++// row lock, then re-checks the WHERE and matches nothing -> 409.
++const approve = asyncHandler(async (req, res) => {
++  const { id } = req.params;
++  const note = req.body.review_note || null;
++
++  const claimed = await req.db.query(
++    `UPDATE requests
++     SET status = 'approved', reviewed_by = $2, reviewed_at = now(), review_note = $3
++     WHERE id = $1 AND status = 'pending'
++     RETURNING *`,
++    [id, req.user.id, note]
++  );
++  if (claimed.rows.length === 0) await explainNotPending(req.db, id);
++  const request = claimed.rows[0];
++
++  // If this throws, withRls rolls everything back — including the status
++  // change above — so a request is never "approved" without its effect.
++  const { resultId, order } = await applyRequest(req.db, request, req.user.id);
++
++  const updated = await req.db.query('UPDATE requests SET result_id = $2 WHERE id = $1 RETURNING *', [id, resultId]);
++
++  await recordAudit(req.db, {
++    userId: req.user.id,
++    action: 'APPROVE',
++    entityType: 'request',
++    entityId: Number(id),
++    before: request,
++    after: updated.rows[0],
++  });
++
++  req.afterCommit(() => {
++    invalidatePrefix('route:/api/reports');
++    emit(req, 'request:reviewed', { requestId: Number(id), status: 'approved' });
++    if (order) emit(req, 'order:created', { orderId: order.id, distributorId: request.distributor_id });
++  });
++
++  req.respond(200, updated.rows[0]);
++});
++
++const reject = asyncHandler(async (req, res) => {
++  const { id } = req.params;
++  const note = req.body.review_note || null;
++
++  const rejected = await req.db.query(
++    `UPDATE requests
++     SET status = 'rejected', reviewed_by = $2, reviewed_at = now(), review_note = $3
++     WHERE id = $1 AND status = 'pending'
++     RETURNING *`,
++    [id, req.user.id, note]
++  );
++  if (rejected.rows.length === 0) await explainNotPending(req.db, id);
++
++  await recordAudit(req.db, {
++    userId: req.user.id,
++    action: 'REJECT',
++    entityType: 'request',
++    entityId: Number(id),
++    after: rejected.rows[0],
++  });
++
++  req.afterCommit(() => emit(req, 'request:reviewed', { requestId: Number(id), status: 'rejected' }));
++  req.respond(200, rejected.rows[0]);
++});
++
++// Only the person who submitted a still-pending request can withdraw it.
++// (An admin who wants to turn one down uses reject.)
++const cancel = asyncHandler(async (req, res) => {
++  const { id } = req.params;
++
++  const existing = await req.db.query('SELECT requested_by, status FROM requests WHERE id = $1', [id]);
++  if (existing.rows.length === 0) throw new ApiError(404, 'Request not found.');
++  if (existing.rows[0].requested_by !== req.user.id) {
++    throw new ApiError(403, 'Only the person who submitted a request can cancel it.');
++  }
++
++  const cancelled = await req.db.query(
++    `UPDATE requests SET status = 'cancelled', reviewed_at = now()
++     WHERE id = $1 AND status = 'pending'
++     RETURNING *`,
++    [id]
++  );
++  if (cancelled.rows.length === 0) {
++    throw new ApiError(409, `This request was already ${existing.rows[0].status}.`);
++  }
++
++  await recordAudit(req.db, {
++    userId: req.user.id,
++    action: 'CANCEL',
++    entityType: 'request',
++    entityId: Number(id),
++    after: cancelled.rows[0],
++  });
++
++  req.afterCommit(() => emit(req, 'request:reviewed', { requestId: Number(id), status: 'cancelled' }));
++  req.respond(200, cancelled.rows[0]);
++});
++
++// ── Approved special prices (read by the order form; revoked by admin) ──
++
++const listOverrides = asyncHandler(async (req, res) => {
++  const { distributor_id, product_id, include_inactive } = req.query;
++  const clauses = [];
++  const params = [];
++
++  if (include_inactive !== 'true' && include_inactive !== '1') clauses.push('po.active = true');
++  if (distributor_id) {
++    params.push(distributor_id);
++    clauses.push(`po.distributor_id = $${params.length}`);
++  }
++  if (product_id) {
++    params.push(product_id);
++    clauses.push(`po.product_id = $${params.length}`);
++  }
++  const where = clauses.length ? `WHERE ${clauses.join(' AND ')}` : '';
++
++  const result = await req.db.query(
++    `SELECT po.*, p.name AS product_name, p.price AS catalog_price, d.name AS distributor_name
++     FROM price_overrides po
++     JOIN products p ON p.id = po.product_id
++     JOIN distributors d ON d.id = po.distributor_id
++     ${where}
++     ORDER BY po.created_at DESC`,
++    params
++  );
++  req.respond(200, result.rows);
++});
++
++// Admin only: revoke (active=false) or re-enable an override.
++const setOverrideActive = asyncHandler(async (req, res) => {
++  const { id } = req.params;
++  const { active } = req.body;
++  if (typeof active !== 'boolean') throw new ApiError(400, 'active must be true or false.');
++
++  const result = await req.db.query('UPDATE price_overrides SET active = $2 WHERE id = $1 RETURNING *', [id, active]);
++  if (result.rows.length === 0) throw new ApiError(404, 'Price override not found.');
++
++  await recordAudit(req.db, {
++    userId: req.user.id,
++    action: active ? 'ENABLE' : 'REVOKE',
++    entityType: 'price_override',
++    entityId: Number(id),
++    after: result.rows[0],
++  });
++
++  req.respond(200, result.rows[0]);
++});
++
++module.exports = { list, getOne, create, approve, reject, cancel, listOverrides, setOverrideActive };
+diff --git a/backend/src/db/schema.sql b/backend/src/db/schema.sql
+index 05c0cea..90ba399 100644
+--- a/backend/src/db/schema.sql
++++ b/backend/src/db/schema.sql
+@@ -94,6 +94,8 @@ CREATE TABLE IF NOT EXISTS user_zones (
+ CREATE INDEX IF NOT EXISTS idx_user_zones_zone ON user_zones(zone_id);
+ 
+ ALTER TABLE distributors ADD COLUMN IF NOT EXISTS zone_id INTEGER REFERENCES zones(id);
++-- distributorController reads/writes `address`, but no migration ever created it.
++ALTER TABLE distributors ADD COLUMN IF NOT EXISTS address TEXT;
+ CREATE INDEX IF NOT EXISTS idx_distributors_zone_id ON distributors(zone_id);
+ 
+ -- ─────────────────────────────────────────────────────────────
+@@ -147,7 +149,7 @@ CREATE TABLE IF NOT EXISTS ledger (
+   distributor_id    INTEGER NOT NULL REFERENCES distributors(id) ON DELETE RESTRICT,
+   order_id          INTEGER REFERENCES orders(id) ON DELETE SET NULL,
+   entry_date        TIMESTAMPTZ NOT NULL DEFAULT now(),
+-  type              TEXT NOT NULL CHECK (type IN ('Cash', 'credit')), -- debit = owes more (order), credit = payment received
++  type              TEXT NOT NULL CHECK (type IN ('debit', 'credit')), -- debit = owes more (order), credit = payment received
+   amount            NUMERIC(14,2) NOT NULL CHECK (amount > 0),
+   running_balance   NUMERIC(14,2) NOT NULL,
+   note              TEXT,
+@@ -427,3 +429,150 @@ EXCEPTION WHEN duplicate_object THEN NULL;
+ END $$;
+ 
+ COMMIT;
++
++-- ─────────────────────────────────────────────────────────────
++-- Requests & approval workflow. Sales reps submit requests (order creation,
++-- credit-limit raise, special price); an admin approves/rejects them. All
++-- statements are idempotent, like the rest of this file.
++-- ─────────────────────────────────────────────────────────────
++BEGIN;
++
++-- NULL = no limit is enforced/flagged for this distributor.
++ALTER TABLE distributors ADD COLUMN IF NOT EXISTS credit_limit NUMERIC(12,2)
++  CHECK (credit_limit IS NULL OR credit_limit >= 0);
++
++CREATE TABLE IF NOT EXISTS requests (
++  id              SERIAL PRIMARY KEY,
++  type            TEXT NOT NULL CHECK (type IN ('order', 'credit_extension', 'price_override')),
++  status          TEXT NOT NULL DEFAULT 'pending' CHECK (status IN ('pending', 'approved', 'rejected', 'cancelled')),
++  requested_by    INTEGER NOT NULL REFERENCES users(id),
++  distributor_id  INTEGER NOT NULL REFERENCES distributors(id),
++  payload         JSONB NOT NULL,          -- type-specific proposed data (see requestController.js)
++  reason          TEXT,
++  reviewed_by     INTEGER REFERENCES users(id),
++  review_note     TEXT,
++  result_id       INTEGER,                 -- order id once an order request is approved
++  created_at      TIMESTAMPTZ NOT NULL DEFAULT now(),
++  reviewed_at     TIMESTAMPTZ
++);
++CREATE INDEX IF NOT EXISTS idx_requests_status ON requests(status, created_at DESC);
++CREATE INDEX IF NOT EXISTS idx_requests_distributor ON requests(distributor_id);
++CREATE INDEX IF NOT EXISTS idx_requests_requested_by ON requests(requested_by);
++
++-- One approved special price per distributor + product (re-approval replaces it).
++CREATE TABLE IF NOT EXISTS price_overrides (
++  id              SERIAL PRIMARY KEY,
++  distributor_id  INTEGER NOT NULL REFERENCES distributors(id),
++  product_id      INTEGER NOT NULL REFERENCES products(id),
++  price           NUMERIC(12,2) NOT NULL CHECK (price >= 0),
++  approved_by     INTEGER NOT NULL REFERENCES users(id),
++  request_id      INTEGER NOT NULL REFERENCES requests(id),
++  active          BOOLEAN NOT NULL DEFAULT true,
++  created_at      TIMESTAMPTZ NOT NULL DEFAULT now(),
++  UNIQUE (distributor_id, product_id)
++);
++
++-- requests: admin sees/changes everything; a rep sees requests for distributors
++-- in their zones, may only INSERT their own (in a zone they cover), and may only
++-- UPDATE (cancel) their own. Only admin can DELETE.
++ALTER TABLE requests ENABLE ROW LEVEL SECURITY;
++ALTER TABLE requests FORCE ROW LEVEL SECURITY;
++
++DO $$ BEGIN
++  CREATE POLICY requests_select ON requests FOR SELECT
++  USING (
++    current_setting('app.role', true) = 'admin'
++    OR EXISTS (
++      SELECT 1
++      FROM distributors d
++      JOIN user_zones uz ON uz.zone_id = d.zone_id
++      WHERE d.id = requests.distributor_id
++        AND uz.user_id = NULLIF(current_setting('app.user_id', true), '')::INTEGER
++    )
++  );
++EXCEPTION WHEN duplicate_object THEN NULL;
++END $$;
++
++DO $$ BEGIN
++  CREATE POLICY requests_insert ON requests FOR INSERT
++  WITH CHECK (
++    current_setting('app.role', true) = 'admin'
++    OR (
++      requested_by = NULLIF(current_setting('app.user_id', true), '')::INTEGER
++      AND EXISTS (
++        SELECT 1
++        FROM distributors d
++        JOIN user_zones uz ON uz.zone_id = d.zone_id
++        WHERE d.id = requests.distributor_id
++          AND uz.user_id = NULLIF(current_setting('app.user_id', true), '')::INTEGER
++      )
++    )
++  );
++EXCEPTION WHEN duplicate_object THEN NULL;
++END $$;
++
++DO $$ BEGIN
++  CREATE POLICY requests_update ON requests FOR UPDATE
++  USING (
++    current_setting('app.role', true) = 'admin'
++    OR requested_by = NULLIF(current_setting('app.user_id', true), '')::INTEGER
++  )
++  WITH CHECK (
++    current_setting('app.role', true) = 'admin'
++    OR requested_by = NULLIF(current_setting('app.user_id', true), '')::INTEGER
++  );
++EXCEPTION WHEN duplicate_object THEN NULL;
++END $$;
++
++DO $$ BEGIN
++  CREATE POLICY requests_delete ON requests FOR DELETE
++  USING (current_setting('app.role', true) = 'admin');
++EXCEPTION WHEN duplicate_object THEN NULL;
++END $$;
++
++-- price_overrides: reps can read overrides for their zones' distributors (so
++-- the order form can offer them); only admin can write (via request approval).
++ALTER TABLE price_overrides ENABLE ROW LEVEL SECURITY;
++ALTER TABLE price_overrides FORCE ROW LEVEL SECURITY;
++
++DO $$ BEGIN
++  CREATE POLICY price_overrides_select ON price_overrides FOR SELECT
++  USING (
++    current_setting('app.role', true) = 'admin'
++    OR EXISTS (
++      SELECT 1
++      FROM distributors d
++      JOIN user_zones uz ON uz.zone_id = d.zone_id
++      WHERE d.id = price_overrides.distributor_id
++        AND uz.user_id = NULLIF(current_setting('app.user_id', true), '')::INTEGER
++    )
++  );
++EXCEPTION WHEN duplicate_object THEN NULL;
++END $$;
++
++DO $$ BEGIN
++  CREATE POLICY price_overrides_admin_write ON price_overrides FOR ALL
++  USING (current_setting('app.role', true) = 'admin')
++  WITH CHECK (current_setting('app.role', true) = 'admin');
++EXCEPTION WHEN duplicate_object THEN NULL;
++END $$;
++
++-- Fix: the original constraint allowed ('Cash','credit') but ledgerService
++-- writes 'debit'/'credit', so every order creation failed. Existing databases
++-- still carry the old constraint; replace it. NOT VALID enforces the new rule
++-- on all new rows without failing the deploy if any legacy row has an old value.
++-- Guarded so re-running schema.sql is a no-op once the fix is in place.
++DO $$
++BEGIN
++  IF EXISTS (
++    SELECT 1 FROM pg_constraint
++    WHERE conname = 'ledger_type_check'
++      AND conrelid = 'ledger'::regclass
++      AND pg_get_constraintdef(oid) LIKE '%Cash%'
++  ) THEN
++    ALTER TABLE ledger DROP CONSTRAINT ledger_type_check;
++    ALTER TABLE ledger ADD CONSTRAINT ledger_type_check CHECK (type IN ('debit', 'credit')) NOT VALID;
++  END IF;
++END $$;
++
++COMMIT;
+diff --git a/backend/src/routes/orderRoutes.js b/backend/src/routes/orderRoutes.js
+index 08e75c6..ea6bc7f 100644
+--- a/backend/src/routes/orderRoutes.js
++++ b/backend/src/routes/orderRoutes.js
+@@ -13,6 +13,7 @@ const createRules = [
+   body('items').isArray({ min: 1 }).withMessage('At least one item is required.'),
+   body('items.*.product_id').isInt({ min: 1 }).withMessage('Each item needs a valid product_id.'),
+   body('items.*.quantity').isFloat({ gt: 0 }).withMessage('Each item quantity must be greater than 0.'),
++  body('items.*.price_override_id').optional({ nullable: true }).isInt({ min: 1 }).withMessage('price_override_id must be a valid id.'),
+   body('discount').optional().isFloat({ min: 0 }).withMessage('Discount must be a non-negative number.'),
+   body('discount_type').optional().isIn(['fixed', 'percentage']).withMessage('discount_type must be fixed or percentage.'),
+   body('freight_cost').optional().isFloat({ min: 0 }).withMessage('Freight cost must be a non-negative number.'),
+diff --git a/backend/src/routes/priceOverrideRoutes.js b/backend/src/routes/priceOverrideRoutes.js
+new file mode 100644
+index 0000000..caca1c7
+--- /dev/null
++++ b/backend/src/routes/priceOverrideRoutes.js
+@@ -0,0 +1,22 @@
++const express = require('express');
++const { param } = require('express-validator');
++const { requireAuth, requireRole } = require('../middleware/auth');
++const { validate } = require('../middleware/validate');
++const { withRls } = require('../middleware/rls');
++const controller = require('../controllers/requestController');
++
++const router = express.Router();
++router.use(requireAuth);
++
++// Approved special prices. Reps read these (RLS limits them to their zones) so the
++// order form can offer the approved price; only admin can revoke / re-enable.
++router.get('/', withRls(controller.listOverrides));
++router.patch(
++  '/:id',
++  requireRole('admin'),
++  param('id').isInt({ min: 1 }).withMessage('Invalid price override id.'),
++  validate,
++  withRls(controller.setOverrideActive)
++);
++
++module.exports = router;
+diff --git a/backend/src/routes/requestRoutes.js b/backend/src/routes/requestRoutes.js
+new file mode 100644
+index 0000000..1eaf75d
+--- /dev/null
++++ b/backend/src/routes/requestRoutes.js
+@@ -0,0 +1,32 @@
++const express = require('express');
++const { body, param } = require('express-validator');
++const { requireAuth, requireRole } = require('../middleware/auth');
++const { validate } = require('../middleware/validate');
++const { withRls } = require('../middleware/rls');
++const controller = require('../controllers/requestController');
++
++const router = express.Router();
++router.use(requireAuth);
++
++const idRule = param('id').isInt({ min: 1 }).withMessage('Invalid request id.');
++
++const createRules = [
++  body('type').isIn(['order', 'credit_extension', 'price_override']).withMessage('Invalid request type.'),
++  body('distributor_id').isInt({ min: 1 }).withMessage('distributor_id is required.'),
++  body('payload').isObject().withMessage('payload must be an object.'),
++  body('reason').optional({ nullable: true }).trim().isLength({ max: 2000 }),
++];
++
++const reviewRules = [
++  idRule,
++  body('review_note').optional({ nullable: true }).trim().isLength({ max: 2000 }),
++];
++
++router.get('/', withRls(controller.list)); // admin = approval inbox, rep = requests in their zones (?mine=true for their own)
++router.get('/:id', idRule, validate, withRls(controller.getOne));
++router.post('/', createRules, validate, withRls(controller.create)); // credit_extension / price_override; orders go through POST /api/orders
++router.post('/:id/approve', requireRole('admin'), reviewRules, validate, withRls(controller.approve));
++router.post('/:id/reject', requireRole('admin'), reviewRules, validate, withRls(controller.reject));
++router.post('/:id/cancel', idRule, validate, withRls(controller.cancel)); // requester only (checked in the controller)
++
++module.exports = router;
+diff --git a/backend/src/services/ledgerService.js b/backend/src/services/ledgerService.js
+index 2fde66b..b5670b3 100644
+--- a/backend/src/services/ledgerService.js
++++ b/backend/src/services/ledgerService.js
+@@ -92,6 +92,21 @@ async function createOrderWithLedger(client, {
+   );
+   const productMap = new Map(productResult.rows.map((p) => [p.id, p]));
+ 
++  // Optional per-line special price (price_override_id). It is only honoured
++  // if it is an ACTIVE price_overrides row for this exact distributor +
++  // product, so a caller can never smuggle in an arbitrary unit price.
++  const overrideIds = items
++    .map((i) => i.price_override_id)
++    .filter((id) => id !== undefined && id !== null);
++  const overrideMap = new Map();
++  if (overrideIds.length > 0) {
++    const overrideResult = await client.query(
++      `SELECT id, distributor_id, product_id, price, active FROM price_overrides WHERE id = ANY($1::int[])`,
++      [overrideIds]
++    );
++    for (const row of overrideResult.rows) overrideMap.set(row.id, row);
++  }
++
+   let subtotal = 0;
+   const resolvedItems = items.map((item) => {
+     const product = productMap.get(item.product_id);
+@@ -104,13 +119,28 @@ async function createOrderWithLedger(client, {
+     if (!(item.quantity > 0)) {
+       throw new ApiError(400, `Quantity for product ${item.product_id} must be greater than zero.`);
+     }
+-    const lineTotal = Number(product.price) * Number(item.quantity);
++
++    let unitPrice = product.price;
++    if (item.price_override_id !== undefined && item.price_override_id !== null) {
++      const override = overrideMap.get(Number(item.price_override_id));
++      if (
++        !override ||
++        !override.active ||
++        override.distributor_id !== Number(distributorId) ||
++        override.product_id !== product.id
++      ) {
++        throw new ApiError(400, `Price override ${item.price_override_id} is not valid for this distributor and product.`);
++      }
++      unitPrice = override.price;
++    }
++
++    const lineTotal = Number(unitPrice) * Number(item.quantity);
+     subtotal += lineTotal;
+     return {
+       product_id: product.id,
+       manufacturer_id: product.manufacturer_id,
+       quantity: item.quantity,
+-      price_at_time_of_order: product.price,
++      price_at_time_of_order: unitPrice,
+       retail_price_at_time_of_order: product.retail_price,
+     };
+   });
+diff --git a/backend/src/services/requestService.js b/backend/src/services/requestService.js
+new file mode 100644
+index 0000000..ca65000
+--- /dev/null
++++ b/backend/src/services/requestService.js
+@@ -0,0 +1,203 @@
++const { ApiError } = require('../utils/ApiError');
++const { recordAudit } = require('../utils/audit');
++const { createOrderWithLedger } = require('./ledgerService');
++
++// Business logic for the requests/approval workflow (see
++// docs/superpowers/specs/2026-10-12-requests-approval-design.md).
++// Every function takes `db` (the transaction-scoped client from withRls) as its
++// first argument, same convention as ledgerService.js, so callers control the
++// transaction and RLS context.
++
++const REQUEST_TYPES = ['order', 'credit_extension', 'price_override'];
++
++// Validates and normalizes the type-specific payload for the two request types
++// that are submitted through POST /api/requests. (Order payloads are validated
++// by orderRoutes.js's createRules, since they arrive through POST /api/orders.)
++async function normalizePayload(db, type, payload) {
++  if (!payload || typeof payload !== 'object' || Array.isArray(payload)) {
++    throw new ApiError(400, 'payload must be an object.');
++  }
++
++  if (type === 'credit_extension') {
++    const raw = payload.new_limit;
++    const limit = Number(raw);
++    if (raw === undefined || raw === null || raw === '' || !Number.isFinite(limit) || limit < 0) {
++      throw new ApiError(400, 'payload.new_limit must be a number >= 0.');
++    }
++    return { new_limit: limit };
++  }
++
++  if (type === 'price_override') {
++    const productId = Number(payload.product_id);
++    const price = Number(payload.price);
++    if (!Number.isInteger(productId) || productId < 1) {
++      throw new ApiError(400, 'payload.product_id must be a valid product id.');
++    }
++    if (payload.price === undefined || payload.price === null || payload.price === '' || !Number.isFinite(price) || price < 0) {
++      throw new ApiError(400, 'payload.price must be a number >= 0.');
++    }
++    const product = await db.query('SELECT id FROM products WHERE id = $1', [productId]);
++    if (product.rows.length === 0) {
++      throw new ApiError(400, `Product ${productId} not found.`);
++    }
++    return { product_id: productId, price };
++  }
++
++  throw new ApiError(400, `Unsupported request type: ${type}`);
++}
++
++// Inserts a pending request. For a rep, RLS (requests_insert) additionally
++// guarantees requested_by is themselves and the distributor is in their zones;
++// the explicit distributor lookup here just turns "not visible to you" into a
++// clean 404 instead of an RLS violation.
++async function createRequest(db, { type, requestedBy, distributorId, payload, reason = null }) {
++  if (!REQUEST_TYPES.includes(type)) {
++    throw new ApiError(400, `Invalid request type: ${type}`);
++  }
++
++  const distributor = await db.query('SELECT id FROM distributors WHERE id = $1', [distributorId]);
++  if (distributor.rows.length === 0) {
++    throw new ApiError(404, `Distributor ${distributorId} not found.`);
++  }
++
++  const result = await db.query(
++    `INSERT INTO requests (type, requested_by, distributor_id, payload, reason)
++     VALUES ($1, $2, $3, $4, $5)
++     RETURNING *`,
++    [type, requestedBy, distributorId, JSON.stringify(payload), reason]
++  );
++  const request = result.rows[0];
++
++  await recordAudit(db, {
++    userId: requestedBy,
++    action: 'CREATE',
++    entityType: 'request',
++    entityId: request.id,
++    after: request,
++  });
++
++  return request;
++}
++
++// Carries out the real-world effect of an approved request. Runs inside the
++// approve transaction: if anything here throws, the whole approval (including
++// the status change) rolls back and the request stays pending.
++// Returns { resultId, order? } — resultId is stored on the request.
++async function applyRequest(db, request, approverId) {
++  const p = request.payload;
++
++  if (request.type === 'order') {
++    const order = await createOrderWithLedger(db, {
++      distributorId: request.distributor_id,
++      createdBy: request.requested_by, // attributed to the rep who asked, not the approving admin
++      items: p.items,
++      discount: p.discount,
++      discountType: p.discount_type || 'fixed',
++      freightCost: p.freight_cost,
++      paymentTerm: p.payment_term,
++      paymentStatus: p.payment_status,
++      amountPaid: p.amount_paid || 0,
++      notes: p.notes,
++    });
++    return { resultId: order.id, order };
++  }
++
++  if (request.type === 'credit_extension') {
++    const updated = await db.query(
++      'UPDATE distributors SET credit_limit = $1 WHERE id = $2 RETURNING id',
++      [p.new_limit, request.distributor_id]
++    );
++    if (updated.rows.length === 0) throw new ApiError(404, 'Distributor not found.');
++    return { resultId: updated.rows[0].id };
++  }
++
++  if (request.type === 'price_override') {
++    const upserted = await db.query(
++      `INSERT INTO price_overrides (distributor_id, product_id, price, approved_by, request_id, active)
++       VALUES ($1, $2, $3, $4, $5, true)
++       ON CONFLICT (distributor_id, product_id)
++       DO UPDATE SET price = EXCLUDED.price,
++                     approved_by = EXCLUDED.approved_by,
++                     request_id = EXCLUDED.request_id,
++                     active = true,
++                     created_at = now()
++       RETURNING id`,
++      [request.distributor_id, p.product_id, p.price, approverId, request.id]
++    );
++    return { resultId: upserted.rows[0].id };
++  }
++
++  throw new ApiError(400, `Unsupported request type: ${request.type}`);
++}
++
++// Rough order total from CURRENT prices (honouring any price overrides), used
++// only to warn an admin that approving would exceed a credit limit. The
++// authoritative total is still computed by createOrderWithLedger at approval.
++async function estimateOrderTotal(db, payload) {
++  const items = Array.isArray(payload.items) ? payload.items : [];
++  if (items.length === 0) return 0;
++
++  const productIds = items.map((i) => Number(i.product_id)).filter(Number.isInteger);
++  const prices = await db.query('SELECT id, price FROM products WHERE id = ANY($1::int[])', [productIds]);
++  const priceMap = new Map(prices.rows.map((p) => [p.id, Number(p.price)]));
++
++  const overrideIds = items
++    .map((i) => i.price_override_id)
++    .filter((id) => id !== undefined && id !== null)
++    .map(Number)
++    .filter(Number.isInteger);
++  const overrideMap = new Map();
++  if (overrideIds.length > 0) {
++    const overrides = await db.query(
++      'SELECT id, price, active FROM price_overrides WHERE id = ANY($1::int[])',
++      [overrideIds]
++    );
++    for (const row of overrides.rows) overrideMap.set(row.id, row);
++  }
++
++  let subtotal = 0;
++  for (const item of items) {
++    const override = item.price_override_id != null ? overrideMap.get(Number(item.price_override_id)) : null;
++    const unit = override && override.active ? Number(override.price) : priceMap.get(Number(item.product_id)) || 0;
++    subtotal += unit * Number(item.quantity || 0);
++  }
++
++  const discount = Number(payload.discount || 0);
++  const discountAmount = payload.discount_type === 'percentage' ? (subtotal * discount) / 100 : discount;
++  return Math.max(0, subtotal - discountAmount + Number(payload.freight_cost || 0));
++}
++
++// Soft guardrail (never blocks approval): flags a pending order request that
++// would push the distributor past their credit_limit.
++async function computeWarnings(db, request) {
++  if (request.status !== 'pending' || request.type !== 'order') return [];
++
++  const result = await db.query('SELECT balance, credit_limit FROM distributors WHERE id = $1', [request.distributor_id]);
++  const distributor = result.rows[0];
++  if (!distributor || distributor.credit_limit === null) return [];
++
++  const total = await estimateOrderTotal(db, request.payload);
++  const projected = Number((Number(distributor.balance) + total - Number(request.payload.amount_paid || 0)).toFixed(2));
++  const limit = Number(distributor.credit_limit);
++
++  if (projected > limit) {
++    return [
++      {
++        code: 'credit_limit_exceeded',
++        message: `Approving this order would put the distributor's balance at ${projected.toFixed(2)}, over their credit limit of ${limit.toFixed(2)}.`,
++        projected_balance: projected,
++        credit_limit: limit,
++      },
++    ];
++  }
++  return [];
++}
++
++module.exports = {
++  REQUEST_TYPES,
++  normalizePayload,
++  createRequest,
++  applyRequest,
++  estimateOrderTotal,
++  computeWarnings,
++};
+diff --git a/docs/superpowers/plans/2026-10-14-notifications-plan.md b/docs/superpowers/plans/2026-10-14-notifications-plan.md
+new file mode 100644
+index 0000000..d2b13a7
+--- /dev/null
++++ b/docs/superpowers/plans/2026-10-14-notifications-plan.md
+@@ -0,0 +1,110 @@
++# Notifications — Implementation Plan
++
++Status: DRAFT for review (nothing built yet). Written so several people/AIs can work in parallel.
++Depends on: Requests & Approval (already built — see `docs/superpowers/specs/2026-10-12-requests-approval-design.md`).
++
++## 1. Goal
++
++Tell the right person, in the app, when something needs their attention or has changed — without them refreshing pages or being polled by hand.
++
++Real-world analogy: a shop's notice board per person. When a rep submits an order, a note is pinned on the **admin's** board; when the admin decides, a note is pinned on the **rep's** board. Each person only ever sees their own board.
++
++## 2. Scope (v1) — proposed, confirm before building
++
++| Event | Who is notified |
++|---|---|
++| Request submitted (order / credit limit / special price) | all active admins |
++| Request approved / rejected (with admin's note) | the rep who submitted it |
++| Order created from an approved request | the rep (link to the order) |
++| Credit-limit extension approved | the rep |
++| Special price approved / revoked | the rep |
++| Distributor balance exceeds credit limit (soft warning) | all admins |
++
++Out of scope for v1 (listed so nobody builds them by accident): email / SMS / push, per-user notification preferences, quiet hours, notifying on payments or cancellations (not gated by approval yet), digest emails.
++
++## 3. Findings that shape the design (verified in the code)
++
++1. **Sockets are unauthenticated and everything is broadcast.** `server.js` accepts any connection and controllers call `io.emit(...)` to *everyone*. Fine for "refresh the orders list"; not acceptable for per-person notifications. The existing `request:created` / `request:reviewed` events (added with Requests & Approval) also go to every connected client — they only carry ids/status, but they should move to targeted delivery too.
++2. **RLS is the app's security model.** A `notifications` table must follow it: a user can only read/update their own rows.
++3. **Notification rows must be written in the same transaction as the business change** (same rule as `afterCommit` for emits): if approval rolls back, no notification exists.
++4. The existing pattern `req.afterCommit(fn)` is the correct place to push the live socket event after COMMIT.
++
++## 4. Design
++
++### Data model
++```
++notifications
++  id            SERIAL PK
++  user_id       INT  NOT NULL REFERENCES users(id) ON DELETE CASCADE   -- recipient
++  type          TEXT NOT NULL          -- 'request_submitted' | 'request_approved' | 'request_rejected' | 'order_created' | 'credit_limit_exceeded' | ...
++  title         TEXT NOT NULL
++  body          TEXT
++  link          TEXT                   -- in-app route, e.g. '/requests' or '/orders/42'
++  entity_type   TEXT, entity_id INT    -- what it is about (request / order / distributor)
++  read_at       TIMESTAMPTZ            -- NULL = unread
++  created_at    TIMESTAMPTZ NOT NULL DEFAULT now()
++INDEX (user_id, read_at, created_at DESC)
++```
++RLS (ENABLE + FORCE): SELECT/UPDATE/DELETE only where `user_id = current_setting('app.user_id')::int`. INSERT: any authenticated context may insert **for any user** (a rep's action notifies admins), so INSERT policy is `WITH CHECK (true)` for the app role, and the *service* decides recipients. Retention: delete rows older than 90 days (cron-style cleanup, or on read).
++
++### API (all under `requireAuth` + `withRls`)
++| Method | Path | Purpose |
++|---|---|---|
++| GET | `/api/notifications?unread=true&page=` | my notifications, newest first (paginated) |
++| GET | `/api/notifications/unread-count` | number for the bell badge |
++| PATCH | `/api/notifications/:id/read` | mark one read |
++| POST | `/api/notifications/read-all` | mark all mine read |
++| DELETE | `/api/notifications/:id` | dismiss one |
++
++### Service: `services/notificationService.js`
++- `notifyUsers(db, userIds, { type, title, body, link, entityType, entityId })` — inserts rows (bulk insert), returns them.
++- `notifyAdmins(db, payload)` — looks up active admins (users table has no RLS) then `notifyUsers`.
++- Callers pass the same `db` transaction client; the caller does `req.afterCommit(() => pushToUsers(...))`.
++
++### Live delivery
++- **Prerequisite:** authenticate the socket handshake with the same session cookie / JWT as `requireAuth`, and have each socket `join('user:<id>')` (and `role:admin`).
++- `pushToUsers(io, userIds, event, data)` emits to `user:<id>` rooms only: event `notification:new` with the row.
++- Frontend `SocketContext` listens for `notification:new`, bumps the badge, shows a toast.
++- Switch `request:created` / `request:reviewed` to targeted rooms as part of the same task.
++- If the socket is down, nothing is lost: the bell fetches the unread count on load, on window focus, and every 60 s as a fallback.
++
++### Frontend
++- Bell icon with unread badge in `Layout` top bar; dropdown of latest 10 with "Mark all read" and "View all".
++- `/notifications` page: full list, unread filter, click → marks read and navigates to `link`.
++- Reuse existing `Toast`, `StatusBadge`, `tokens.css` tokens only (project rule — no new colors).
++
++## 5. Tasks (parallelizable)
++
++Dependency graph: **T1 → T2/T3/T4 → T5/T6**; T7 can start any time; T8 last.
++
++| ID | Task | Owner can start when | Files (own these — avoid collisions) |
++|---|---|---|---|
++| T1 | Schema: `notifications` table, index, RLS policies, idempotent (`IF NOT EXISTS`, `DO $$ … duplicate_object`) | now | `backend/src/db/schema.sql` (append-only block) |
++| T2 | `notificationService.js` + unit-style script test against local Postgres | T1 | `backend/src/services/notificationService.js` |
++| T3 | Notifications controller + routes + mount in `app.js` | T1 | `controllers/notificationController.js`, `routes/notificationRoutes.js`, `app.js` (2 lines) |
++| T4 | Socket auth + rooms (`user:<id>`, `role:admin`), `pushToUsers` helper | now | `backend/src/server.js`, `backend/src/utils/realtime.js` |
++| T5 | Wire producers: requestController (submit/approve/reject/cancel), orderController (rep order → 202), credit-limit warning | T2, T4 | `requestController.js`, `orderController.js`, `requestService.js` |
++| T6 | Frontend: API client, bell + dropdown, `/notifications` page, SocketContext listener, 60 s fallback poll | T3 (API shape is fixed above, so UI can start with a mock) | `frontend/src/api/endpoints.js`, `components/NotificationBell.jsx`, `pages/NotificationsPage.jsx`, `context/SocketContext.jsx`, `components/Layout.jsx`, `App.jsx` |
++| T7 | Retention cleanup (delete > 90 days) | T1 | `backend/src/services/notificationService.js` or a small job in `server.js` |
++| T8 | End-to-end verification + patch packaging | all | — |
++
++### Acceptance criteria
++- A rep submits an order → every admin has exactly one unread notification; the rep has none.
++- Admin approves → the rep gets one notification linking to the new order; admins do not get a duplicate.
++- Rolled-back approval (force an error) → no notification rows created.
++- Rep A can never read, count, or mark rep B's notifications (verify with two tokens, expect 404/empty).
++- An unauthenticated socket is refused; a connected user receives only events for their own room.
++- Bell badge matches `GET /unread-count`; marking read updates it without reload.
++- Schema applies twice with no errors; `node --check` clean; `vite build` clean.
++
++## 6. Risks / decisions to confirm
++
++1. **Who counts as "all admins"?** Proposed: every active user with role `admin`.
++2. **Socket auth change is a behavior change** for existing live-refresh (orders list). Needs a regression check on Orders/Dashboard live updates.
++3. **Notification fan-out size** is tiny today (few admins), so synchronous insert inside the request transaction is fine; revisit if admin count grows large.
++4. **Volume:** credit-limit warnings could repeat on every order — de-duplicate (one unread per distributor).
++5. Email/push later: the `notifications` table is the single source, so a worker can fan out from it without changing producers.
++
++## 7. Suggested order if one person does it alone
++
++T1 → T2 → T3 → T4 → T5 → T6 → T7 → T8. About one focused session for backend (T1–T5, T7), one for frontend (T6) plus verification (T8).
+diff --git a/docs/superpowers/specs/2026-10-12-requests-approval-design.md b/docs/superpowers/specs/2026-10-12-requests-approval-design.md
+new file mode 100644
+index 0000000..f5266de
+--- /dev/null
++++ b/docs/superpowers/specs/2026-10-12-requests-approval-design.md
+@@ -0,0 +1,136 @@
++# Requests & Approval Workflow — Design Spec
++
++Date: 2026-10-12
++Status: Design approved in conversation; awaiting written-spec review
++Depends on: Zones RLS (branch `zones-rls-implementation`) — this design reuses its `withRls` / `req.afterCommit` / `req.respond` patterns and its zone-scoped RLS policies.
++
++## 1. Goal
++
++Sales reps must not be able to change money-affecting state on their own. They submit **requests**; an admin approves or rejects them; **nothing changes until approval**. Admin actions stay immediate.
++
++Three request types, one mechanism:
++
++| Type | Rep asks for | Effect on approval |
++|---|---|---|
++| `order` | An order to be created | Order + ledger entry created, attributed to the requesting rep |
++| `credit_extension` | A higher credit limit for a distributor | `distributors.credit_limit` updated |
++| `price_override` | A special price for one distributor + product | Row upserted in `price_overrides`; selectable on future orders |
++
++## 2. Scope decisions (made during brainstorming)
++
++- Every rep-created order needs admin approval. Admin-created orders go live immediately.
++- Discount override is **not** a separate type: every order is already reviewed, and the discount is visible on it.
++- Credit limit is a **soft guardrail**: if approving an order would push a distributor past `credit_limit`, the admin sees a warning but may still approve. Admin is the final authority.
++- Price override is scoped to one distributor + product pair. It does not change the catalog price.
++- **Out of scope this round:** recording payments and cancelling orders by reps stay as they are today. Only order *creation* is gated. These are a natural follow-up request type.
++- `POST /api/orders` stays the single entry point (no frontend route change). Behaviour branches on role:
++  - `admin` → unchanged (live order, `201`)
++  - `sales_rep` → inserts a `requests` row, returns `202 Accepted` with the pending request
++
++## 3. Data model
++
++```sql
++CREATE TABLE IF NOT EXISTS requests (
++  id              SERIAL PRIMARY KEY,
++  type            TEXT NOT NULL CHECK (type IN ('order', 'credit_extension', 'price_override')),
++  status          TEXT NOT NULL DEFAULT 'pending' CHECK (status IN ('pending', 'approved', 'rejected', 'cancelled')),
++  requested_by    INTEGER NOT NULL REFERENCES users(id),
++  distributor_id  INTEGER NOT NULL REFERENCES distributors(id),
++  payload         JSONB NOT NULL,
++  reason          TEXT,
++  reviewed_by     INTEGER REFERENCES users(id),
++  review_note     TEXT,
++  result_id       INTEGER,
++  created_at      TIMESTAMPTZ NOT NULL DEFAULT now(),
++  reviewed_at     TIMESTAMPTZ
++);
++
++ALTER TABLE distributors ADD COLUMN IF NOT EXISTS credit_limit NUMERIC(12,2); -- NULL = no limit
++
++CREATE TABLE IF NOT EXISTS price_overrides (
++  id              SERIAL PRIMARY KEY,
++  distributor_id  INTEGER NOT NULL REFERENCES distributors(id),
++  product_id      INTEGER NOT NULL REFERENCES products(id),
++  price           NUMERIC(12,2) NOT NULL CHECK (price >= 0),
++  approved_by     INTEGER NOT NULL REFERENCES users(id),
++  request_id      INTEGER NOT NULL REFERENCES requests(id),
++  active          BOOLEAN NOT NULL DEFAULT true,
++  created_at      TIMESTAMPTZ NOT NULL DEFAULT now(),
++  UNIQUE (distributor_id, product_id)
++);
++```
++
++Payload shapes (validated per type at submission time):
++
++- `order`: the exact body `POST /api/orders` accepts today (`distributor_id`, `items[]`, `discount`, `discount_type`, `freight_cost`, `payment_term`, `amount_paid`, `notes`; items may carry an optional `price_override_id`).
++- `credit_extension`: `{ "new_limit": <number >= 0> }`
++- `price_override`: `{ "product_id": <int>, "price": <number >= 0> }`
++
++`distributor_id` is always set (for an order it is the order's distributor) so RLS can reuse the zone pattern.
++
++### RLS on the new tables
++
++Enable and FORCE RLS, same idiom as the zones work (`current_setting('app.user_id', true)` / `app.role`):
++
++- `requests`: admin → all rows. Rep → SELECT rows for distributors in one of their zones (via `user_zones`); INSERT `WITH CHECK` requires `requested_by` = own id and distributor in their zones; UPDATE (cancel) only on their own rows.
++- `price_overrides`: admin → all. Rep → SELECT only, for distributors in their zones. Writes only via admin approval.
++
++Idempotent via `CREATE TABLE IF NOT EXISTS` and the existing `DO $$ ... EXCEPTION WHEN duplicate_object` wrapper for policies, matching `schema.sql` conventions. No one-time backfill is needed.
++
++## 4. API
++
++New `backend/src/routes/requestRoutes.js` mounted at `/api/requests`, all handlers wrapped in `withRls`, using `req.respond` / `req.afterCommit`.
++
++| Method + path | Who | Behaviour |
++|---|---|---|
++| `GET /api/requests?status=&type=` | any role | RLS-scoped list. Admin = approval inbox; rep = "my requests" |
++| `GET /api/requests/:id` | any role | Detail (RLS-scoped) |
++| `POST /api/requests` | sales_rep (and admin) | Create `credit_extension` / `price_override` requests. `order` type is created through `POST /api/orders` |
++| `POST /api/requests/:id/approve` | admin | Runs the type-specific effect + marks approved, in one transaction |
++| `POST /api/requests/:id/reject` | admin | Body `{ review_note }`; no side effects |
++| `POST /api/requests/:id/cancel` | requester | Withdraw own request while `pending` |
++
++### Approve flow (single transaction)
++
++1. `UPDATE requests SET status='approved', reviewed_by=$admin, reviewed_at=now() WHERE id=$1 AND status='pending' RETURNING *` — zero rows → `409 "Already reviewed."` (handles two admins racing).
++2. Dispatch on `type`:
++   - `order` → `createOrderWithLedger(req.db, { ...payload, created_by: request.requested_by })`; store the new order id in `result_id`. If `distributors.credit_limit` is set and would be exceeded, the request detail response includes a `warnings` array (computed on read), but approval is not blocked.
++   - `credit_extension` → `UPDATE distributors SET credit_limit = $new WHERE id = $d`
++   - `price_override` → `INSERT ... ON CONFLICT (distributor_id, product_id) DO UPDATE SET price, approved_by, request_id, active=true`
++3. If the effect throws (e.g. the order fails against current data), the transaction rolls back and the request stays `pending`. Never "approved without effect".
++4. Cache invalidation / Socket.IO emits go in `req.afterCommit`.
++
++### `POST /api/orders` change
++
++In `orderController.create`: if `req.user.role === 'sales_rep'`, insert a `requests` row (`type='order'`, `payload=req.body`) and `req.respond(202, request)`; otherwise existing behaviour. Existing express-validator `createRules` still run first, so malformed orders are rejected at submission rather than at approval.
++
++### Price override usage
++
++An order line item may include `price_override_id`. `createOrderWithLedger` must verify that id is an `active` override for that same distributor + product and use its price; otherwise reject. A rep can never type an arbitrary unit price.
++
++## 5. Frontend
++
++- Order stepper: handle `202` → show "Submitted for approval" (not "Order created"); no navigation to a non-existent order.
++- New **Requests** page: admin sees the pending inbox with approve/reject (+ note) and credit-limit warnings; rep sees their own requests with status.
++- Rep-facing forms to raise a credit extension and a price override from the distributor / order screens.
++- Order stepper line items: when an active override exists for the chosen distributor + product, offer it as the price.
++- Reuse the existing status-modal system (no `window.confirm`) and existing design tokens only.
++
++## 6. Edge cases
++
++- Rep edits a pending request → not allowed; cancel and resubmit.
++- Two admins approve concurrently → second gets 409 (approve step 1).
++- Rep's zones change after submitting → irrelevant; `distributor_id` is fixed at submission.
++- Approving an order whose products/prices changed since submission → the order is created with *current* data; the effect either succeeds or rolls back and the request stays pending with the error shown to the admin.
++- Discount applies as in the submitted payload; the admin is expected to review it before approving.
++
++## 7. Known gaps / follow-ups (explicitly not in this round)
++
++- Payment recording and order cancellation approvals.
++- `distributors.zone_id` can't be cleared via `COALESCE` (pre-existing).
++- `ledger.type` CHECK constraint (`'Cash','credit'` vs code inserting `'debit'`) blocks **every** order creation, including approved ones. This must be fixed before this feature can be exercised end-to-end.
++- No notifications; admins find requests via the inbox (a Socket.IO "request created" event is a cheap later add).
++
++## 8. Testing
++
++The repo has no automated test framework; verification is manual (curl/SQL against a local Postgres), matching the zones work. Key checks: rep `POST /api/orders` returns 202 and changes no order/ledger rows; admin approve creates the order attributed to the rep; double-approve returns 409; rep cannot see another zone's requests; rep cannot approve; a price override cannot be used unless active and matching.
+diff --git a/frontend/src/App.jsx b/frontend/src/App.jsx
+index 3d6e313..add92ec 100644
+--- a/frontend/src/App.jsx
++++ b/frontend/src/App.jsx
+@@ -12,6 +12,7 @@ import DashboardPage from './pages/DashboardPage';
+ import OrdersPage from './pages/OrdersPage';
+ import CreateOrderPage from './pages/CreateOrderPage';
+ import OrderDetailPage from './pages/OrderDetailPage';
++import RequestsPage from './pages/RequestsPage';
+ import DistributorsPage from './pages/DistributorsPage';
+ import ProductsPage from './pages/ProductsPage';
+ import ManufacturersPage from './pages/ManufacturersPage';
+@@ -65,6 +66,7 @@ const router = createBrowserRouter([
+           { path: '/orders', element: <OrdersPage /> },
+           { path: '/orders/new', element: <CreateOrderPage /> },
+           { path: '/orders/:id', element: <OrderDetailPage /> },
++          { path: '/requests', element: <RequestsPage /> },
+           { path: '/distributors', element: <DistributorsPage /> },
+           { path: '/ledger', element: <LedgerPage /> },
+           { path: '/products', element: <ProtectedRoute adminOnly><ProductsPage /></ProtectedRoute> },
+diff --git a/frontend/src/api/endpoints.js b/frontend/src/api/endpoints.js
+index f3ce875..b5f3f69 100644
+--- a/frontend/src/api/endpoints.js
++++ b/frontend/src/api/endpoints.js
+@@ -78,6 +78,23 @@ export const zonesApi = {
+   remove: (id) => client.delete(`/zones/${id}`),
+ };
+ 
++export const requestsApi = {
++  // Admin sees the whole inbox; reps see requests in their zones (mine: true = only their own).
++  list: (params) => client.get('/requests', { params }),
++  get: (id) => client.get(`/requests/${id}`),
++  // credit_extension / price_override only — orders go through ordersApi.create,
++  // which answers 202 + a pending request for non-admins.
++  create: (data) => client.post('/requests', data),
++  approve: (id, review_note) => client.post(`/requests/${id}/approve`, { review_note }),
++  reject: (id, review_note) => client.post(`/requests/${id}/reject`, { review_note }),
++  cancel: (id) => client.post(`/requests/${id}/cancel`),
++};
++
++export const priceOverridesApi = {
++  list: (params) => client.get('/price-overrides', { params }),
++  setActive: (id, active) => client.patch(`/price-overrides/${id}`, { active }),
++};
++
+ export const exportApi = {
+   // which: 'products' | 'orders' | 'distributors'; format: 'excel' | 'pdf'.
+   // Excel keeps the original URLs (/export/products); PDF adds /pdf on the end.
+diff --git a/frontend/src/components/Layout.jsx b/frontend/src/components/Layout.jsx
+index bc3b9d7..5e95870 100644
+--- a/frontend/src/components/Layout.jsx
++++ b/frontend/src/components/Layout.jsx
+@@ -13,6 +13,7 @@ import {
+   CloudUpload,
+   Menu,
+   Settings,
++  ClipboardCheck,
+ } from 'lucide-react';
+ 
+ import { useAuth } from '../context/AuthContext';
+@@ -23,6 +24,7 @@ import { APP_NAME } from '../config';
+ const NAV_ITEMS = [
+   { to: '/', label: 'Dashboard', icon: LayoutDashboard, end: true },
+   { to: '/orders', label: 'Orders', icon: FileText },
++  { to: '/requests', label: 'Requests', icon: ClipboardCheck },
+   { to: '/distributors', label: 'Distributors', icon: Building2 },
+   { to: '/products', label: 'Products', icon: Package, adminOnly: true },
+   { to: '/manufacturers', label: 'Manufacturers', icon: Factory, adminOnly: true },
+diff --git a/frontend/src/components/StatusBadge.jsx b/frontend/src/components/StatusBadge.jsx
+index 1e94d65..09a8079 100644
+--- a/frontend/src/components/StatusBadge.jsx
++++ b/frontend/src/components/StatusBadge.jsx
+@@ -10,6 +10,8 @@ const TONES = {
+   unpaid: 'red',
+   inactive: 'red',
+   cancelled: 'red',
++  approved: 'green',
++  rejected: 'red',
+ };
+ 
+ export default function StatusBadge({ value }) {
+diff --git a/frontend/src/context/SocketContext.jsx b/frontend/src/context/SocketContext.jsx
+index c1e670a..55e4920 100644
+--- a/frontend/src/context/SocketContext.jsx
++++ b/frontend/src/context/SocketContext.jsx
+@@ -37,6 +37,8 @@ export function SocketProvider({ children }) {
+     socket.on('order:created', handle('order:created'));
+     socket.on('order:updated', handle('order:updated'));
+     socket.on('order:payment', handle('order:payment'));
++    socket.on('request:created', handle('request:created'));
++    socket.on('request:reviewed', handle('request:reviewed'));
+ 
+     return () => {
+       socket.disconnect();
+diff --git a/frontend/src/pages/CreateOrderPage.jsx b/frontend/src/pages/CreateOrderPage.jsx
+index 1caaf18..753552f 100644
+--- a/frontend/src/pages/CreateOrderPage.jsx
++++ b/frontend/src/pages/CreateOrderPage.jsx
+@@ -286,6 +286,13 @@ export default function CreateOrderPage() {
+       submittedRef.current = true;
+       setSubmitted(true);
+       if (draftIdRef.current) deleteDraft(draftIdRef.current).catch(() => {});
++      if (res.status === 202 || res.data.pending_approval) {
++        // Sales reps don't create orders directly — it's now a pending request
++        // that an admin has to approve. Nothing exists on the ledger yet.
++        toast.success('Order submitted for admin approval.');
++        navigate('/requests');
++        return;
++      }
+       toast.success(`Order ${res.data.order_number} created.`);
+       navigate(`/orders/${res.data.id}`);
+     } catch (err) {
+diff --git a/frontend/src/pages/DistributorsPage.jsx b/frontend/src/pages/DistributorsPage.jsx
+index b586889..7c1bbb3 100644
+--- a/frontend/src/pages/DistributorsPage.jsx
++++ b/frontend/src/pages/DistributorsPage.jsx
+@@ -82,8 +82,11 @@ export default function DistributorsPage() {
+     // An empty dropdown gives '' so we drop the key. The old text "zone" is no longer used.
+     const payload = { ...form };
+     delete payload.zone;
+-    if (payload.zone_id === '' || payload.zone_id == null) delete payload.zone_id;
+-    else payload.zone_id = Number(payload.zone_id);
++    if (payload.zone_id === '' || payload.zone_id == null) {
++      // Editing: send null so an existing zone can be cleared. Creating: just omit it.
++      if (editing?.id) payload.zone_id = null;
++      else delete payload.zone_id;
++    } else payload.zone_id = Number(payload.zone_id);
+     try {
+       if (editing?.id) {
+         await distributorsApi.update(editing.id, payload);
+diff --git a/frontend/src/pages/RequestsPage.jsx b/frontend/src/pages/RequestsPage.jsx
+new file mode 100644
+index 0000000..6866009
+--- /dev/null
++++ b/frontend/src/pages/RequestsPage.jsx
+@@ -0,0 +1,351 @@
++import { useCallback, useEffect, useMemo, useState } from 'react';
++import { Plus, Check, X, AlertTriangle } from 'lucide-react';
++import { requestsApi, distributors as distributorsApi, products as productsApi } from '../api/endpoints';
++import { apiErrorMessage } from '../api/client';
++import { useAuth } from '../context/AuthContext';
++import { useToast } from '../context/ToastContext';
++import { useConfirm } from '../context/ConfirmContext';
++import { useLiveOrderEvents } from '../context/SocketContext';
++import { fetchAllPages } from '../utils/fetchAllPages';
++import Modal from '../components/Modal';
++import StatusBadge from '../components/StatusBadge';
++import Pagination from '../components/Pagination';
++
++const TYPE_LABELS = {
++  order: 'Order',
++  credit_extension: 'Credit limit',
++  price_override: 'Special price',
++};
++
++const money = (n) => Number(n || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
++const fmtDate = (iso) => (iso ? new Date(iso).toLocaleString(undefined, { dateStyle: 'medium', timeStyle: 'short' }) : '—');
++
++// Admin sees the whole approval inbox; a sales rep sees their own requests.
++// Same page, same table — the available actions differ by role.
++export default function RequestsPage() {
++  const { isAdmin } = useAuth();
++  const toast = useToast();
++  const confirm = useConfirm();
++
++  const [rows, setRows] = useState([]);
++  const [pagination, setPagination] = useState(null);
++  const [page, setPage] = useState(1);
++  const [statusFilter, setStatusFilter] = useState('pending');
++  const [loading, setLoading] = useState(true);
++
++  const [productsList, setProductsList] = useState([]);
++  const [distributorsList, setDistributorsList] = useState([]);
++
++  const [reviewing, setReviewing] = useState(null); // request detail (with warnings) being reviewed
++  const [reviewNote, setReviewNote] = useState('');
++  const [acting, setActing] = useState(false);
++
++  const [creating, setCreating] = useState(false);
++  const [form, setForm] = useState({ type: 'credit_extension', distributor_id: '', new_limit: '', product_id: '', price: '', reason: '' });
++  const [saving, setSaving] = useState(false);
++
++  const productName = useMemo(() => new Map(productsList.map((p) => [p.id, p.name])), [productsList]);
++
++  const load = useCallback(async () => {
++    try {
++      const res = await requestsApi.list({
++        page,
++        pageSize: 25,
++        status: statusFilter || undefined,
++        mine: isAdmin ? undefined : 'true',
++      });
++      setRows(res.data.data);
++      setPagination(res.data.pagination);
++    } catch (err) {
++      toast.error(apiErrorMessage(err));
++    } finally {
++      setLoading(false);
++    }
++    // eslint-disable-next-line react-hooks/exhaustive-deps
++  }, [page, statusFilter, isAdmin]);
++
++  useEffect(() => { load(); }, [load]);
++  useEffect(() => { setPage(1); }, [statusFilter]);
++
++  // Names for the "special price" summaries and the new-request form.
++  useEffect(() => {
++    fetchAllPages(productsApi.list, { is_active: 'true' }).then(setProductsList).catch(() => {});
++    fetchAllPages(distributorsApi.list, { status: 'active' }).then(setDistributorsList).catch(() => {});
++  }, []);
++
++  useLiveOrderEvents((e) => {
++    if (e.type === 'request:created' || e.type === 'request:reviewed') load();
++  });
++
++  const summary = (r) => {
++    const p = r.payload || {};
++    if (r.type === 'order') {
++      const n = (p.items || []).length;
++      return `${n} item${n === 1 ? '' : 's'} · ${p.payment_term || '—'}`;
++    }
++    if (r.type === 'credit_extension') return `New credit limit: ${money(p.new_limit)}`;
++    if (r.type === 'price_override') return `${productName.get(p.product_id) || `Product #${p.product_id}`} at ${money(p.price)}`;
++    return '';
++  };
++
++  const openReview = async (r) => {
++    try {
++      const res = await requestsApi.get(r.id); // includes credit-limit warnings for pending orders
++      setReviewNote('');
++      setReviewing(res.data);
++    } catch (err) {
++      toast.error(apiErrorMessage(err));
++    }
++  };
++
++  const decide = async (action) => {
++    if (!reviewing || acting) return;
++    setActing(true);
++    try {
++      if (action === 'approve') {
++        await requestsApi.approve(reviewing.id, reviewNote || undefined);
++        toast.success('Request approved.');
++      } else {
++        await requestsApi.reject(reviewing.id, reviewNote || undefined);
++        toast.success('Request rejected.');
++      }
++      setReviewing(null);
++      load();
++    } catch (err) {
++      toast.error(apiErrorMessage(err));
++      load(); // e.g. someone else already actioned it
++    } finally {
++      setActing(false);
++    }
++  };
++
++  const cancelRequest = async (r) => {
++    if (!await confirm({
++      title: 'Cancel Request?',
++      message: 'This withdraws the request. You can submit a new one later.',
++      confirmLabel: 'Cancel request',
++      danger: true,
++    })) return;
++    try {
++      await requestsApi.cancel(r.id);
++      toast.success('Request cancelled.');
++      load();
++    } catch (err) {
++      toast.error(apiErrorMessage(err));
++    }
++  };
++
++  const submitNew = async () => {
++    if (saving) return;
++    if (!form.distributor_id) return toast.error('Choose a distributor.');
++    let payload;
++    if (form.type === 'credit_extension') {
++      if (form.new_limit === '' || Number(form.new_limit) < 0) return toast.error('Enter the credit limit you are asking for.');
++      payload = { new_limit: Number(form.new_limit) };
++    } else {
++      if (!form.product_id) return toast.error('Choose a product.');
++      if (form.price === '' || Number(form.price) < 0) return toast.error('Enter the special price.');
++      payload = { product_id: Number(form.product_id), price: Number(form.price) };
++    }
++    setSaving(true);
++    try {
++      await requestsApi.create({
++        type: form.type,
++        distributor_id: Number(form.distributor_id),
++        payload,
++        reason: form.reason || undefined,
++      });
++      toast.success('Request submitted for approval.');
++      setCreating(false);
++      setForm({ type: 'credit_extension', distributor_id: '', new_limit: '', product_id: '', price: '', reason: '' });
++      setStatusFilter('pending');
++      load();
++    } catch (err) {
++      toast.error(apiErrorMessage(err));
++    } finally {
++      setSaving(false);
++    }
++  };
++
++  const setF = (k) => (e) => setForm((f) => ({ ...f, [k]: e.target.value }));
++
++  return (
++    <div>
++      <div className="page-header">
++        <div>
++          <h1>Requests</h1>
++          <p>
++            {isAdmin
++              ? 'Orders, credit-limit changes and special prices submitted by sales reps. Nothing takes effect until you approve it.'
++              : 'Your orders and requests waiting for admin approval.'}
++          </p>
++        </div>
++        <div className="page-header-actions">
++          <select value={statusFilter} onChange={(e) => setStatusFilter(e.target.value)} aria-label="Filter by status">
++            <option value="pending">Pending</option>
++            <option value="approved">Approved</option>
++            <option value="rejected">Rejected</option>
++            <option value="cancelled">Cancelled</option>
++            <option value="">All</option>
++          </select>
++          {!isAdmin && (
++            <button className="btn" onClick={() => setCreating(true)}>
++              <Plus size={16} /> New request
++            </button>
++          )}
++        </div>
++      </div>
++
++      <div className="card">
++        {loading ? (
++          <div className="empty-state">Loading…</div>
++        ) : (
++          <div className="table-wrap">
++            <table className="data-table">
++              <thead>
++                <tr>
++                  <th>#</th>
++                  <th>Type</th>
++                  <th>Distributor</th>
++                  {isAdmin && <th>Requested by</th>}
++                  <th>Details</th>
++                  <th>Status</th>
++                  <th>Submitted</th>
++                  <th />
++                </tr>
++              </thead>
++              <tbody>
++                {rows.map((r) => (
++                  <tr key={r.id}>
++                    <td>{r.id}</td>
++                    <td>{TYPE_LABELS[r.type] || r.type}</td>
++                    <td>{r.distributor_name}</td>
++                    {isAdmin && <td>{r.requested_by_name || '—'}</td>}
++                    <td>
++                      {summary(r)}
++                      {r.reason && <div style={{ fontSize: 12.5, color: 'var(--ink-muted)' }}>{r.reason}</div>}
++                      {r.review_note && r.status !== 'pending' && (
++                        <div style={{ fontSize: 12.5, color: 'var(--ink-muted)' }}>Admin note: {r.review_note}</div>
++                      )}
++                    </td>
++                    <td><StatusBadge value={r.status} /></td>
++                    <td>{fmtDate(r.created_at)}</td>
++                    <td>
++                      <div className="table-actions">
++                        {isAdmin && r.status === 'pending' && (
++                          <button className="btn btn-sm" onClick={() => openReview(r)}>Review</button>
++                        )}
++                        {!isAdmin && r.status === 'pending' && (
++                          <button className="btn btn-secondary btn-sm" onClick={() => cancelRequest(r)}>Cancel</button>
++                        )}
++                      </div>
++                    </td>
++                  </tr>
++                ))}
++                {rows.length === 0 && (
++                  <tr>
++                    <td colSpan={isAdmin ? 8 : 7}>
++                      <div className="empty-state">
++                        {statusFilter === 'pending' ? 'Nothing waiting for approval.' : 'No requests found.'}
++                      </div>
++                    </td>
++                  </tr>
++                )}
++              </tbody>
++            </table>
++          </div>
++        )}
++        <Pagination pagination={pagination} onPageChange={setPage} />
++      </div>
++
++      {reviewing && (
++        <Modal title={`Request #${reviewing.id} — ${TYPE_LABELS[reviewing.type] || reviewing.type}`} onClose={() => !acting && setReviewing(null)} width={560}>
++          <p style={{ margin: '0 0 8px' }}>
++            <strong>{reviewing.requested_by_name || 'A sales rep'}</strong> for <strong>{reviewing.distributor_name}</strong>
++          </p>
++          <p style={{ margin: '0 0 12px' }}>{summary(reviewing)}</p>
++
++          {reviewing.type === 'order' && (reviewing.payload?.items || []).length > 0 && (
++            <ul style={{ margin: '0 0 12px', paddingLeft: 18, fontSize: 13.5 }}>
++              {reviewing.payload.items.map((it, i) => (
++                <li key={i}>
++                  {productName.get(it.product_id) || `Product #${it.product_id}`} × {it.quantity}
++                  {it.price_override_id ? ' (special price)' : ''}
++                </li>
++              ))}
++            </ul>
++          )}
++          {reviewing.reason && <p style={{ margin: '0 0 12px', color: 'var(--ink-muted)' }}>Reason: {reviewing.reason}</p>}
++
++          {(reviewing.warnings || []).map((w) => (
++            <div key={w.code} className="field-error" style={{ display: 'flex', gap: 8, alignItems: 'flex-start', marginBottom: 12 }}>
++              <AlertTriangle size={16} style={{ flexShrink: 0, marginTop: 2 }} />
++              <span>{w.message}</span>
++            </div>
++          ))}
++
++          <div className="field">
++            <label htmlFor="review-note">Note (optional)</label>
++            <textarea id="review-note" rows={3} maxLength={2000} value={reviewNote} onChange={(e) => setReviewNote(e.target.value)} />
++          </div>
++
++          <div className="modal-actions">
++            <button className="btn btn-danger" disabled={acting} onClick={() => decide('reject')}>
++              <X size={16} /> Reject
++            </button>
++            <button className="btn" disabled={acting} onClick={() => decide('approve')}>
++              <Check size={16} /> Approve
++            </button>
++          </div>
++        </Modal>
++      )}
++
++      {creating && (
++        <Modal title="New request" onClose={() => !saving && setCreating(false)} width={520}>
++          <div className="field">
++            <label htmlFor="rq-type">What do you need?</label>
++            <select id="rq-type" value={form.type} onChange={setF('type')}>
++              <option value="credit_extension">Raise a distributor's credit limit</option>
++              <option value="price_override">Special price for a distributor</option>
++            </select>
++          </div>
++          <div className="field">
++            <label htmlFor="rq-dist">Distributor</label>
++            <select id="rq-dist" value={form.distributor_id} onChange={setF('distributor_id')}>
++              <option value="">Select…</option>
++              {distributorsList.map((d) => <option key={d.id} value={d.id}>{d.name}</option>)}
++            </select>
++          </div>
++          {form.type === 'credit_extension' ? (
++            <div className="field">
++              <label htmlFor="rq-limit">Requested credit limit</label>
++              <input id="rq-limit" type="number" min="0" step="0.01" value={form.new_limit} onChange={setF('new_limit')} />
++            </div>
++          ) : (
++            <div className="field-row">
++              <div className="field">
++                <label htmlFor="rq-prod">Product</label>
++                <select id="rq-prod" value={form.product_id} onChange={setF('product_id')}>
++                  <option value="">Select…</option>
++                  {productsList.map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}
++                </select>
++              </div>
++              <div className="field">
++                <label htmlFor="rq-price">Special price</label>
++                <input id="rq-price" type="number" min="0" step="0.01" value={form.price} onChange={setF('price')} />
++              </div>
++            </div>
++          )}
++          <div className="field">
++            <label htmlFor="rq-reason">Reason (optional)</label>
++            <textarea id="rq-reason" rows={3} maxLength={2000} value={form.reason} onChange={setF('reason')} />
++          </div>
++          <div className="modal-actions">
++            <button className="btn btn-secondary" disabled={saving} onClick={() => setCreating(false)}>Cancel</button>
++            <button className="btn" disabled={saving} onClick={submitNew}>Submit for approval</button>
++          </div>
++        </Modal>
++      )}
++    </div>
++  );
++}

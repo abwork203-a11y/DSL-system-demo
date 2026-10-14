@@ -94,6 +94,8 @@ CREATE TABLE IF NOT EXISTS user_zones (
 CREATE INDEX IF NOT EXISTS idx_user_zones_zone ON user_zones(zone_id);
 
 ALTER TABLE distributors ADD COLUMN IF NOT EXISTS zone_id INTEGER REFERENCES zones(id);
+-- distributorController reads/writes `address`, but no migration ever created it.
+ALTER TABLE distributors ADD COLUMN IF NOT EXISTS address TEXT;
 CREATE INDEX IF NOT EXISTS idx_distributors_zone_id ON distributors(zone_id);
 
 -- ─────────────────────────────────────────────────────────────
@@ -147,7 +149,7 @@ CREATE TABLE IF NOT EXISTS ledger (
   distributor_id    INTEGER NOT NULL REFERENCES distributors(id) ON DELETE RESTRICT,
   order_id          INTEGER REFERENCES orders(id) ON DELETE SET NULL,
   entry_date        TIMESTAMPTZ NOT NULL DEFAULT now(),
-  type              TEXT NOT NULL CHECK (type IN ('Cash', 'credit')), -- debit = owes more (order), credit = payment received
+  type              TEXT NOT NULL CHECK (type IN ('debit', 'credit')), -- debit = owes more (order), credit = payment received
   amount            NUMERIC(14,2) NOT NULL CHECK (amount > 0),
   running_balance   NUMERIC(14,2) NOT NULL,
   note              TEXT,
@@ -424,6 +426,153 @@ DO $$ BEGIN
   CREATE POLICY backups_admin_only ON backups
   USING (current_setting('app.role', true) = 'admin');
 EXCEPTION WHEN duplicate_object THEN NULL;
+END $$;
+
+COMMIT;
+
+-- ─────────────────────────────────────────────────────────────
+-- Requests & approval workflow. Sales reps submit requests (order creation,
+-- credit-limit raise, special price); an admin approves/rejects them. All
+-- statements are idempotent, like the rest of this file.
+-- ─────────────────────────────────────────────────────────────
+BEGIN;
+
+-- NULL = no limit is enforced/flagged for this distributor.
+ALTER TABLE distributors ADD COLUMN IF NOT EXISTS credit_limit NUMERIC(12,2)
+  CHECK (credit_limit IS NULL OR credit_limit >= 0);
+
+CREATE TABLE IF NOT EXISTS requests (
+  id              SERIAL PRIMARY KEY,
+  type            TEXT NOT NULL CHECK (type IN ('order', 'credit_extension', 'price_override')),
+  status          TEXT NOT NULL DEFAULT 'pending' CHECK (status IN ('pending', 'approved', 'rejected', 'cancelled')),
+  requested_by    INTEGER NOT NULL REFERENCES users(id),
+  distributor_id  INTEGER NOT NULL REFERENCES distributors(id),
+  payload         JSONB NOT NULL,          -- type-specific proposed data (see requestController.js)
+  reason          TEXT,
+  reviewed_by     INTEGER REFERENCES users(id),
+  review_note     TEXT,
+  result_id       INTEGER,                 -- order id once an order request is approved
+  created_at      TIMESTAMPTZ NOT NULL DEFAULT now(),
+  reviewed_at     TIMESTAMPTZ
+);
+CREATE INDEX IF NOT EXISTS idx_requests_status ON requests(status, created_at DESC);
+CREATE INDEX IF NOT EXISTS idx_requests_distributor ON requests(distributor_id);
+CREATE INDEX IF NOT EXISTS idx_requests_requested_by ON requests(requested_by);
+
+-- One approved special price per distributor + product (re-approval replaces it).
+CREATE TABLE IF NOT EXISTS price_overrides (
+  id              SERIAL PRIMARY KEY,
+  distributor_id  INTEGER NOT NULL REFERENCES distributors(id),
+  product_id      INTEGER NOT NULL REFERENCES products(id),
+  price           NUMERIC(12,2) NOT NULL CHECK (price >= 0),
+  approved_by     INTEGER NOT NULL REFERENCES users(id),
+  request_id      INTEGER NOT NULL REFERENCES requests(id),
+  active          BOOLEAN NOT NULL DEFAULT true,
+  created_at      TIMESTAMPTZ NOT NULL DEFAULT now(),
+  UNIQUE (distributor_id, product_id)
+);
+
+-- requests: admin sees/changes everything; a rep sees requests for distributors
+-- in their zones, may only INSERT their own (in a zone they cover), and may only
+-- UPDATE (cancel) their own. Only admin can DELETE.
+ALTER TABLE requests ENABLE ROW LEVEL SECURITY;
+ALTER TABLE requests FORCE ROW LEVEL SECURITY;
+
+DO $$ BEGIN
+  CREATE POLICY requests_select ON requests FOR SELECT
+  USING (
+    current_setting('app.role', true) = 'admin'
+    OR EXISTS (
+      SELECT 1
+      FROM distributors d
+      JOIN user_zones uz ON uz.zone_id = d.zone_id
+      WHERE d.id = requests.distributor_id
+        AND uz.user_id = NULLIF(current_setting('app.user_id', true), '')::INTEGER
+    )
+  );
+EXCEPTION WHEN duplicate_object THEN NULL;
+END $$;
+
+DO $$ BEGIN
+  CREATE POLICY requests_insert ON requests FOR INSERT
+  WITH CHECK (
+    current_setting('app.role', true) = 'admin'
+    OR (
+      requested_by = NULLIF(current_setting('app.user_id', true), '')::INTEGER
+      AND EXISTS (
+        SELECT 1
+        FROM distributors d
+        JOIN user_zones uz ON uz.zone_id = d.zone_id
+        WHERE d.id = requests.distributor_id
+          AND uz.user_id = NULLIF(current_setting('app.user_id', true), '')::INTEGER
+      )
+    )
+  );
+EXCEPTION WHEN duplicate_object THEN NULL;
+END $$;
+
+DO $$ BEGIN
+  CREATE POLICY requests_update ON requests FOR UPDATE
+  USING (
+    current_setting('app.role', true) = 'admin'
+    OR requested_by = NULLIF(current_setting('app.user_id', true), '')::INTEGER
+  )
+  WITH CHECK (
+    current_setting('app.role', true) = 'admin'
+    OR requested_by = NULLIF(current_setting('app.user_id', true), '')::INTEGER
+  );
+EXCEPTION WHEN duplicate_object THEN NULL;
+END $$;
+
+DO $$ BEGIN
+  CREATE POLICY requests_delete ON requests FOR DELETE
+  USING (current_setting('app.role', true) = 'admin');
+EXCEPTION WHEN duplicate_object THEN NULL;
+END $$;
+
+-- price_overrides: reps can read overrides for their zones' distributors (so
+-- the order form can offer them); only admin can write (via request approval).
+ALTER TABLE price_overrides ENABLE ROW LEVEL SECURITY;
+ALTER TABLE price_overrides FORCE ROW LEVEL SECURITY;
+
+DO $$ BEGIN
+  CREATE POLICY price_overrides_select ON price_overrides FOR SELECT
+  USING (
+    current_setting('app.role', true) = 'admin'
+    OR EXISTS (
+      SELECT 1
+      FROM distributors d
+      JOIN user_zones uz ON uz.zone_id = d.zone_id
+      WHERE d.id = price_overrides.distributor_id
+        AND uz.user_id = NULLIF(current_setting('app.user_id', true), '')::INTEGER
+    )
+  );
+EXCEPTION WHEN duplicate_object THEN NULL;
+END $$;
+
+DO $$ BEGIN
+  CREATE POLICY price_overrides_admin_write ON price_overrides FOR ALL
+  USING (current_setting('app.role', true) = 'admin')
+  WITH CHECK (current_setting('app.role', true) = 'admin');
+EXCEPTION WHEN duplicate_object THEN NULL;
+END $$;
+
+-- Fix: the original constraint allowed ('Cash','credit') but ledgerService
+-- writes 'debit'/'credit', so every order creation failed. Existing databases
+-- still carry the old constraint; replace it. NOT VALID enforces the new rule
+-- on all new rows without failing the deploy if any legacy row has an old value.
+-- Guarded so re-running schema.sql is a no-op once the fix is in place.
+DO $$
+BEGIN
+  IF EXISTS (
+    SELECT 1 FROM pg_constraint
+    WHERE conname = 'ledger_type_check'
+      AND conrelid = 'ledger'::regclass
+      AND pg_get_constraintdef(oid) LIKE '%Cash%'
+  ) THEN
+    ALTER TABLE ledger DROP CONSTRAINT ledger_type_check;
+    ALTER TABLE ledger ADD CONSTRAINT ledger_type_check CHECK (type IN ('debit', 'credit')) NOT VALID;
+  END IF;
 END $$;
 
 COMMIT;

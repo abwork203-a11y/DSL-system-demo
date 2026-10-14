@@ -13,6 +13,7 @@ const createRules = [
   body('items').isArray({ min: 1 }).withMessage('At least one item is required.'),
   body('items.*.product_id').isInt({ min: 1 }).withMessage('Each item needs a valid product_id.'),
   body('items.*.quantity').isFloat({ gt: 0 }).withMessage('Each item quantity must be greater than 0.'),
+  body('items.*.price_override_id').optional({ nullable: true }).isInt({ min: 1 }).withMessage('price_override_id must be a valid id.'),
   body('discount').optional().isFloat({ min: 0 }).withMessage('Discount must be a non-negative number.'),
   body('discount_type').optional().isIn(['fixed', 'percentage']).withMessage('discount_type must be fixed or percentage.'),
   body('freight_cost').optional().isFloat({ min: 0 }).withMessage('Freight cost must be a non-negative number.'),

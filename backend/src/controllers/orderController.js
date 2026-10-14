@@ -1,6 +1,7 @@
 const { asyncHandler } = require('../utils/asyncHandler');
 const { ApiError } = require('../utils/ApiError');
 const { createOrderWithLedger, recordPayment, cancelOrder, deleteOrder } = require('../services/ledgerService');
+const { createRequest } = require('../services/requestService');
 const { recordAudit } = require('../utils/audit');
 const { parsePagination, paginatedResponse } = require('../utils/pagination');
 const { invalidatePrefix } = require('../utils/cache');
@@ -87,6 +88,38 @@ const getOne = asyncHandler(async (req, res) => {
 const create = asyncHandler(async (req, res) => {
   const { distributor_id, items, discount, discount_type, freight_cost, payment_term, payment_status, amount_paid, notes } = req.body;
   if (!distributor_id) throw new ApiError(400, 'distributor_id is required.');
+
+  // Non-admin (sales rep): nothing is created yet. The order is stored as a
+  // pending request; no order, stock or ledger row exists until an admin approves.
+  if (req.user.role !== 'admin') {
+    const payload = {
+      distributor_id: Number(distributor_id),
+      items: (items || []).map((i) => ({
+        product_id: Number(i.product_id),
+        quantity: Number(i.quantity),
+        ...(i.price_override_id != null ? { price_override_id: Number(i.price_override_id) } : {}),
+      })),
+      discount: discount || 0,
+      discount_type: discount_type || 'fixed',
+      freight_cost: freight_cost || 0,
+      payment_term,
+      payment_status,
+      amount_paid: amount_paid || 0,
+      notes: notes || null,
+    };
+    const request = await createRequest(req.db, {
+      type: 'order',
+      requestedBy: req.user.id,
+      distributorId: distributor_id,
+      payload,
+      reason: notes || null,
+    });
+    req.afterCommit(() => {
+      const io = req.app.get('io');
+      if (io) io.emit('request:created', { requestId: request.id, type: 'order' });
+    });
+    return req.respond(202, { ...request, pending_approval: true });
+  }
 
   const order = await createOrderWithLedger(req.db, {
     distributorId: distributor_id,

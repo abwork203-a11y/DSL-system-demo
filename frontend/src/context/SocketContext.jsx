@@ -37,6 +37,8 @@ export function SocketProvider({ children }) {
     socket.on('order:created', handle('order:created'));
     socket.on('order:updated', handle('order:updated'));
     socket.on('order:payment', handle('order:payment'));
+    socket.on('request:created', handle('request:created'));
+    socket.on('request:reviewed', handle('request:reviewed'));
 
     return () => {
       socket.disconnect();

@@ -10,6 +10,8 @@ const TONES = {
   unpaid: 'red',
   inactive: 'red',
   cancelled: 'red',
+  approved: 'green',
+  rejected: 'red',
 };
 
 export default function StatusBadge({ value }) {

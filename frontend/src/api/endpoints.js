@@ -78,6 +78,23 @@ export const zonesApi = {
   remove: (id) => client.delete(`/zones/${id}`),
 };
 
+export const requestsApi = {
+  // Admin sees the whole inbox; reps see requests in their zones (mine: true = only their own).
+  list: (params) => client.get('/requests', { params }),
+  get: (id) => client.get(`/requests/${id}`),
+  // credit_extension / price_override only — orders go through ordersApi.create,
+  // which answers 202 + a pending request for non-admins.
+  create: (data) => client.post('/requests', data),
+  approve: (id, review_note) => client.post(`/requests/${id}/approve`, { review_note }),
+  reject: (id, review_note) => client.post(`/requests/${id}/reject`, { review_note }),
+  cancel: (id) => client.post(`/requests/${id}/cancel`),
+};
+
+export const priceOverridesApi = {
+  list: (params) => client.get('/price-overrides', { params }),
+  setActive: (id, active) => client.patch(`/price-overrides/${id}`, { active }),
+};
+
 export const exportApi = {
   // which: 'products' | 'orders' | 'distributors'; format: 'excel' | 'pdf'.
   // Excel keeps the original URLs (/export/products); PDF adds /pdf on the end.

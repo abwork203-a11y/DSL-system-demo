@@ -82,8 +82,11 @@ export default function DistributorsPage() {
     // An empty dropdown gives '' so we drop the key. The old text "zone" is no longer used.
     const payload = { ...form };
     delete payload.zone;
-    if (payload.zone_id === '' || payload.zone_id == null) delete payload.zone_id;
-    else payload.zone_id = Number(payload.zone_id);
+    if (payload.zone_id === '' || payload.zone_id == null) {
+      // Editing: send null so an existing zone can be cleared. Creating: just omit it.
+      if (editing?.id) payload.zone_id = null;
+      else delete payload.zone_id;
+    } else payload.zone_id = Number(payload.zone_id);
     try {
       if (editing?.id) {
         await distributorsApi.update(editing.id, payload);

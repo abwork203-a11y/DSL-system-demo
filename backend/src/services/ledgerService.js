@@ -92,6 +92,21 @@ async function createOrderWithLedger(client, {
   );
   const productMap = new Map(productResult.rows.map((p) => [p.id, p]));
 
+  // Optional per-line special price (price_override_id). It is only honoured
+  // if it is an ACTIVE price_overrides row for this exact distributor +
+  // product, so a caller can never smuggle in an arbitrary unit price.
+  const overrideIds = items
+    .map((i) => i.price_override_id)
+    .filter((id) => id !== undefined && id !== null);
+  const overrideMap = new Map();
+  if (overrideIds.length > 0) {
+    const overrideResult = await client.query(
+      `SELECT id, distributor_id, product_id, price, active FROM price_overrides WHERE id = ANY($1::int[])`,
+      [overrideIds]
+    );
+    for (const row of overrideResult.rows) overrideMap.set(row.id, row);
+  }
+
   let subtotal = 0;
   const resolvedItems = items.map((item) => {
     const product = productMap.get(item.product_id);
@@ -104,13 +119,28 @@ async function createOrderWithLedger(client, {
     if (!(item.quantity > 0)) {
       throw new ApiError(400, `Quantity for product ${item.product_id} must be greater than zero.`);
     }
-    const lineTotal = Number(product.price) * Number(item.quantity);
+
+    let unitPrice = product.price;
+    if (item.price_override_id !== undefined && item.price_override_id !== null) {
+      const override = overrideMap.get(Number(item.price_override_id));
+      if (
+        !override ||
+        !override.active ||
+        override.distributor_id !== Number(distributorId) ||
+        override.product_id !== product.id
+      ) {
+        throw new ApiError(400, `Price override ${item.price_override_id} is not valid for this distributor and product.`);
+      }
+      unitPrice = override.price;
+    }
+
+    const lineTotal = Number(unitPrice) * Number(item.quantity);
     subtotal += lineTotal;
     return {
       product_id: product.id,
       manufacturer_id: product.manufacturer_id,
       quantity: item.quantity,
-      price_at_time_of_order: product.price,
+      price_at_time_of_order: unitPrice,
       retail_price_at_time_of_order: product.retail_price,
     };
   });

@@ -286,6 +286,13 @@ export default function CreateOrderPage() {
       submittedRef.current = true;
       setSubmitted(true);
       if (draftIdRef.current) deleteDraft(draftIdRef.current).catch(() => {});
+      if (res.status === 202 || res.data.pending_approval) {
+        // Sales reps don't create orders directly — it's now a pending request
+        // that an admin has to approve. Nothing exists on the ledger yet.
+        toast.success('Order submitted for admin approval.');
+        navigate('/requests');
+        return;
+      }
       toast.success(`Order ${res.data.order_number} created.`);
       navigate(`/orders/${res.data.id}`);
     } catch (err) {

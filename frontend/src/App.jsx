@@ -12,6 +12,7 @@ import DashboardPage from './pages/DashboardPage';
 import OrdersPage from './pages/OrdersPage';
 import CreateOrderPage from './pages/CreateOrderPage';
 import OrderDetailPage from './pages/OrderDetailPage';
+import RequestsPage from './pages/RequestsPage';
 import DistributorsPage from './pages/DistributorsPage';
 import ProductsPage from './pages/ProductsPage';
 import ManufacturersPage from './pages/ManufacturersPage';
@@ -65,6 +66,7 @@ const router = createBrowserRouter([
           { path: '/orders', element: <OrdersPage /> },
           { path: '/orders/new', element: <CreateOrderPage /> },
           { path: '/orders/:id', element: <OrderDetailPage /> },
+          { path: '/requests', element: <RequestsPage /> },
           { path: '/distributors', element: <DistributorsPage /> },
           { path: '/ledger', element: <LedgerPage /> },
           { path: '/products', element: <ProtectedRoute adminOnly><ProductsPage /></ProtectedRoute> },
