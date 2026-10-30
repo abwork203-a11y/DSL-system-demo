@@ -1239,6 +1239,19 @@ table.data-table {
   padding-right: 0;
 }
 
+/* Empty-state row: no divider line under the message */
+.data-table .empty-row > td {
+  border-bottom: none;
+}
+
+/* Small muted line under a cell's main text (reason, admin note, etc.) */
+.cell-note {
+  margin-top: 2px;
+
+  color: var(--ink-muted);
+  font-size: 12.5px;
+}
+
 .capitalize {
   text-transform: capitalize;
 }
@@ -1317,12 +1330,14 @@ table.data-table {
   }
 
   .data-table tr[data-status="completed"],
+  .data-table tr[data-status="approved"],
   .data-table tr[data-status="paid"],
   .data-table tr[data-status="active"] {
     border-left-color: var(--status-positive);
   }
 
   .data-table tr[data-status="cancelled"],
+  .data-table tr[data-status="rejected"],
   .data-table tr[data-status="inactive"] {
     border-left-color: var(--status-negative);
   }

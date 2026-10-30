@@ -170,7 +170,7 @@ export default function RequestsPage() {
   const setF = (k) => (e) => setForm((f) => ({ ...f, [k]: e.target.value }));
 
   return (
-    <div>
+    <div className="content">
       <div className="page-header">
         <div>
           <h1>Requests</h1>
@@ -181,7 +181,7 @@ export default function RequestsPage() {
           </p>
         </div>
         <div className="page-header-actions">
-          <select value={statusFilter} onChange={(e) => setStatusFilter(e.target.value)} aria-label="Filter by status">
+          <select className="form-control" value={statusFilter} onChange={(e) => setStatusFilter(e.target.value)} aria-label="Filter by status">
             <option value="pending">Pending</option>
             <option value="approved">Approved</option>
             <option value="rejected">Rejected</option>
@@ -216,20 +216,20 @@ export default function RequestsPage() {
               </thead>
               <tbody>
                 {rows.map((r) => (
-                  <tr key={r.id}>
-                    <td>{r.id}</td>
-                    <td>{TYPE_LABELS[r.type] || r.type}</td>
-                    <td>{r.distributor_name}</td>
-                    {isAdmin && <td>{r.requested_by_name || '—'}</td>}
-                    <td>
+                  <tr key={r.id} data-status={r.status}>
+                    <td data-label="#">{r.id}</td>
+                    <td data-label="Type">{TYPE_LABELS[r.type] || r.type}</td>
+                    <td data-label="Distributor">{r.distributor_name}</td>
+                    {isAdmin && <td data-label="Requested by">{r.requested_by_name || '—'}</td>}
+                    <td data-label="Details">
                       {summary(r)}
-                      {r.reason && <div style={{ fontSize: 12.5, color: 'var(--ink-muted)' }}>{r.reason}</div>}
+                      {r.reason && <div className="cell-note">{r.reason}</div>}
                       {r.review_note && r.status !== 'pending' && (
-                        <div style={{ fontSize: 12.5, color: 'var(--ink-muted)' }}>Admin note: {r.review_note}</div>
+                        <div className="cell-note">Admin note: {r.review_note}</div>
                       )}
                     </td>
-                    <td><StatusBadge value={r.status} /></td>
-                    <td>{fmtDate(r.created_at)}</td>
+                    <td data-label="Status"><StatusBadge value={r.status} /></td>
+                    <td data-label="Submitted">{fmtDate(r.created_at)}</td>
                     <td>
                       <div className="table-actions">
                         {isAdmin && r.status === 'pending' && (
@@ -243,7 +243,7 @@ export default function RequestsPage() {
                   </tr>
                 ))}
                 {rows.length === 0 && (
-                  <tr>
+                  <tr className="empty-row">
                     <td colSpan={isAdmin ? 8 : 7}>
                       <div className="empty-state">
                         {statusFilter === 'pending' ? 'Nothing waiting for approval.' : 'No requests found.'}
