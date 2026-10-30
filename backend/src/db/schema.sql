@@ -443,10 +443,10 @@ ALTER TABLE distributors ADD COLUMN IF NOT EXISTS credit_limit NUMERIC(12,2)
 
 CREATE TABLE IF NOT EXISTS requests (
   id              SERIAL PRIMARY KEY,
-  type            TEXT NOT NULL CHECK (type IN ('order', 'credit_extension', 'price_override')),
+  type            TEXT NOT NULL CHECK (type IN ('order', 'credit_extension', 'price_override', 'distributor_create')),
   status          TEXT NOT NULL DEFAULT 'pending' CHECK (status IN ('pending', 'approved', 'rejected', 'cancelled')),
   requested_by    INTEGER NOT NULL REFERENCES users(id),
-  distributor_id  INTEGER NOT NULL REFERENCES distributors(id),
+  distributor_id  INTEGER REFERENCES distributors(id),  -- NULL only for type 'distributor_create' (the distributor doesn't exist yet)
   payload         JSONB NOT NULL,          -- type-specific proposed data (see requestController.js)
   reason          TEXT,
   reviewed_by     INTEGER REFERENCES users(id),
@@ -574,5 +574,67 @@ BEGIN
     ALTER TABLE ledger ADD CONSTRAINT ledger_type_check CHECK (type IN ('debit', 'credit')) NOT VALID;
   END IF;
 END $$;
+
+-- A sales rep adding a distributor now goes through approval too: new request
+-- type 'distributor_create'. There is no distributor row yet, so distributor_id
+-- becomes nullable — but only for that type (CHECK below).
+DO $$
+DECLARE old_name TEXT;
+BEGIN
+  SELECT conname INTO old_name FROM pg_constraint
+  WHERE conrelid = 'requests'::regclass AND contype = 'c'
+    AND pg_get_constraintdef(oid) LIKE '%credit_extension%'
+    AND pg_get_constraintdef(oid) NOT LIKE '%distributor_create%'
+  LIMIT 1;
+  IF old_name IS NOT NULL THEN
+    EXECUTE format('ALTER TABLE requests DROP CONSTRAINT %I', old_name);
+    ALTER TABLE requests ADD CONSTRAINT requests_type_check
+      CHECK (type IN ('order', 'credit_extension', 'price_override', 'distributor_create'));
+  END IF;
+END $$;
+
+ALTER TABLE requests ALTER COLUMN distributor_id DROP NOT NULL;
+
+DO $$ BEGIN
+  ALTER TABLE requests ADD CONSTRAINT requests_distributor_required
+    CHECK (distributor_id IS NOT NULL OR type = 'distributor_create');
+EXCEPTION WHEN duplicate_object THEN NULL;
+END $$;
+
+-- Policies replaced (DROP + CREATE is idempotent): a rep can always see their OWN
+-- requests (including a distributor_create, which has no zone yet), and may submit
+-- one with no distributor.
+DROP POLICY IF EXISTS requests_select ON requests;
+CREATE POLICY requests_select ON requests FOR SELECT
+USING (
+  current_setting('app.role', true) = 'admin'
+  OR requested_by = NULLIF(current_setting('app.user_id', true), '')::INTEGER
+  OR EXISTS (
+    SELECT 1
+    FROM distributors d
+    JOIN user_zones uz ON uz.zone_id = d.zone_id
+    WHERE d.id = requests.distributor_id
+      AND uz.user_id = NULLIF(current_setting('app.user_id', true), '')::INTEGER
+  )
+);
+
+DROP POLICY IF EXISTS requests_insert ON requests;
+CREATE POLICY requests_insert ON requests FOR INSERT
+WITH CHECK (
+  current_setting('app.role', true) = 'admin'
+  OR (
+    requested_by = NULLIF(current_setting('app.user_id', true), '')::INTEGER
+    AND (
+      (distributor_id IS NULL AND type = 'distributor_create')
+      OR EXISTS (
+        SELECT 1
+        FROM distributors d
+        JOIN user_zones uz ON uz.zone_id = d.zone_id
+        WHERE d.id = requests.distributor_id
+          AND uz.user_id = NULLIF(current_setting('app.user_id', true), '')::INTEGER
+      )
+    )
+  )
+);
 
 COMMIT;

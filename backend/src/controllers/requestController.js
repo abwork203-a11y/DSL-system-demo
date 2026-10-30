@@ -11,9 +11,9 @@ const { normalizePayload, createRequest, applyRequest, computeWarnings } = requi
 // nothing is sent until COMMIT has succeeded.
 
 const REQUEST_SELECT = `
-  SELECT r.*, d.name AS distributor_name, u.name AS requested_by_name, rv.name AS reviewed_by_name
+  SELECT r.*, COALESCE(d.name, r.payload->>'name') AS distributor_name, u.name AS requested_by_name, rv.name AS reviewed_by_name
   FROM requests r
-  JOIN distributors d ON d.id = r.distributor_id
+  LEFT JOIN distributors d ON d.id = r.distributor_id
   LEFT JOIN users u ON u.id = r.requested_by
   LEFT JOIN users rv ON rv.id = r.reviewed_by`;
 
@@ -75,6 +75,9 @@ const create = asyncHandler(async (req, res) => {
   if (type === 'order') {
     throw new ApiError(400, 'Order requests are submitted through POST /api/orders.');
   }
+  if (type === 'distributor_create') {
+    throw new ApiError(400, 'New-distributor requests are submitted through POST /api/distributors.');
+  }
 
   const normalized = await normalizePayload(req.db, type, payload);
   const request = await createRequest(req.db, {
@@ -118,7 +121,15 @@ const approve = asyncHandler(async (req, res) => {
   // change above — so a request is never "approved" without its effect.
   const { resultId, order } = await applyRequest(req.db, request, req.user.id);
 
-  const updated = await req.db.query('UPDATE requests SET result_id = $2 WHERE id = $1 RETURNING *', [id, resultId]);
+  // For a new-distributor request, also link the request to the distributor it created.
+  const updated = await req.db.query(
+    `UPDATE requests
+     SET result_id = $2::int,
+         distributor_id = COALESCE(distributor_id, CASE WHEN type = 'distributor_create' THEN $2::int END)
+     WHERE id = $1
+     RETURNING *`,
+    [id, resultId]
+  );
 
   await recordAudit(req.db, {
     userId: req.user.id,

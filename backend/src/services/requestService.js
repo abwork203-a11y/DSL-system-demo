@@ -8,7 +8,45 @@ const { createOrderWithLedger } = require('./ledgerService');
 // first argument, same convention as ledgerService.js, so callers control the
 // transaction and RLS context.
 
-const REQUEST_TYPES = ['order', 'credit_extension', 'price_override'];
+const REQUEST_TYPES = ['order', 'credit_extension', 'price_override', 'distributor_create'];
+
+// Validates a sales rep's "add this distributor" submission (arrives through
+// POST /api/distributors) and returns the sanitized payload. A rep may only
+// place the distributor in one of THEIR zones — otherwise it would be invisible
+// to them after approval.
+async function normalizeDistributorPayload(db, user, body) {
+  const clean = (v, max = 200) => {
+    if (v === undefined || v === null) return null;
+    const s = String(v).trim();
+    if (s.length > max) throw new ApiError(400, 'One of the fields is too long.');
+    return s || null;
+  };
+
+  const name = clean(body.name);
+  if (!name) throw new ApiError(400, 'name is required.');
+
+  let zoneId = null;
+  if (body.zone_id !== undefined && body.zone_id !== null && body.zone_id !== '') {
+    zoneId = Number(body.zone_id);
+    if (!Number.isInteger(zoneId) || zoneId < 1) throw new ApiError(400, 'zone_id must be a valid zone.');
+    if (user.role !== 'admin') {
+      const allowed = await db.query('SELECT 1 FROM user_zones WHERE user_id = $1 AND zone_id = $2', [user.id, zoneId]);
+      if (allowed.rows.length === 0) throw new ApiError(403, 'You can only add distributors in your own zones.');
+    }
+  }
+
+  return {
+    name,
+    contact_name: clean(body.contact_name),
+    contact_phone: clean(body.contact_phone, 50),
+    contact_email: clean(body.contact_email),
+    zone_id: zoneId,
+    region: clean(body.region),
+    city: clean(body.city),
+    area: clean(body.area),
+    address: clean(body.address, 500),
+  };
+}
 
 // Validates and normalizes the type-specific payload for the two request types
 // that are submitted through POST /api/requests. (Order payloads are validated
@@ -55,9 +93,13 @@ async function createRequest(db, { type, requestedBy, distributorId, payload, re
     throw new ApiError(400, `Invalid request type: ${type}`);
   }
 
-  const distributor = await db.query('SELECT id FROM distributors WHERE id = $1', [distributorId]);
-  if (distributor.rows.length === 0) {
-    throw new ApiError(404, `Distributor ${distributorId} not found.`);
+  if (type === 'distributor_create') {
+    distributorId = null; // the distributor doesn't exist until an admin approves
+  } else {
+    const distributor = await db.query('SELECT id FROM distributors WHERE id = $1', [distributorId]);
+    if (distributor.rows.length === 0) {
+      throw new ApiError(404, `Distributor ${distributorId} not found.`);
+    }
   }
 
   const result = await db.query(
@@ -100,6 +142,23 @@ async function applyRequest(db, request, approverId) {
       notes: p.notes,
     });
     return { resultId: order.id, order };
+  }
+
+  if (request.type === 'distributor_create') {
+    const inserted = await db.query(
+      `INSERT INTO distributors (name, contact_name, contact_phone, contact_email, zone_id, region, city, area, address)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
+       RETURNING *`,
+      [p.name, p.contact_name, p.contact_phone, p.contact_email, p.zone_id, p.region, p.city, p.area, p.address]
+    );
+    await recordAudit(db, {
+      userId: approverId,
+      action: 'CREATE',
+      entityType: 'distributor',
+      entityId: inserted.rows[0].id,
+      after: inserted.rows[0],
+    });
+    return { resultId: inserted.rows[0].id };
   }
 
   if (request.type === 'credit_extension') {
@@ -196,6 +255,7 @@ async function computeWarnings(db, request) {
 module.exports = {
   REQUEST_TYPES,
   normalizePayload,
+  normalizeDistributorPayload,
   createRequest,
   applyRequest,
   estimateOrderTotal,

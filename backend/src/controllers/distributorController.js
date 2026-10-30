@@ -1,4 +1,5 @@
 const { asyncHandler } = require('../utils/asyncHandler');
+const { createRequest, normalizeDistributorPayload } = require('../services/requestService');
 const { ApiError } = require('../utils/ApiError');
 const { recordAudit } = require('../utils/audit');
 const { parsePagination, paginatedResponse } = require('../utils/pagination');
@@ -43,6 +44,24 @@ const getOne = asyncHandler(async (req, res) => {
 const create = asyncHandler(async (req, res) => {
   const { name, contact_name, contact_phone, contact_email, zone_id, region, city, area, address } = req.body; 
   if (!name) throw new ApiError(400, 'name is required.');
+
+  // Sales reps don't add distributors directly: it becomes a pending request an
+  // admin must approve. Nothing is created until then.
+  if (req.user.role !== 'admin') {
+    const payload = await normalizeDistributorPayload(req.db, req.user, req.body);
+    const request = await createRequest(req.db, {
+      type: 'distributor_create',
+      requestedBy: req.user.id,
+      distributorId: null,
+      payload,
+      reason: null,
+    });
+    req.afterCommit(() => {
+      const io = req.app.get('io');
+      if (io) io.emit('request:created', { requestId: request.id, type: 'distributor_create' });
+    });
+    return req.respond(202, { ...request, pending_approval: true });
+  }
 
  const result = await req.db.query(
   `INSERT INTO distributors (

@@ -1,0 +1,503 @@
+diff --git a/backend/src/controllers/distributorController.js b/backend/src/controllers/distributorController.js
+index 8d3f7a7..0f0cc3c 100644
+--- a/backend/src/controllers/distributorController.js
++++ b/backend/src/controllers/distributorController.js
+@@ -1,4 +1,5 @@
+ const { asyncHandler } = require('../utils/asyncHandler');
++const { createRequest, normalizeDistributorPayload } = require('../services/requestService');
+ const { ApiError } = require('../utils/ApiError');
+ const { recordAudit } = require('../utils/audit');
+ const { parsePagination, paginatedResponse } = require('../utils/pagination');
+@@ -44,6 +45,24 @@ const create = asyncHandler(async (req, res) => {
+   const { name, contact_name, contact_phone, contact_email, zone_id, region, city, area, address } = req.body; 
+   if (!name) throw new ApiError(400, 'name is required.');
+ 
++  // Sales reps don't add distributors directly: it becomes a pending request an
++  // admin must approve. Nothing is created until then.
++  if (req.user.role !== 'admin') {
++    const payload = await normalizeDistributorPayload(req.db, req.user, req.body);
++    const request = await createRequest(req.db, {
++      type: 'distributor_create',
++      requestedBy: req.user.id,
++      distributorId: null,
++      payload,
++      reason: null,
++    });
++    req.afterCommit(() => {
++      const io = req.app.get('io');
++      if (io) io.emit('request:created', { requestId: request.id, type: 'distributor_create' });
++    });
++    return req.respond(202, { ...request, pending_approval: true });
++  }
++
+  const result = await req.db.query(
+   `INSERT INTO distributors (
+      name, contact_name, contact_phone, contact_email,
+diff --git a/backend/src/controllers/requestController.js b/backend/src/controllers/requestController.js
+index 5b5936d..6db6f38 100644
+--- a/backend/src/controllers/requestController.js
++++ b/backend/src/controllers/requestController.js
+@@ -11,9 +11,9 @@ const { normalizePayload, createRequest, applyRequest, computeWarnings } = requi
+ // nothing is sent until COMMIT has succeeded.
+ 
+ const REQUEST_SELECT = `
+-  SELECT r.*, d.name AS distributor_name, u.name AS requested_by_name, rv.name AS reviewed_by_name
++  SELECT r.*, COALESCE(d.name, r.payload->>'name') AS distributor_name, u.name AS requested_by_name, rv.name AS reviewed_by_name
+   FROM requests r
+-  JOIN distributors d ON d.id = r.distributor_id
++  LEFT JOIN distributors d ON d.id = r.distributor_id
+   LEFT JOIN users u ON u.id = r.requested_by
+   LEFT JOIN users rv ON rv.id = r.reviewed_by`;
+ 
+@@ -75,6 +75,9 @@ const create = asyncHandler(async (req, res) => {
+   if (type === 'order') {
+     throw new ApiError(400, 'Order requests are submitted through POST /api/orders.');
+   }
++  if (type === 'distributor_create') {
++    throw new ApiError(400, 'New-distributor requests are submitted through POST /api/distributors.');
++  }
+ 
+   const normalized = await normalizePayload(req.db, type, payload);
+   const request = await createRequest(req.db, {
+@@ -118,7 +121,15 @@ const approve = asyncHandler(async (req, res) => {
+   // change above — so a request is never "approved" without its effect.
+   const { resultId, order } = await applyRequest(req.db, request, req.user.id);
+ 
+-  const updated = await req.db.query('UPDATE requests SET result_id = $2 WHERE id = $1 RETURNING *', [id, resultId]);
++  // For a new-distributor request, also link the request to the distributor it created.
++  const updated = await req.db.query(
++    `UPDATE requests
++     SET result_id = $2::int,
++         distributor_id = COALESCE(distributor_id, CASE WHEN type = 'distributor_create' THEN $2::int END)
++     WHERE id = $1
++     RETURNING *`,
++    [id, resultId]
++  );
+ 
+   await recordAudit(req.db, {
+     userId: req.user.id,
+diff --git a/backend/src/db/schema.sql b/backend/src/db/schema.sql
+index 90ba399..8498b99 100644
+--- a/backend/src/db/schema.sql
++++ b/backend/src/db/schema.sql
+@@ -443,10 +443,10 @@ ALTER TABLE distributors ADD COLUMN IF NOT EXISTS credit_limit NUMERIC(12,2)
+ 
+ CREATE TABLE IF NOT EXISTS requests (
+   id              SERIAL PRIMARY KEY,
+-  type            TEXT NOT NULL CHECK (type IN ('order', 'credit_extension', 'price_override')),
++  type            TEXT NOT NULL CHECK (type IN ('order', 'credit_extension', 'price_override', 'distributor_create')),
+   status          TEXT NOT NULL DEFAULT 'pending' CHECK (status IN ('pending', 'approved', 'rejected', 'cancelled')),
+   requested_by    INTEGER NOT NULL REFERENCES users(id),
+-  distributor_id  INTEGER NOT NULL REFERENCES distributors(id),
++  distributor_id  INTEGER REFERENCES distributors(id),  -- NULL only for type 'distributor_create' (the distributor doesn't exist yet)
+   payload         JSONB NOT NULL,          -- type-specific proposed data (see requestController.js)
+   reason          TEXT,
+   reviewed_by     INTEGER REFERENCES users(id),
+@@ -575,4 +575,66 @@ BEGIN
+   END IF;
+ END $$;
+ 
++-- A sales rep adding a distributor now goes through approval too: new request
++-- type 'distributor_create'. There is no distributor row yet, so distributor_id
++-- becomes nullable — but only for that type (CHECK below).
++DO $$
++DECLARE old_name TEXT;
++BEGIN
++  SELECT conname INTO old_name FROM pg_constraint
++  WHERE conrelid = 'requests'::regclass AND contype = 'c'
++    AND pg_get_constraintdef(oid) LIKE '%credit_extension%'
++    AND pg_get_constraintdef(oid) NOT LIKE '%distributor_create%'
++  LIMIT 1;
++  IF old_name IS NOT NULL THEN
++    EXECUTE format('ALTER TABLE requests DROP CONSTRAINT %I', old_name);
++    ALTER TABLE requests ADD CONSTRAINT requests_type_check
++      CHECK (type IN ('order', 'credit_extension', 'price_override', 'distributor_create'));
++  END IF;
++END $$;
++
++ALTER TABLE requests ALTER COLUMN distributor_id DROP NOT NULL;
++
++DO $$ BEGIN
++  ALTER TABLE requests ADD CONSTRAINT requests_distributor_required
++    CHECK (distributor_id IS NOT NULL OR type = 'distributor_create');
++EXCEPTION WHEN duplicate_object THEN NULL;
++END $$;
++
++-- Policies replaced (DROP + CREATE is idempotent): a rep can always see their OWN
++-- requests (including a distributor_create, which has no zone yet), and may submit
++-- one with no distributor.
++DROP POLICY IF EXISTS requests_select ON requests;
++CREATE POLICY requests_select ON requests FOR SELECT
++USING (
++  current_setting('app.role', true) = 'admin'
++  OR requested_by = NULLIF(current_setting('app.user_id', true), '')::INTEGER
++  OR EXISTS (
++    SELECT 1
++    FROM distributors d
++    JOIN user_zones uz ON uz.zone_id = d.zone_id
++    WHERE d.id = requests.distributor_id
++      AND uz.user_id = NULLIF(current_setting('app.user_id', true), '')::INTEGER
++  )
++);
++
++DROP POLICY IF EXISTS requests_insert ON requests;
++CREATE POLICY requests_insert ON requests FOR INSERT
++WITH CHECK (
++  current_setting('app.role', true) = 'admin'
++  OR (
++    requested_by = NULLIF(current_setting('app.user_id', true), '')::INTEGER
++    AND (
++      (distributor_id IS NULL AND type = 'distributor_create')
++      OR EXISTS (
++        SELECT 1
++        FROM distributors d
++        JOIN user_zones uz ON uz.zone_id = d.zone_id
++        WHERE d.id = requests.distributor_id
++          AND uz.user_id = NULLIF(current_setting('app.user_id', true), '')::INTEGER
++      )
++    )
++  )
++);
++
+ COMMIT;
+diff --git a/backend/src/services/requestService.js b/backend/src/services/requestService.js
+index ca65000..11e1ae8 100644
+--- a/backend/src/services/requestService.js
++++ b/backend/src/services/requestService.js
+@@ -8,7 +8,45 @@ const { createOrderWithLedger } = require('./ledgerService');
+ // first argument, same convention as ledgerService.js, so callers control the
+ // transaction and RLS context.
+ 
+-const REQUEST_TYPES = ['order', 'credit_extension', 'price_override'];
++const REQUEST_TYPES = ['order', 'credit_extension', 'price_override', 'distributor_create'];
++
++// Validates a sales rep's "add this distributor" submission (arrives through
++// POST /api/distributors) and returns the sanitized payload. A rep may only
++// place the distributor in one of THEIR zones — otherwise it would be invisible
++// to them after approval.
++async function normalizeDistributorPayload(db, user, body) {
++  const clean = (v, max = 200) => {
++    if (v === undefined || v === null) return null;
++    const s = String(v).trim();
++    if (s.length > max) throw new ApiError(400, 'One of the fields is too long.');
++    return s || null;
++  };
++
++  const name = clean(body.name);
++  if (!name) throw new ApiError(400, 'name is required.');
++
++  let zoneId = null;
++  if (body.zone_id !== undefined && body.zone_id !== null && body.zone_id !== '') {
++    zoneId = Number(body.zone_id);
++    if (!Number.isInteger(zoneId) || zoneId < 1) throw new ApiError(400, 'zone_id must be a valid zone.');
++    if (user.role !== 'admin') {
++      const allowed = await db.query('SELECT 1 FROM user_zones WHERE user_id = $1 AND zone_id = $2', [user.id, zoneId]);
++      if (allowed.rows.length === 0) throw new ApiError(403, 'You can only add distributors in your own zones.');
++    }
++  }
++
++  return {
++    name,
++    contact_name: clean(body.contact_name),
++    contact_phone: clean(body.contact_phone, 50),
++    contact_email: clean(body.contact_email),
++    zone_id: zoneId,
++    region: clean(body.region),
++    city: clean(body.city),
++    area: clean(body.area),
++    address: clean(body.address, 500),
++  };
++}
+ 
+ // Validates and normalizes the type-specific payload for the two request types
+ // that are submitted through POST /api/requests. (Order payloads are validated
+@@ -55,9 +93,13 @@ async function createRequest(db, { type, requestedBy, distributorId, payload, re
+     throw new ApiError(400, `Invalid request type: ${type}`);
+   }
+ 
+-  const distributor = await db.query('SELECT id FROM distributors WHERE id = $1', [distributorId]);
+-  if (distributor.rows.length === 0) {
+-    throw new ApiError(404, `Distributor ${distributorId} not found.`);
++  if (type === 'distributor_create') {
++    distributorId = null; // the distributor doesn't exist until an admin approves
++  } else {
++    const distributor = await db.query('SELECT id FROM distributors WHERE id = $1', [distributorId]);
++    if (distributor.rows.length === 0) {
++      throw new ApiError(404, `Distributor ${distributorId} not found.`);
++    }
+   }
+ 
+   const result = await db.query(
+@@ -102,6 +144,23 @@ async function applyRequest(db, request, approverId) {
+     return { resultId: order.id, order };
+   }
+ 
++  if (request.type === 'distributor_create') {
++    const inserted = await db.query(
++      `INSERT INTO distributors (name, contact_name, contact_phone, contact_email, zone_id, region, city, area, address)
++       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
++       RETURNING *`,
++      [p.name, p.contact_name, p.contact_phone, p.contact_email, p.zone_id, p.region, p.city, p.area, p.address]
++    );
++    await recordAudit(db, {
++      userId: approverId,
++      action: 'CREATE',
++      entityType: 'distributor',
++      entityId: inserted.rows[0].id,
++      after: inserted.rows[0],
++    });
++    return { resultId: inserted.rows[0].id };
++  }
++
+   if (request.type === 'credit_extension') {
+     const updated = await db.query(
+       'UPDATE distributors SET credit_limit = $1 WHERE id = $2 RETURNING id',
+@@ -196,6 +255,7 @@ async function computeWarnings(db, request) {
+ module.exports = {
+   REQUEST_TYPES,
+   normalizePayload,
++  normalizeDistributorPayload,
+   createRequest,
+   applyRequest,
+   estimateOrderTotal,
+diff --git a/frontend/src/pages/DistributorsPage.jsx b/frontend/src/pages/DistributorsPage.jsx
+index 7c1bbb3..48bd7d3 100644
+--- a/frontend/src/pages/DistributorsPage.jsx
++++ b/frontend/src/pages/DistributorsPage.jsx
+@@ -92,8 +92,13 @@ export default function DistributorsPage() {
+         await distributorsApi.update(editing.id, payload);
+         toast.success('Distributor updated.');
+       } else {
+-        await distributorsApi.create(payload);
+-        toast.success('Distributor added.');
++        const res = await distributorsApi.create(payload);
++        if (res.status === 202 || res.data?.pending_approval) {
++          // Sales reps don't add distributors directly — an admin has to approve it first.
++          toast.success('Submitted for admin approval. It will appear once approved.');
++        } else {
++          toast.success('Distributor added.');
++        }
+       }
+       setEditing(null);
+       load();
+diff --git a/frontend/src/pages/RequestsPage.jsx b/frontend/src/pages/RequestsPage.jsx
+index 6866009..525c332 100644
+--- a/frontend/src/pages/RequestsPage.jsx
++++ b/frontend/src/pages/RequestsPage.jsx
+@@ -1,6 +1,6 @@
+ import { useCallback, useEffect, useMemo, useState } from 'react';
+ import { Plus, Check, X, AlertTriangle } from 'lucide-react';
+-import { requestsApi, distributors as distributorsApi, products as productsApi } from '../api/endpoints';
++import { requestsApi, distributors as distributorsApi, products as productsApi, zonesApi } from '../api/endpoints';
+ import { apiErrorMessage } from '../api/client';
+ import { useAuth } from '../context/AuthContext';
+ import { useToast } from '../context/ToastContext';
+@@ -10,11 +10,13 @@ import { fetchAllPages } from '../utils/fetchAllPages';
+ import Modal from '../components/Modal';
+ import StatusBadge from '../components/StatusBadge';
+ import Pagination from '../components/Pagination';
++import { TableSkeleton } from '../components/Skeleton';
+ 
+ const TYPE_LABELS = {
+   order: 'Order',
+   credit_extension: 'Credit limit',
+   price_override: 'Special price',
++  distributor_create: 'New distributor',
+ };
+ 
+ const money = (n) => Number(n || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+@@ -31,6 +33,8 @@ export default function RequestsPage() {
+   const [pagination, setPagination] = useState(null);
+   const [page, setPage] = useState(1);
+   const [statusFilter, setStatusFilter] = useState('pending');
++  const [typeFilter, setTypeFilter] = useState('');
++  const [zonesList, setZonesList] = useState([]);
+   const [loading, setLoading] = useState(true);
+ 
+   const [productsList, setProductsList] = useState([]);
+@@ -52,6 +56,7 @@ export default function RequestsPage() {
+         page,
+         pageSize: 25,
+         status: statusFilter || undefined,
++        type: typeFilter || undefined,
+         mine: isAdmin ? undefined : 'true',
+       });
+       setRows(res.data.data);
+@@ -62,21 +67,24 @@ export default function RequestsPage() {
+       setLoading(false);
+     }
+     // eslint-disable-next-line react-hooks/exhaustive-deps
+-  }, [page, statusFilter, isAdmin]);
++  }, [page, statusFilter, typeFilter, isAdmin]);
+ 
+   useEffect(() => { load(); }, [load]);
+-  useEffect(() => { setPage(1); }, [statusFilter]);
++  useEffect(() => { setPage(1); }, [statusFilter, typeFilter]);
+ 
+   // Names for the "special price" summaries and the new-request form.
+   useEffect(() => {
+     fetchAllPages(productsApi.list, { is_active: 'true' }).then(setProductsList).catch(() => {});
+     fetchAllPages(distributorsApi.list, { status: 'active' }).then(setDistributorsList).catch(() => {});
++    zonesApi.list().then((res) => setZonesList(res.data)).catch(() => {});
+   }, []);
+ 
+   useLiveOrderEvents((e) => {
+     if (e.type === 'request:created' || e.type === 'request:reviewed') load();
+   });
+ 
++  const zoneName = (id) => (id ? zonesList.find((z) => z.id === id)?.name || '' : '');
++
+   const summary = (r) => {
+     const p = r.payload || {};
+     if (r.type === 'order') {
+@@ -85,6 +93,7 @@ export default function RequestsPage() {
+     }
+     if (r.type === 'credit_extension') return `New credit limit: ${money(p.new_limit)}`;
+     if (r.type === 'price_override') return `${productName.get(p.product_id) || `Product #${p.product_id}`} at ${money(p.price)}`;
++    if (r.type === 'distributor_create') return [p.city, p.area].filter(Boolean).join(' · ') || [zoneName(p.zone_id)].filter(Boolean).join('') || 'New distributor';
+     return '';
+   };
+ 
+@@ -170,35 +179,46 @@ export default function RequestsPage() {
+   const setF = (k) => (e) => setForm((f) => ({ ...f, [k]: e.target.value }));
+ 
+   return (
+-    <div>
++    <div className="content">
+       <div className="page-header">
+         <div>
+           <h1>Requests</h1>
+           <p>
+             {isAdmin
+-              ? 'Orders, credit-limit changes and special prices submitted by sales reps. Nothing takes effect until you approve it.'
+-              : 'Your orders and requests waiting for admin approval.'}
++              ? 'Orders, new distributors, credit-limit changes and special prices submitted by sales reps. Nothing takes effect until you approve it.'
++              : 'Your orders, new distributors and requests waiting for admin approval.'}
+           </p>
+         </div>
+-        <div className="page-header-actions">
+-          <select value={statusFilter} onChange={(e) => setStatusFilter(e.target.value)} aria-label="Filter by status">
++        {!isAdmin && (
++          <div className="page-header-actions">
++            <button className="btn" onClick={() => setCreating(true)}>
++              <Plus size={16} /> New request
++            </button>
++          </div>
++        )}
++      </div>
++
++      <div className="toolbar">
++        <div className="toolbar-group">
++          <select id="requests-status" aria-label="Status" value={statusFilter} onChange={(e) => setStatusFilter(e.target.value)}>
++            <option value="">All statuses</option>
+             <option value="pending">Pending</option>
+             <option value="approved">Approved</option>
+             <option value="rejected">Rejected</option>
+             <option value="cancelled">Cancelled</option>
+-            <option value="">All</option>
+           </select>
+-          {!isAdmin && (
+-            <button className="btn" onClick={() => setCreating(true)}>
+-              <Plus size={16} /> New request
+-            </button>
+-          )}
++        </div>
++        <div className="toolbar-group">
++          <select id="requests-type" aria-label="Type" value={typeFilter} onChange={(e) => setTypeFilter(e.target.value)}>
++            <option value="">All types</option>
++            {Object.entries(TYPE_LABELS).map(([v, l]) => <option key={v} value={v}>{l}</option>)}
++          </select>
+         </div>
+       </div>
+ 
+       <div className="card">
+         {loading ? (
+-          <div className="empty-state">Loading…</div>
++          <TableSkeleton columns={isAdmin ? 8 : 7} rows={6} />
+         ) : (
+           <div className="table-wrap">
+             <table className="data-table">
+@@ -219,7 +239,7 @@ export default function RequestsPage() {
+                   <tr key={r.id}>
+                     <td>{r.id}</td>
+                     <td>{TYPE_LABELS[r.type] || r.type}</td>
+-                    <td>{r.distributor_name}</td>
++                    <td>{r.distributor_name || '—'}</td>
+                     {isAdmin && <td>{r.requested_by_name || '—'}</td>}
+                     <td>
+                       {summary(r)}
+@@ -261,9 +281,28 @@ export default function RequestsPage() {
+       {reviewing && (
+         <Modal title={`Request #${reviewing.id} — ${TYPE_LABELS[reviewing.type] || reviewing.type}`} onClose={() => !acting && setReviewing(null)} width={560}>
+           <p style={{ margin: '0 0 8px' }}>
+-            <strong>{reviewing.requested_by_name || 'A sales rep'}</strong> for <strong>{reviewing.distributor_name}</strong>
++            <strong>{reviewing.requested_by_name || 'A sales rep'}</strong>
++            {reviewing.type === 'distributor_create' ? ' wants to add a distributor' : <> for <strong>{reviewing.distributor_name}</strong></>}
+           </p>
+-          <p style={{ margin: '0 0 12px' }}>{summary(reviewing)}</p>
++          {reviewing.type === 'distributor_create' ? (
++            <dl className="request-details">
++              {[
++                ['Name', reviewing.payload?.name],
++                ['Contact', reviewing.payload?.contact_name],
++                ['Phone', reviewing.payload?.contact_phone],
++                ['Email', reviewing.payload?.contact_email],
++                ['Zone', zoneName(reviewing.payload?.zone_id)],
++                ['Region', reviewing.payload?.region],
++                ['City', reviewing.payload?.city],
++                ['Area', reviewing.payload?.area],
++                ['Address', reviewing.payload?.address],
++              ].filter(([, v]) => v).map(([k, v]) => (
++                <div key={k}><dt>{k}</dt><dd>{v}</dd></div>
++              ))}
++            </dl>
++          ) : (
++            <p style={{ margin: '0 0 12px' }}>{summary(reviewing)}</p>
++          )}
+ 
+           {reviewing.type === 'order' && (reviewing.payload?.items || []).length > 0 && (
+             <ul style={{ margin: '0 0 12px', paddingLeft: 18, fontSize: 13.5 }}>
+@@ -278,7 +317,7 @@ export default function RequestsPage() {
+           {reviewing.reason && <p style={{ margin: '0 0 12px', color: 'var(--ink-muted)' }}>Reason: {reviewing.reason}</p>}
+ 
+           {(reviewing.warnings || []).map((w) => (
+-            <div key={w.code} className="field-error" style={{ display: 'flex', gap: 8, alignItems: 'flex-start', marginBottom: 12 }}>
++            <div key={w.code} className="request-warning">
+               <AlertTriangle size={16} style={{ flexShrink: 0, marginTop: 2 }} />
+               <span>{w.message}</span>
+             </div>
+diff --git a/frontend/src/styles/ui.css b/frontend/src/styles/ui.css
+index 396f0f8..84cee25 100644
+--- a/frontend/src/styles/ui.css
++++ b/frontend/src/styles/ui.css
+@@ -4354,3 +4354,30 @@ input[type='password']::-ms-clear {
+ 
+ .download-icon-pdf svg { color: var(--status-negative); }
+ .download-icon-excel svg { color: var(--status-positive); }
++
++/* Requests page: review modal details + warning */
++.request-details {
++  margin: 0 0 12px;
++  display: grid;
++  gap: 6px;
++  font-size: 13.5px;
++}
++.request-details > div {
++  display: grid;
++  grid-template-columns: 90px 1fr;
++  gap: 8px;
++}
++.request-details dt { color: var(--ink-muted); }
++.request-details dd { margin: 0; }
++.request-warning {
++  display: flex;
++  gap: 8px;
++  align-items: flex-start;
++  margin-bottom: 12px;
++  padding: 10px 12px;
++  border: 1px solid var(--brass);
++  border-radius: 6px;
++  background: var(--surface);
++  font-size: 13.5px;
++}
++.request-warning svg { flex-shrink: 0; margin-top: 2px; color: var(--brass); }
