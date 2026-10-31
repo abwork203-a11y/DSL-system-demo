@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { Plus, Check, X, AlertTriangle } from 'lucide-react';
-import { requestsApi, distributors as distributorsApi, products as productsApi } from '../api/endpoints';
+import { requestsApi, priceOverridesApi, distributors as distributorsApi, products as productsApi, zonesApi } from '../api/endpoints';
 import { apiErrorMessage } from '../api/client';
 import { useAuth } from '../context/AuthContext';
 import { useToast } from '../context/ToastContext';
@@ -10,11 +10,13 @@ import { fetchAllPages } from '../utils/fetchAllPages';
 import Modal from '../components/Modal';
 import StatusBadge from '../components/StatusBadge';
 import Pagination from '../components/Pagination';
+import RequestDetailsForm from '../components/RequestDetailsForm';
 
 const TYPE_LABELS = {
   order: 'Order',
   credit_extension: 'Credit limit',
   price_override: 'Special price',
+  distributor_create: 'New distributor',
 };
 
 const money = (n) => Number(n || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
@@ -35,6 +37,8 @@ export default function RequestsPage() {
 
   const [productsList, setProductsList] = useState([]);
   const [distributorsList, setDistributorsList] = useState([]);
+  const [zonesList, setZonesList] = useState([]);
+  const [overridePrices, setOverridePrices] = useState(new Map()); // price_override_id -> special price, for the order being reviewed
 
   const [reviewing, setReviewing] = useState(null); // request detail (with warnings) being reviewed
   const [reviewNote, setReviewNote] = useState('');
@@ -45,6 +49,8 @@ export default function RequestsPage() {
   const [saving, setSaving] = useState(false);
 
   const productName = useMemo(() => new Map(productsList.map((p) => [p.id, p.name])), [productsList]);
+  const productPrice = useMemo(() => new Map(productsList.map((p) => [p.id, Number(p.price)])), [productsList]);
+  const zoneName = (id) => (id ? zonesList.find((z) => z.id === id)?.name || '' : '');
 
   const load = useCallback(async () => {
     try {
@@ -71,6 +77,7 @@ export default function RequestsPage() {
   useEffect(() => {
     fetchAllPages(productsApi.list, { is_active: 'true' }).then(setProductsList).catch(() => {});
     fetchAllPages(distributorsApi.list, { status: 'active' }).then(setDistributorsList).catch(() => {});
+    zonesApi.list().then((res) => setZonesList(res.data)).catch(() => {});
   }, []);
 
   useLiveOrderEvents((e) => {
@@ -85,12 +92,21 @@ export default function RequestsPage() {
     }
     if (r.type === 'credit_extension') return `New credit limit: ${money(p.new_limit)}`;
     if (r.type === 'price_override') return `${productName.get(p.product_id) || `Product #${p.product_id}`} at ${money(p.price)}`;
+    if (r.type === 'distributor_create') return [p.city, p.area].filter(Boolean).join(' · ') || zoneName(p.zone_id) || 'New distributor';
     return '';
   };
 
   const openReview = async (r) => {
     try {
       const res = await requestsApi.get(r.id); // includes credit-limit warnings for pending orders
+      let overrides = new Map();
+      if (res.data.type === 'order' && (res.data.payload?.items || []).some((it) => it.price_override_id)) {
+        try {
+          const o = await priceOverridesApi.list({ distributor_id: res.data.distributor_id, include_inactive: 'true' });
+          overrides = new Map(o.data.map((x) => [x.id, Number(x.price)]));
+        } catch { /* fall back to catalog prices */ }
+      }
+      setOverridePrices(overrides);
       setReviewNote('');
       setReviewing(res.data);
     } catch (err) {
@@ -176,8 +192,8 @@ export default function RequestsPage() {
           <h1>Requests</h1>
           <p>
             {isAdmin
-              ? 'Orders, credit-limit changes and special prices submitted by sales reps. Nothing takes effect until you approve it.'
-              : 'Your orders and requests waiting for admin approval.'}
+              ? 'Orders, new distributors, credit-limit changes and special prices submitted by sales reps. Nothing takes effect until you approve it.'
+              : 'Your orders, new distributors and requests waiting for admin approval.'}
           </p>
         </div>
         <div className="page-header-actions">
@@ -219,7 +235,7 @@ export default function RequestsPage() {
                   <tr key={r.id} data-status={r.status}>
                     <td data-label="#">{r.id}</td>
                     <td data-label="Type">{TYPE_LABELS[r.type] || r.type}</td>
-                    <td data-label="Distributor">{r.distributor_name}</td>
+                    <td data-label="Distributor">{r.distributor_name || '—'}</td>
                     {isAdmin && <td data-label="Requested by">{r.requested_by_name || '—'}</td>}
                     <td data-label="Details">
                       {summary(r)}
@@ -259,26 +275,28 @@ export default function RequestsPage() {
       </div>
 
       {reviewing && (
-        <Modal title={`Request #${reviewing.id} — ${TYPE_LABELS[reviewing.type] || reviewing.type}`} onClose={() => !acting && setReviewing(null)} width={560}>
-          <p style={{ margin: '0 0 8px' }}>
-            <strong>{reviewing.requested_by_name || 'A sales rep'}</strong> for <strong>{reviewing.distributor_name}</strong>
+        <Modal title={`Request #${reviewing.id} — ${TYPE_LABELS[reviewing.type] || reviewing.type}`} onClose={() => !acting && setReviewing(null)} width={640}>
+          <p style={{ margin: '0 0 14px' }}>
+            Submitted by <strong>{reviewing.requested_by_name || 'a sales rep'}</strong> on {fmtDate(reviewing.created_at)}
           </p>
-          <p style={{ margin: '0 0 12px' }}>{summary(reviewing)}</p>
 
-          {reviewing.type === 'order' && (reviewing.payload?.items || []).length > 0 && (
-            <ul style={{ margin: '0 0 12px', paddingLeft: 18, fontSize: 13.5 }}>
-              {reviewing.payload.items.map((it, i) => (
-                <li key={i}>
-                  {productName.get(it.product_id) || `Product #${it.product_id}`} × {it.quantity}
-                  {it.price_override_id ? ' (special price)' : ''}
-                </li>
-              ))}
-            </ul>
+          {(reviewing.type === 'order' || reviewing.type === 'distributor_create') ? (
+            <RequestDetailsForm
+              request={reviewing}
+              productName={productName}
+              productPrice={productPrice}
+              overridePrices={overridePrices}
+              zoneName={zoneName}
+            />
+          ) : (
+            <p style={{ margin: '0 0 12px' }}>
+              <strong>{reviewing.distributor_name}</strong> — {summary(reviewing)}
+            </p>
           )}
           {reviewing.reason && <p style={{ margin: '0 0 12px', color: 'var(--ink-muted)' }}>Reason: {reviewing.reason}</p>}
 
           {(reviewing.warnings || []).map((w) => (
-            <div key={w.code} className="field-error" style={{ display: 'flex', gap: 8, alignItems: 'flex-start', marginBottom: 12 }}>
+            <div key={w.code} className="request-warning">
               <AlertTriangle size={16} style={{ flexShrink: 0, marginTop: 2 }} />
               <span>{w.message}</span>
             </div>

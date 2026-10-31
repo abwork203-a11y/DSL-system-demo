@@ -4372,3 +4372,43 @@ input[type='password']::-ms-clear {
 
 
 .request-form .field input[readonly], .request-form .field textarea[readonly] { background: var(--surface-sunken); cursor: default; } .request-form-total { display: flex; justify-content: space-between; align-items: baseline; margin: 4px 0 6px; padding-top: 12px; border-top: 1px solid var(--rule); font-size: 13.5px; } .request-form-total strong { font-size: 18px; } .request-form-hint { margin: 0 0 14px; color: var(--ink-muted); font-size: 12px; }
+.backup-reminder-banner {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+
+  margin: 0 28px 16px;
+  padding: 10px 14px;
+
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--rule);
+  border-left: 3px solid var(--status-pending);
+
+  background: var(--surface);
+  color: var(--ink);
+
+  font-size: 13.5px;
+  line-height: 1.5;
+}
+
+.backup-reminder-banner > svg {
+  flex-shrink: 0;
+  color: var(--status-pending);
+}
+
+.backup-reminder-banner > span {
+  flex: 1;
+  min-width: 0;
+}
+
+.backup-reminder-banner .btn {
+  margin-left: auto;
+  white-space: nowrap;
+}
+
+@media (max-width: 640px) {
+  .backup-reminder-banner {
+    flex-wrap: wrap;
+    margin: 0 16px 16px;
+  }
+}
