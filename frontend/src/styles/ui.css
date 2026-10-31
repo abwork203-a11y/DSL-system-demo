@@ -4369,3 +4369,6 @@ input[type='password']::-ms-clear {
 
 .download-icon-pdf svg { color: var(--status-negative); }
 .download-icon-excel svg { color: var(--status-positive); }
+
+
+.request-form .field input[readonly], .request-form .field textarea[readonly] { background: var(--surface-sunken); cursor: default; } .request-form-total { display: flex; justify-content: space-between; align-items: baseline; margin: 4px 0 6px; padding-top: 12px; border-top: 1px solid var(--rule); font-size: 13.5px; } .request-form-total strong { font-size: 18px; } .request-form-hint { margin: 0 0 14px; color: var(--ink-muted); font-size: 12px; }
